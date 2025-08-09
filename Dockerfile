@@ -9,7 +9,7 @@ COPY package*.json ./
 ENV HUSKY=0
 
 # Instala TODAS as dependências (incluindo dev)
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copia o restante do código-fonte
 COPY . .
