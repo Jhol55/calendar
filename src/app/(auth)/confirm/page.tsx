@@ -10,10 +10,8 @@ export default function Confirm() {
   const { user } = useUser();
 
   return (
-    <main className='relative flex justify-center items-center w-screen h-screen overflow-hidden p-10'>
-      <section
-        className="flex-col md:w-2/3 lg:w-1/2 xl:w-1/3 rounded-3xl relative flex justify-center items-center w-full h-full gap-8 bg-zinc-900"
-      >
+    <main className="relative flex justify-center items-center w-screen h-screen overflow-hidden p-10">
+      <section className="flex-col md:w-2/3 lg:w-1/2 xl:w-1/3 rounded-3xl relative flex justify-center items-center w-full h-full gap-8 bg-zinc-900">
         <Typography variant="h1">Confirmar email</Typography>
         <Typography variant="p" className="text-center px-2.5">
           Um código de confirmação foi enviado para

@@ -63,7 +63,6 @@ export const LoginForm = ({
       onSubmit={handleSubmit}
     >
       <div className="h-full" /> {/* justify-center when overflow */}
-      
       {inputs.map((input, index) => (
         <React.Fragment key={index}>
           <FormControl variant="label" htmlFor={`${baseId}-${index}`}>
@@ -105,7 +104,6 @@ export const LoginForm = ({
       </div>
       <SubmitButton variant="gradient">Login</SubmitButton>
       {children}
-      
       <div className="h-full" /> {/* justify-center when overflow */}
     </Form>
   );

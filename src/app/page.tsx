@@ -9,10 +9,8 @@ import Image from 'next/image';
 
 export default function Home() {
   return (
-    <main className='relative flex justify-center items-center w-screen h-screen overflow-hidden p-10'>
-      <section      
-        className="md:flex flex-col hidden md:w-1/2 xl:w-1/3 relative justify-center items-center w-full h-full gap-8"
-      >
+    <main className="relative flex justify-center items-center w-screen h-screen overflow-hidden p-10">
+      <section className="md:flex flex-col hidden md:w-1/2 xl:w-1/3 relative justify-center items-center w-full h-full gap-8">
         <LoginForm className="z-1" />
       </section>
       <section

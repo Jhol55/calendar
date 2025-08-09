@@ -13,9 +13,7 @@ export async function POST(request: NextRequest) {
     password: userService.hashPassword(requestData.password),
   };
 
-  const { error } = await supabase
-    .from('users')
-    .insert({ ...encryptedData });
+  const { error } = await supabase.from('users').insert({ ...encryptedData });
 
   if (error) {
     return NextResponse.json({ success: false });

@@ -42,7 +42,7 @@ export const Form = forwardRef<HTMLFormElement, FormProps>(
       if (isSubmitSuccessful) {
         onSubmitSuccessful?.();
       }
-    }, [isSubmitSuccessful, onSubmitSuccessful])
+    }, [isSubmitSuccessful, onSubmitSuccessful]);
 
     return (
       <FormProvider

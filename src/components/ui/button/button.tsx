@@ -40,9 +40,9 @@ const Button = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
       [animatedStyle, className],
     );
 
-    const gradientBackground = useMemo(() => {  
+    const gradientBackground = useMemo(() => {
       if (variant === 'gradient') {
-        const color = isDarkMode ? darkBgHexColor : bgHexColor
+        const color = isDarkMode ? darkBgHexColor : bgHexColor;
         const darkenedBackgroundColor = darkenColor(color, darkenFactor);
         return `linear-gradient(325deg, ${darkenedBackgroundColor} 0%, ${color} 55%, ${darkenedBackgroundColor} 90%)`;
       }
@@ -50,8 +50,8 @@ const Button = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
     }, [variant, isDarkMode, darkBgHexColor, bgHexColor, darkenFactor]);
 
     useEffect(() => {
-      if (typeof window !== "undefined") {
-        setIsDarkMode(document.body.classList.contains("dark"));
+      if (typeof window !== 'undefined') {
+        setIsDarkMode(document.body.classList.contains('dark'));
       }
     }, []);
 
@@ -62,7 +62,12 @@ const Button = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
         className={classNames}
         style={{
           backgroundImage: gradientBackground,
-          backgroundColor: variant === 'default' ? isDarkMode ? darkBgHexColor : bgHexColor : undefined,
+          backgroundColor:
+            variant === 'default'
+              ? isDarkMode
+                ? darkBgHexColor
+                : bgHexColor
+              : undefined,
         }}
         {...props}
       >

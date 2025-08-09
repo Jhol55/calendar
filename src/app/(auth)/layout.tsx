@@ -19,6 +19,5 @@ export default function RootLayout({
     getUser();
   }, [setUser]);
 
-
   return <>{children}</>;
 }

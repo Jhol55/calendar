@@ -18,7 +18,7 @@ const SubmitButton = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
       }, 500);
 
       return () => clearTimeout(timeout);
-    }, [isSubmitSuccessful, reset])
+    }, [isSubmitSuccessful, reset]);
 
     useEffect(() => {
       const timeout = setTimeout(() => {
