@@ -33,7 +33,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/public ./public
 
 # Expõe a porta
-EXPOSE 3000
+EXPOSE 3001
 
 # Inicia o Next.js
 CMD ["next", "start"]
