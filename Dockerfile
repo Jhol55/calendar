@@ -36,4 +36,4 @@ COPY --from=builder /app/public ./public
 EXPOSE 4000
 
 # Inicia o Next.js
-CMD ["npm", "start"]
+CMD ["next", "start", "-H", "0.0.0.0", "-p", "4000"]
