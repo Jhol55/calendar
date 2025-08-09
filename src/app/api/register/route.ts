@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/services/supabase';
 import { sessionService } from '@/services/session';
 import { userService } from '@/services/user';
 
@@ -13,7 +12,11 @@ export async function POST(request: NextRequest) {
     password: userService.hashPassword(requestData.password),
   };
 
-  const { error } = await supabase.from('users').insert({ ...encryptedData });
+  if (encryptedData) {
+    console.log(userService.generateValidationCodeFromEmail(requestData.email));
+  }
+
+  const error = true;
 
   if (error) {
     return NextResponse.json({ success: false });
