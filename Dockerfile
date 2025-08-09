@@ -3,13 +3,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copia os arquivos de configuração de pacotes
-# ATENÇÃO: Use package-lock.json, não pnpm-lock.yaml
 COPY package.json package-lock.json ./
 
 # Instala as dependências de forma limpa, ignorando scripts para segurança
 RUN npm ci --ignore-scripts
-
-COPY --from=deps /app/node_modules ./node_modules
 
 # Copia o restante do código-fonte
 COPY . .
@@ -30,8 +27,7 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public .public
-
+# Cria o diretório .next e define as permissões
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
@@ -48,9 +44,6 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# O healthcheck precisa do curl ou wget
-# Use curl pois já é um pacote padrão em muitas imagens
-# HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "curl", "-f", "http://localhost:3000/health" ]
-
 # Comando para rodar a aplicação
-CMD HOSTNAME="0.0.0.0 node server.js"
+# Foi corrigido o formato do comando CMD
+CMD ["node", "server.js"]
