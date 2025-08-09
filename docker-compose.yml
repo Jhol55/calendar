@@ -2,7 +2,7 @@ services:
   nextjs-app:
     build: .
     ports:
-      - '4000:4000'
+      - '3000:3000'
     restart: always
     environment:
-      - PORT=4000
+      - PORT=3000
