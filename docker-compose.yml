@@ -3,14 +3,18 @@ services:
     build: .
     ports:
       - '3001:3000'
+    environment:
+      - DATABASE_URL=postgres://postgres:sua_senha_segura@postgres:5432/nomedobanco
     restart: always
 
   postgres:
-    image: pgvector/pgvector:pg17
-    restart: always
+    image: pgvector/pgvector:pg17 
+    ports:
+      - '5432:5432'
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=sua_senha_segura
       - POSTGRES_DB=nomedobanco
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
+    restart: always
