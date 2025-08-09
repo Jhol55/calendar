@@ -39,13 +39,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 USER nextjs
 
 # Configuração de porta e healthcheck
-EXPOSE 4000
-ENV PORT 4000
+EXPOSE 3000
+ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
 # O healthcheck precisa do curl ou wget
 # Use curl pois já é um pacote padrão em muitas imagens
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "curl", "-f", "http://localhost:4000/health" ]
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "curl", "-f", "http://localhost:3000/health" ]
 
 # Comando para rodar a aplicação
 CMD ["node", "server.js"]
