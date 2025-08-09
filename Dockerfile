@@ -32,8 +32,10 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/public ./public
 
+ENV HOSTNAME "0.0.0.0"
+
 # Expõe a porta
 EXPOSE 4000
 
 # Inicia o Next.js
-CMD ["next", "start", "-H", "0.0.0.0", "-p", "4000"]
+CMD ["next", "start"]
