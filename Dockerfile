@@ -1,14 +1,12 @@
-# Estágio 1: Build da Aplicação
-FROM node:18-alpine AS builder
+# Estágio 1: Build das Dependências e Aplicação
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copia o package.json e o lockfile
-COPY package*.json ./
+# Copia os arquivos de configuração de pacotes
+# ATENÇÃO: Use package-lock.json, não pnpm-lock.yaml
+COPY package.json package-lock.json ./
 
-# Desativa o Husky no build
-ENV HUSKY=0
-
-# Instala TODAS as dependências (incluindo dev)
+# Instala as dependências de forma limpa, ignorando scripts para segurança
 RUN npm ci --ignore-scripts
 
 # Copia o restante do código-fonte
@@ -17,23 +15,37 @@ COPY . .
 # Roda o build do Next.js
 RUN npm run build
 
-# Remove as devDependencies para deixar leve
-RUN npm prune --omit=dev
-
 # ---
 
-# Estágio 2: Imagem Final de Produção
-FROM node:18-alpine
-WORKDIR /app
+# Estágio 2: Imagem de Produção Final
+FROM node:20-alpine AS runner
 
-# Copia as dependências já sem devDependencies
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/public ./public
+# Define variáveis de ambiente
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
 
-# Expõe a porta
-EXPOSE 3000
+# Configura permissões e usuário
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
 
-# Inicia o Next.js
-CMD ["next", "start"]
+# Copia os artefatos de build do estágio 'builder'
+# Isso cria uma imagem de produção otimizada e leve
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
+
+# Configuração de porta e healthcheck
+EXPOSE 4000
+ENV PORT 4000
+ENV HOSTNAME "0.0.0.0"
+
+# O healthcheck precisa do curl ou wget
+# Use curl pois já é um pacote padrão em muitas imagens
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "curl", "-f", "http://localhost:4000/health" ]
+
+# Comando para rodar a aplicação
+CMD ["node", "server.js"]
