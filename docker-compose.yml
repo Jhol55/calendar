@@ -1,0 +1,15 @@
+services:
+  nextjs-app:
+    # Indica ao Docker Compose para construir a imagem usando o Dockerfile
+    # localizado no diretório atual. Ele irá executar o build em múltiplos estágios
+    # e usar a imagem final do Estágio 2.
+    build: .
+
+    # Mapeia a porta 3000 do contêiner para a porta 3000 da sua máquina host.
+    # Isso permite que você acesse a aplicação pelo endereço http://localhost:3000.
+    ports:
+      - '3000:3000'
+
+    # Define a política de reinício do contêiner.
+    # 'always' garante que o contêiner reinicie automaticamente se for parado ou falhar.
+    restart: always
