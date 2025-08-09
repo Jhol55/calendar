@@ -5,7 +5,7 @@ services:
     # e usar a imagem final do Estágio 2.
     build: .
 
-    # Mapeia a porta 3000 do contêiner para a porta 3001 da sua máquina host.
+    # Mapeia a porta 3001 do contêiner para a porta 3000 da sua máquina host.
     # Isso permite que você acesse a aplicação pelo endereço http://localhost:3001.
     ports:
       - '3001:3000'
