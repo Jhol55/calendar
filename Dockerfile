@@ -5,6 +5,9 @@ WORKDIR /app
 # Copia o package.json e o lockfile
 COPY package*.json ./
 
+# Desativa o Husky no build (para não rodar prepare)
+ENV HUSKY=0
+
 # Instala as dependências de produção
 RUN npm install --only=production
 
