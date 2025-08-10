@@ -10,8 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "format": "prettier --write .",
-    "commit": "cz",
-    "prepare": "test -d .git && husky install && git config --local core.editor cat && git config core.hooksPath .husky/_ || exit 0"
+    "commit": "cz"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

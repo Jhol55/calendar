@@ -8,8 +8,9 @@ ENV DATABASE_URL=${DATABASE_URL}
 # Copia os arquivos de configuração de pacotes
 COPY package.json package-lock.json ./
 
-# Instala as dependências de forma limpa, ignorando scripts para segurança
-RUN npm ci --ignore-scripts
+# "prepare": "test -d .git && husky install && git config --local core.editor cat && git config core.hooksPath .husky/_ || exit 0"
+# Instala as dependências de forma limpa, ignorando scripts para segurança --ignore-scripts
+RUN npm ci
 
 # Copia o restante do código-fonte
 COPY . .
