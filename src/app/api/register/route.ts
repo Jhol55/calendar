@@ -4,9 +4,12 @@ import { userService } from '@/services/user';
 
 export async function POST(request: NextRequest) {
   const requestData = await request.json();
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { repeatPassword, ...filteredData } = requestData;
+
+  if (repeatPassword !== requestData.password) {
+    return NextResponse.json({ success: false });
+  }
+
   const encryptedData = {
     ...filteredData,
     password: userService.hashPassword(requestData.password),
