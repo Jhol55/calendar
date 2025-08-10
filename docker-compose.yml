@@ -4,7 +4,7 @@ services:
     ports:
       - '3001:3000'
     environment:
-      - DATABASE_URL=postgres://postgres:Y7q@kR3p!zW1Lx9u@postgres:5432/calendar
+      - DATABASE_URL=postgres://postgres:Y7q%40kR3p!zW1Lx9u@postgres:5432/calendar
     restart: always
 
   postgres:
@@ -13,7 +13,7 @@ services:
       - '5432:5432'
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=Y7q@kR3p!zW1Lx9u
+      - POSTGRES_PASSWORD=Y7q%40kR3p!zW1Lx9u
       - POSTGRES_DB=calendar
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
