@@ -4,7 +4,7 @@ services:
     ports:
       - '3001:3000'
     environment:
-      - DATABASE_URL=postgres://postgres:Y7q1kR3p!zW1Lx9u@postgres:5432/calendar
+      - DATABASE_URL=postgresql://postgres:Y7q1kR3p!zW1Lx9u@postgres:5432/calendar?schema=public
     restart: always
 
   postgres:
