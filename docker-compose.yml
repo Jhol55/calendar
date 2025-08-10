@@ -26,3 +26,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  pgweb:
+    image: sosedoff/pgweb
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/calendar?schema=public
+    ports:
+      - '8081:8081'
+    depends_on:
+      - postgres
