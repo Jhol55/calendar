@@ -13,8 +13,6 @@ COPY . .
 
 RUN npx prisma generate
 
-RUN npx prisma migrate dev --create-only
-
 
 # Roda o build do Next.js
 RUN npm run build
