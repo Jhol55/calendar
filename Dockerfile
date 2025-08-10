@@ -16,6 +16,7 @@ COPY . .
 
 RUN npx prisma generate
 
+
 # Roda o build do Next.js
 RUN npm run build
 
@@ -49,5 +50,6 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-
-CMD sh -c "npx prisma migrate deploy && node server.js"
+# Comando para rodar a aplicação
+# Foi corrigido o formato do comando CMD
+CMD ["node", "server.js"]
