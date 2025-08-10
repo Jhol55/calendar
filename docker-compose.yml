@@ -9,7 +9,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "npx prisma migrate dev --create-only && npx prisma migrate deploy && node server.js"
+    command: sh -c "npx prisma migrate deploy && node server.js"
 
   postgres:
     image: pgvector/pgvector:pg17
