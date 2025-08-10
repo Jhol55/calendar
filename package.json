@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
     "format": "prettier --write .",
-    "commit": "cz"
+    "commit": "cz",
+    "prepare": "test -d .git && husky install && git config --local core.editor cat && git config core.hooksPath .husky/_ || exit 0"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

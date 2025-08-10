@@ -8,14 +8,11 @@ ENV DATABASE_URL=${DATABASE_URL}
 # Copia os arquivos de configuração de pacotes
 COPY package.json package-lock.json ./
 
-# "prepare": "test -d .git && husky install && git config --local core.editor cat && git config core.hooksPath .husky/_ || exit 0"
 # Instala as dependências de forma limpa, ignorando scripts para segurança --ignore-scripts
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copia o restante do código-fonte
 COPY . .
-
-RUN npx prisma generate
 
 # Roda o build do Next.js
 RUN npm run build
