@@ -31,7 +31,7 @@ services:
     image: sosedoff/pgweb
     restart: always
     environment:
-      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/calendar?schema=public&sslmode=disable # REMOVE SSL DISABLE
+      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/calendar?sslmode=disable # REMOVE SSL DISABLE
     ports:
       - '8081:8081'
     depends_on:
