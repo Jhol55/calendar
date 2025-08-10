@@ -2,9 +2,6 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-ARG DATABASE_URL="postgresql://user:password@localhost:5432/db"
-ENV DATABASE_URL=${DATABASE_URL}
-
 # Copia os arquivos de configuração de pacotes
 COPY package.json package-lock.json ./
 
