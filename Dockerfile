@@ -11,6 +11,8 @@ RUN npm ci --ignore-scripts
 # Copia o restante do código-fonte
 COPY . .
 
+RUN npx prisma generate
+
 # Roda o build do Next.js
 RUN npm run build
 
