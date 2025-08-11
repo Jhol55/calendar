@@ -17,9 +17,14 @@ export async function POST(request: NextRequest) {
     password: userService.hashPassword(requestData.password),
   };
 
-  const newUser = await prisma.user.create({
-    data: encryptedData,
-  });
+  let newUser = {};
+  try {
+    newUser = await prisma.user.create({
+      data: encryptedData,
+    });
+  } catch (error) {
+    console.error('Erro na requisição:', error);
+  }
 
   await sessionService.deleteSession();
   await sessionService.createSession(requestData);
