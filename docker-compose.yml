@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: jhonathangalhardo/calendar:latest
     ports:
       - '3001:3000'
     environment:
