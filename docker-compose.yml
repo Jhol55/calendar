@@ -9,19 +9,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # command: sh -c "npx prisma migrate deploy && node server.js"
-    command: 
-      sh -c "
-        echo 'Waiting for Postgres...';
-        until pg_isready -h postgres -U myuser; do
-          sleep 2;
-        done;
-        npx prisma migrate dev --name init;
-        echo 'Applying migrations...';
-        npx prisma migrate deploy;
-        echo 'Starting app...';
-        node server.js
-      "
+    command: sh -c "npx prisma migrate deploy && node server.js"
 
   postgres:
     image: pgvector/pgvector:pg17
