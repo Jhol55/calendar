@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: app
     ports:
-      - '3000:3000'
+      - '3001:3000'
     environment:
       - DATABASE_URL=postgresql://postgres:123456@postgres:5432/calendar
       - SECRET_KEY=supersecret123
