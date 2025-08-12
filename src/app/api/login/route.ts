@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { userService } from '@/services/user';
+import { authService } from '@/services/auth';
 import { sessionService } from '@/services/session';
 
 export async function POST(request: NextRequest) {
@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
 
   const data = { password: '1' };
 
-  const success = userService.verifyPassword(
+  const success = await authService.verifyPassword(
     requestData.password,
     data?.password,
   );
