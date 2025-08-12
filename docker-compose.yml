@@ -14,7 +14,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && npm start"
+    command: sh -c "npx prisma migrate dev --create-only --name calendar && npx prisma migrate deploy && npm start"
 
   postgres:
     container_name: db
