@@ -10,8 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "format": "prettier --write .",
-    "commit": "cz",
-    "docker:up": "npx prisma migrate dev --create-only --name calendar && docker compose up -d && rm -rf generated"
+    "commit": "cz"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
