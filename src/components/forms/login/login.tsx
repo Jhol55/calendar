@@ -11,6 +11,7 @@ import { userService } from '@/services/user';
 import { loginFormSchema } from '@/components/forms/login/login.schema';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
+import { CODES } from '@/constants/responses';
 
 export const LoginForm = ({
   className,
@@ -43,7 +44,10 @@ export const LoginForm = ({
   ) => {
     const response = await userService.login(data);
 
-    if (!response?.success) {
+    if (
+      response.code === CODES.LOGIN.INVALID_PASSWORD ||
+      response.code === CODES.LOGIN.USER_NOT_FOUND
+    ) {
       setError('email', {
         message: 'Email ou senha inválidos',
       });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sessionService } from '@/services/session';
 import { authService } from '@/services/auth';
 import { prisma } from '@/services/prisma';
+import { RESPONSES } from '@/constants/responses';
 
 export async function POST(request: NextRequest) {
   const requestData = await request.json();
@@ -26,8 +27,14 @@ export async function POST(request: NextRequest) {
     await authService.generateValidationCodeFromEmail(requestData.email),
   );
 
-  return NextResponse.json({
-    success: true,
-    status: 201,
-  });
+  return NextResponse.json(
+    {
+      success: RESPONSES.REGISTER.SUCCESS.success,
+      message: RESPONSES.REGISTER.SUCCESS.message,
+      code: RESPONSES.REGISTER.SUCCESS.code,
+    },
+    {
+      status: RESPONSES.REGISTER.SUCCESS.status,
+    },
+  );
 }
