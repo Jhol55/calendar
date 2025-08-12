@@ -1,9 +1,9 @@
 services:
   app:
     # build:
-      # context: .
-      # target: runner
-      # dockerfile: Dockerfile
+    #   context: .
+    #   target: runner
+    #   dockerfile: Dockerfile
     image: jhonathangalhardo/calendar:latest
     container_name: app
     ports:
