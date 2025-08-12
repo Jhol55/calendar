@@ -1,6 +1,6 @@
 services:
   app:
-    build:
+    # build:
       # context: .
       # target: runner
       # dockerfile: Dockerfile
