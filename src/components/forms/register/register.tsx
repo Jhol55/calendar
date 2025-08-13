@@ -10,6 +10,7 @@ import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { userService } from '@/services/user';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
+import { CODES } from '@/constants/responses';
 
 export const RegisterForm = ({
   className,
@@ -48,9 +49,9 @@ export const RegisterForm = ({
   ) => {
     const response = await userService.register(data);
 
-    if (!response?.success) {
+    if (response.code === CODES.REGISTER.USER_ALREADY_EXISTS) {
       setError('email', {
-        message: 'Email já cadastrado',
+        message: response.message,
       });
       return;
     }

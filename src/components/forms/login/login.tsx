@@ -49,7 +49,7 @@ export const LoginForm = ({
       response.code === CODES.LOGIN.USER_NOT_FOUND
     ) {
       setError('email', {
-        message: 'Email ou senha inválidos',
+        message: response.message,
       });
       return;
     }
