@@ -38,8 +38,11 @@ export class sessionService {
     const time = remember ? 7 * 24 * 60 * 60 : 60 * 60; // 7 dias ou 1 hora
     const expires = new Date(Date.now() + time * 1000);
     const session = await this.encrypt({ user, expires, remember }, time);
-    cookies().set('session', session, {
-      expires,
+
+    cookies().set({
+      name: 'session',
+      value: session,
+      expires: expires,
       httpOnly: true,
       secure: true,
       sameSite: 'lax',
