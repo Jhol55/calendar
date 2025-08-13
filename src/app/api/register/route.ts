@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         code: RESPONSES.REGISTER.USER_ALREADY_EXISTS.code,
       },
       {
-        status: RESPONSES.REGISTER.USER_ALREADY_EXISTS.status,
+        status: 200,
       },
     );
   }
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       code: RESPONSES.REGISTER.SUCCESS.code,
     },
     {
-      status: RESPONSES.REGISTER.SUCCESS.status,
+      status: 200,
     },
   );
 }

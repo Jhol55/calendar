@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         message: RESPONSES.LOGIN.USER_NOT_FOUND.message,
         code: RESPONSES.LOGIN.USER_NOT_FOUND.code,
       },
-      { status: RESPONSES.LOGIN.USER_NOT_FOUND.status },
+      { status: 200 },
     );
   }
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         message: RESPONSES.LOGIN.SUCCESS.message,
         code: RESPONSES.LOGIN.SUCCESS.code,
       },
-      { status: RESPONSES.LOGIN.SUCCESS.status },
+      { status: 200 },
     );
   }
 
@@ -47,6 +47,6 @@ export async function POST(request: NextRequest) {
       message: RESPONSES.LOGIN.INVALID_PASSWORD.message,
       code: RESPONSES.LOGIN.INVALID_PASSWORD.code,
     },
-    { status: RESPONSES.LOGIN.INVALID_PASSWORD.status },
+    { status: 200 },
   );
 }
