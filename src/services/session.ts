@@ -42,7 +42,7 @@ export class sessionService {
       expires,
       httpOnly: true,
       secure: true,
-      sameSite: 'strict',
+      sameSite: 'lax',
     });
   }
 
@@ -75,7 +75,7 @@ export class sessionService {
       expires: parsed.expires,
       httpOnly: true,
       secure: true,
-      sameSite: 'strict',
+      sameSite: 'lax',
     });
     return res;
   }
