@@ -6,6 +6,7 @@ export const CODES = {
   },
   REGISTER: {
     SUCCESS: 0,
+    USER_ALREADY_EXISTS: 1,
   },
 };
 
@@ -21,13 +22,13 @@ export const RESPONSES = {
       code: CODES.LOGIN.USER_NOT_FOUND,
       success: false,
       status: 404,
-      message: 'Usuário não encontrado',
+      message: 'Email ou senha inválidos',
     },
     INVALID_PASSWORD: {
       code: CODES.LOGIN.INVALID_PASSWORD,
       success: false,
       status: 401,
-      message: 'Senha incorreta',
+      message: 'Email ou senha inválidos',
     },
   },
   REGISTER: {
@@ -36,6 +37,12 @@ export const RESPONSES = {
       success: true,
       status: 201,
       message: 'Registro realizado com sucesso',
+    },
+    USER_ALREADY_EXISTS: {
+      code: CODES.REGISTER.USER_ALREADY_EXISTS,
+      success: false,
+      status: 409,
+      message: 'Este e-mail já está em uso',
     },
   },
 };
