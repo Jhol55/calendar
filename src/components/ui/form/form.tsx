@@ -60,7 +60,10 @@ export const Form = forwardRef<HTMLFormElement, FormProps>(
       >
         <form
           ref={ref}
-          onSubmit={handleSubmit(() => onSubmit?.(form, setError))}
+          onSubmit={handleSubmit(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            onSubmit?.(form, setError);
+          })}
           autoComplete={autoComplete}
           {...props}
         >
