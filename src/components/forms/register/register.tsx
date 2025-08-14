@@ -85,6 +85,7 @@ export const RegisterForm = ({
             type={input.type}
             placeholder={input.placeholder}
             fieldName={input.fieldName}
+            autoComplete="off"
           />
 
           <ErrorField fieldName={input.fieldName} />
