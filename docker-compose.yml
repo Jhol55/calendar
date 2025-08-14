@@ -5,13 +5,14 @@ services:
     #   target: runner
     #   dockerfile: Dockerfile
     image: jhonathangalhardo/calendar:latest
-    container_name: app
     ports:
       - '3001:3000'
+    container_name: app
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:123456@postgres:5432/calendar
       - SECRET_KEY=supersecret123
+      - NEXT_PUBLIC_API_URL=https://teste21-calendar.awmygg.easypanel.host/api
     restart: unless-stopped
     depends_on:
       postgres:
@@ -46,3 +47,4 @@ services:
       - '8081:8081'
     depends_on:
       - postgres
+

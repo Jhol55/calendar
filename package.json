@@ -10,7 +10,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "format": "prettier --write .",
-    "commit": "cz"
+    "commit": "cz",
+    "obfuscate": "node ./scripts/obfuscate.js",
+    "build:obfuscated": "npm run build && npm run obfuscate"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
