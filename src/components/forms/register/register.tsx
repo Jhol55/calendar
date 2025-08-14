@@ -7,10 +7,9 @@ import React, { useId } from 'react';
 import { registerFormSchema } from '@/components/forms/register/register.schema';
 import { cn } from '@/lib/utils';
 import { FieldValues, UseFormSetError } from 'react-hook-form';
-import { userService } from '@/services/user';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
-import { CODES } from '@/constants/responses';
+import { registerUser } from '@/actions/user';
 
 export const RegisterForm = ({
   className,
@@ -47,10 +46,16 @@ export const RegisterForm = ({
     data: FieldValues,
     setError: UseFormSetError<FieldValues>,
   ) => {
-    const response = await userService.register(data);
+    const formData = new FormData();
 
-    if (response.code === CODES.REGISTER.USER_ALREADY_EXISTS) {
-      setError('email', {
+    formData.append('email', data.email);
+    formData.append('password', data.password);
+    formData.append('repeatPassword', data.repeatPassword);
+
+    const response = await registerUser(formData);
+
+    if (!response.success) {
+      setError(response.field as 'email' | 'password' | 'repeatPassword', {
         message: response.message,
       });
       return;
