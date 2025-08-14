@@ -8,7 +8,7 @@ datasource db {
   url = env("DATABASE_URL")
 }
 
-model User {
+model user {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
@@ -16,4 +16,10 @@ model User {
   role      String   @default("user")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+}
+
+model licence {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
 }
