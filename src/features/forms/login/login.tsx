@@ -50,7 +50,7 @@ export const LoginForm = ({
     const response = await login(formData);
 
     if (!response.success) {
-      setError('email', {
+      setError(response.field as 'email' | 'password', {
         message: response.message,
       });
       return;
