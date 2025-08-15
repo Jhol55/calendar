@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
-import { ConfirmEmailForm } from '@/components/forms/confirm-email';
+import { ConfirmEmailForm } from '@/features/forms/confirm-email';
 import { useUser } from '@/hooks/use-user';
 import Image from 'next/image';
 

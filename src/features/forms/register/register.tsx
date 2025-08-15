@@ -1,19 +1,17 @@
-import { Form } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { InputProps } from '@/components/ui/input/input.type';
 import { ErrorField } from '@/components/ui/error-field';
+import { Form } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import React, { useId } from 'react';
+import { registerFormSchema } from '@/features/forms/register/register.schema';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
 import { FieldValues, UseFormSetError } from 'react-hook-form';
-import { userService } from '@/services/user';
-import { loginFormSchema } from '@/components/forms/login/login.schema';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
-import { CODES } from '@/constants/responses';
+import { registerUser } from '@/actions/user/register-user';
 
-export const LoginForm = ({
+export const RegisterForm = ({
   className,
   children,
 }: {
@@ -28,12 +26,18 @@ export const LoginForm = ({
       label: 'Email',
       placeholder: 'sample@gmail.com',
       fieldName: 'email',
-      type: 'email',
+      type: 'text',
     },
     {
       label: 'Senha',
       placeholder: '••••••••••••',
       fieldName: 'password',
+      type: 'password',
+    },
+    {
+      label: 'Repetir Senha',
+      placeholder: '••••••••••••',
+      fieldName: 'repeatPassword',
       type: 'password',
     },
   ];
@@ -42,28 +46,31 @@ export const LoginForm = ({
     data: FieldValues,
     setError: UseFormSetError<FieldValues>,
   ) => {
-    const response = await userService.login(data);
+    const formData = new FormData();
 
-    if (
-      response.code === CODES.LOGIN.INVALID_PASSWORD ||
-      response.code === CODES.LOGIN.USER_NOT_FOUND
-    ) {
-      setError('email', {
+    formData.append('email', data.email);
+    formData.append('password', data.password);
+    formData.append('repeatPassword', data.repeatPassword);
+
+    const response = await registerUser(formData);
+
+    if (!response.success) {
+      setError(response.field as 'email' | 'password' | 'repeatPassword', {
         message: response.message,
       });
       return;
     }
 
-    router.push('/index');
+    router.push('/confirm');
   };
 
   return (
     <Form
       className={cn(
-        'flex flex-col gap-2 w-full h-full overflow-y-auto md:rounded-l-3xl p-4 -z-50 bg-zinc-900',
+        'flex flex-col gap-2 w-full h-full overflow-y-auto md:rounded-r-3xl p-4 -z-50 bg-zinc-900',
         className,
       )}
-      zodSchema={loginFormSchema}
+      zodSchema={registerFormSchema}
       onSubmit={handleSubmit}
     >
       <div className="h-full" /> {/* justify-center when overflow */}
@@ -76,37 +83,15 @@ export const LoginForm = ({
           <Input
             id={`${baseId}-${index}`}
             type={input.type}
-            fieldName={input.fieldName}
             placeholder={input.placeholder}
+            fieldName={input.fieldName}
+            autoComplete="off"
           />
 
           <ErrorField fieldName={input.fieldName} />
         </React.Fragment>
       ))}
-      <div className="flex justify-between items-center w-full mb-2">
-        <div className="flex items-center gap-2">
-          <Input
-            type="checkbox"
-            id={`${baseId}-${inputs.length}`}
-            fieldName="remember"
-          />
-          <FormControl
-            variant="label"
-            htmlFor={`${baseId}-${inputs.length}`}
-            className="translate-y-[2px] whitespace-nowrap text-sm"
-          >
-            Lembrar de mim
-          </FormControl>
-        </div>
-        <Link
-          href="/forget-password"
-          target="_blank"
-          className="text-sm font-medium underline"
-        >
-          Esqueceu a senha?
-        </Link>
-      </div>
-      <SubmitButton variant="gradient">Login</SubmitButton>
+      <SubmitButton variant="gradient">Registre-se</SubmitButton>
       {children}
       <div className="h-full" /> {/* justify-center when overflow */}
     </Form>

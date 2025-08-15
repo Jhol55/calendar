@@ -3,8 +3,8 @@
 import { Button } from '@/components/ui/button';
 import { FlipCard } from '@/components/ui/flip-card';
 import { Typography } from '@/components/ui/typography';
-import { LoginForm } from '@/components/forms/login';
-import { RegisterForm } from '@/components/forms/register';
+import { LoginForm } from '@/features/forms/login';
+import { RegisterForm } from '@/features/forms/register';
 import Image from 'next/image';
 
 export default function Home() {
