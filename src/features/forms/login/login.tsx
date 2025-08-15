@@ -7,11 +7,10 @@ import React, { useId } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { FieldValues, UseFormSetError } from 'react-hook-form';
-import { userService } from '@/services/user';
 import { loginFormSchema } from '@/features/forms/login/login.schema';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
-import { CODES } from '@/constants/responses';
+import { login } from '@/actions/user/login';
 
 export const LoginForm = ({
   className,
@@ -42,12 +41,15 @@ export const LoginForm = ({
     data: FieldValues,
     setError: UseFormSetError<FieldValues>,
   ) => {
-    const response = await userService.login(data);
+    const formData = new FormData();
 
-    if (
-      response.code === CODES.LOGIN.INVALID_PASSWORD ||
-      response.code === CODES.LOGIN.USER_NOT_FOUND
-    ) {
+    formData.append('email', data.email);
+    formData.append('password', data.password);
+    formData.append('remember', data.remember || 'false');
+
+    const response = await login(formData);
+
+    if (!response.success) {
       setError('email', {
         message: response.message,
       });
