@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
-import { registerUser } from '@/actions/user';
+import { registerUser } from '@/actions/user/register-user';
 
 export const RegisterForm = ({
   className,
