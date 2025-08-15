@@ -2,7 +2,7 @@
 
 import { sessionService } from '@/services/session';
 import { authService } from '@/services/auth';
-import { prisma } from '@/services/prisma';
+import { prisma } from '@/lib/prisma';
 import { RESPONSES } from '@/constants/responses';
 import { registerFormSchema } from '@/components/forms/register/register.schema';
 
