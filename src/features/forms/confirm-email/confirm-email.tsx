@@ -1,9 +1,9 @@
-import { confirmEmailFormSchema } from '@/components/forms/confirm-email/confirm-email.schema';
+import { confirmEmailFormSchema } from '@/features/forms/confirm-email/confirm-email.schema';
 import { Form } from '@/components/ui/form';
 import { InputOTP } from '@/components/ui/input-otp';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { ErrorField } from '@/components/ui/error-field';
-import { confirmEmailFormMask } from '@/components/forms/confirm-email/confirm-email.mask';
+import { confirmEmailFormMask } from '@/features/forms/confirm-email/confirm-email.mask';
 import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { userService } from '@/services/user';
