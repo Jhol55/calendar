@@ -8,7 +8,7 @@ import { useForm } from '@/hooks/use-form';
 const SubmitButton = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
   ({ type = 'submit', useLoading = true, children, ...props }, ref) => {
     const { isSubmitting, isSubmitSuccessful, reset, errors } = useForm();
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
       setIsLoading(useLoading && isSubmitting);
