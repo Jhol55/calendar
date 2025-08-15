@@ -3,8 +3,7 @@
 import { useEffect } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { userService } from '@/services/user';
-import { useState } from 'react';
-import { Sidebar, SidebarToggle } from '@/components/layout/sidebar';
+import { Sidebar } from '@/features/layout/sidebar';
 
 export default function RootLayout({
   children,
@@ -22,21 +21,10 @@ export default function RootLayout({
     fetchUser();
   }, [setUser]);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
   return (
-    <div className="flex flex-col h-screen bg-zinc-900">
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-      />
-
-      <SidebarToggle
-        isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-      />
-
+    <>
+      <Sidebar />
       <main className="flex-1 overflow-auto">{children}</main>
-    </div>
+    </>
   );
 }
