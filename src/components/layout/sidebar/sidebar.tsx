@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
@@ -19,16 +20,16 @@ import { MenuItem, SidebarProps, SidebarToggleProps } from './sidebar.type';
 
 const menuItems: MenuItem[] = [
   {
+    id: 'calendar',
+    label: 'Calendário',
+    icon: <Calendar size={20} />,
+    href: '/index',
+  },
+  {
     id: 'dashboard',
     label: 'Dashboard',
     icon: <Home size={20} />,
     href: '/dashboard',
-  },
-  {
-    id: 'calendar',
-    label: 'Calendário',
-    icon: <Calendar size={20} />,
-    href: '/calendar',
   },
   {
     id: 'users',
@@ -60,10 +61,15 @@ const menuItems: MenuItem[] = [
 export const Sidebar: React.FC<SidebarProps> = ({
   className,
   isOpen = true,
-  onToggle,
+  headerClassName,
+  navClassName,
+  footerClassName,
+  logoClassName,
+  menuItemClassName,
 }) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [activeItem, setActiveItem] = useState<string>('');
+  const router = useRouter();
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
@@ -78,8 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleItemClick = (itemId: string, href?: string) => {
     setActiveItem(itemId);
     if (href) {
-      // Aqui você pode adicionar navegação
-      console.log(`Navegando para: ${href}`);
+      router.push(href);
     }
   };
 
@@ -96,8 +101,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'w-full justify-start gap-3 px-4 py-3 text-left transition-all duration-300',
             'hover:bg-zinc-800/50',
             isActive && '!bg-zinc-800/50 shadow-lg',
-            level > 0 && 'ml-4 text-sm py-2 w-[calc(100%-1rem)]',
+            level > 0 && 'ml-4 text-sm py-2 sm:w-[calc(100%-1rem)]',
             'bg-transparent border-none shadow-none',
+            menuItemClassName,
           )}
           onClick={() => {
             if (hasSubItems) {
@@ -159,29 +165,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Mobile overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={onToggle}
-        />
-      )}
-
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-screen bg-zinc-900/95 backdrop-blur-sm border-r border-zinc-800/50',
+          'fixed left-0 sm:top-0 top-10 sm:h-screen h-[calc(100vh-2.5rem)] bg-zinc-900/95 backdrop-blur-sm border-r border-zinc-800/50',
           'transition-transform duration-300 ease-in-out z-50',
           'flex flex-col',
-          isOpen ? 'translate-x-0' : '-translate-x-full',
-          'w-80 md:relative md:translate-x-0',
+          isOpen ? 'translate-y-0' : '-translate-y-full',
+          'sm:w-80 w-full md:relative md:translate-x-0',
           className,
         )}
       >
         {/* Header with Logo */}
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800/50">
+        <div
+          className={cn(
+            'flex items-center justify-between p-6 border-b border-zinc-800/50',
+            headerClassName,
+          )}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center">
+            <div
+              className={cn(
+                'w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center',
+                logoClassName,
+              )}
+            >
               <Calendar size={24} className="text-white" />
             </div>
             <div>
@@ -193,24 +201,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </Typography>
             </div>
           </div>
-
-          {/* Mobile close button */}
-          <Button
-            variant="default"
-            className="md:hidden p-2 bg-zinc-800/50 hover:bg-zinc-700/50 border-none"
-            onClick={onToggle}
-          >
-            <X size={20} />
-          </Button>
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav
+          className={cn('flex-1 p-4 space-y-2 overflow-y-auto', navClassName)}
+        >
           {menuItems.map((item) => renderMenuItem(item))}
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-zinc-800/50">
+        <div className={cn('p-4 border-t border-zinc-800/50', footerClassName)}>
           <Button
             variant="gradient"
             className="w-full justify-start gap-3 px-4 py-3 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30"
@@ -227,13 +228,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
 // Mobile toggle button component
 export const SidebarToggle: React.FC<SidebarToggleProps> = ({
+  className,
   onToggle,
   isOpen,
 }) => {
   return (
     <Button
       variant="default"
-      className="fixed top-4 left-4 z-50 md:hidden p-3 bg-zinc-900/95 backdrop-blur-sm border border-zinc-800/50 hover:bg-zinc-800/95"
+      className={cn(
+        'z-50 sm:hidden p-3 bg-zinc-900/95 backdrop-blur-sm border rounded-none border-zinc-800/50 hover:bg-zinc-800/95',
+        className,
+      )}
       onClick={onToggle}
     >
       {isOpen ? <X size={20} /> : <Menu size={20} />}
