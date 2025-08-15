@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/services/auth';
 import { sessionService } from '@/services/session';
 import { RESPONSES } from '@/constants/responses';
-import { prisma } from '@/services/prisma';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   const requestData = await request.json();
