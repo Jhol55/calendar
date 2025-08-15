@@ -13,9 +13,7 @@ type RegisterResponse = {
   field?: string;
 };
 
-export async function registerUser(
-  formData: FormData,
-): Promise<RegisterResponse> {
+export async function register(formData: FormData): Promise<RegisterResponse> {
   const data = {
     email: formData.get('email'),
     password: formData.get('password'),

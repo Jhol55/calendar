@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
-import { registerUser } from '@/actions/user/register-user';
+import { register } from '@/actions/user/register';
 
 export const RegisterForm = ({
   className,
@@ -52,7 +52,7 @@ export const RegisterForm = ({
     formData.append('password', data.password);
     formData.append('repeatPassword', data.repeatPassword);
 
-    const response = await registerUser(formData);
+    const response = await register(formData);
 
     if (!response.success) {
       setError(response.field as 'email' | 'password' | 'repeatPassword', {
