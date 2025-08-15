@@ -11,6 +11,7 @@
     "test:watch": "jest --watch",
     "format": "prettier --write .",
     "commit": "cz",
+    "prepare": "husky install && git config --local core.editor cat && git config core.hooksPath .husky/_",
     "obfuscate": "node ./scripts/obfuscate.js",
     "build:obfuscated": "npm run build && npm run obfuscate",
     "docker-up:dev": "npm run dev && docker compose -f docker-compose.dev.yml up -d",
