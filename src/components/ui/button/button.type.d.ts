@@ -15,7 +15,7 @@ interface GradientButtonProps extends BaseButtonProps {
 }
 
 interface DefaultButtonProps extends BaseButtonProps {
-  variant?: 'default';
+  variant?: 'default' | 'ghost';
   animated?: never | undefined;
 }
 
