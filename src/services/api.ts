@@ -1,179 +1,111 @@
-type RequestData = BodyInit | null | Record<string, unknown>;
-
-interface ApiResponse<T = unknown> {
-  data: T | null;
+// Define interfaces para as respostas e configurações
+interface ApiResponse {
+  data: object;
   status: number;
-  message: string;
+  success: boolean;
+  statusText: string;
+  headers: Record<string, string>;
+  config: RequestInit;
 }
 
-interface ErrorResponse {
-  message: string;
-  success?: boolean;
-  code?: number;
-}
-
-class APIError extends Error {
+interface ApiErrorResponse {
+  data: object;
   status: number;
-  response?: unknown;
-  code?: number;
-
-  constructor(
-    message: string,
-    status: number,
-    response?: unknown,
-    code?: number,
-  ) {
-    super(message);
-    this.status = status;
-    this.response = response;
-    this.code = code;
-  }
+  statusText: string;
+  headers: Record<string, string>;
 }
 
-const defaultHeaders = {
-  'Content-Type': 'application/json',
-};
+interface ApiError extends Error {
+  response?: ApiErrorResponse;
+}
 
-class FetchAPI {
-  private baseURL: string;
+// Estende a interface RequestInit para incluir headers de forma mais flexível
+interface ApiConfig extends RequestInit {
+  headers?: Record<string, string>;
+}
 
-  constructor() {
-    const internalBaseURL = 'http://app:3000/api';
-    const externalBaseURL = process.env.NEXT_PUBLIC_API_URL || '';
+const internalBaseURL = 'http://app:3000/api';
+const externalBaseURL = process.env.NEXT_PUBLIC_API_URL || '';
 
-    this.baseURL =
-      process.env.NODE_ENV === 'production'
-        ? typeof window === 'undefined'
-          ? internalBaseURL
-          : externalBaseURL
-        : 'http://localhost:3000/api';
+const baseURL =
+  process.env.NODE_ENV === 'production'
+    ? typeof window === 'undefined'
+      ? internalBaseURL
+      : externalBaseURL
+    : 'http://localhost:3000/api';
+
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+const request = async (
+  method: HttpMethod,
+  url: string,
+  data: unknown = null,
+  config: ApiConfig = {},
+): Promise<ApiResponse> => {
+  const finalURL = `${baseURL}${url}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    ...config.headers,
+  };
+
+  const options: RequestInit = {
+    method,
+    headers,
+    ...config,
+  };
+
+  if (data) {
+    options.body = JSON.stringify(data);
   }
 
-  private buildUrl(url: string): string {
-    return this.baseURL + url;
-  }
+  try {
+    const response = await fetch(finalURL, options);
 
-  private async fetchWithTimeout(
-    url: string,
-    options: RequestInit,
-    timeout = 8000,
-  ): Promise<Response> {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
+    let responseData = null;
     try {
-      return await fetch(url, {
-        cache: 'force-cache',
-        ...options,
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(id);
+      responseData = await response.json();
+    } catch {
+      // O corpo da resposta não é um JSON válido ou está vazio.
     }
-  }
 
-  async get<T = unknown>(
-    url: string,
-    options: RequestInit = {},
-  ): Promise<ApiResponse<T>> {
-    const res = await this.fetchWithTimeout(this.buildUrl(url), {
-      ...options,
-      method: 'GET',
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-    });
-    return this.handleResponse<T>(res);
-  }
-
-  async post<T = unknown>(
-    url: string,
-    data?: RequestData,
-    options: RequestInit = {},
-  ): Promise<ApiResponse<T>> {
-    const isFormData = data instanceof FormData;
-
-    const res = await this.fetchWithTimeout(this.buildUrl(url), {
-      ...options,
-      method: 'POST',
-      headers: {
-        ...(isFormData ? {} : defaultHeaders),
-        ...options.headers,
-      },
-      body: data ? (isFormData ? data : JSON.stringify(data)) : undefined,
-    });
-    return this.handleResponse<T>(res);
-  }
-
-  async put<T = unknown>(
-    url: string,
-    data?: RequestData,
-    options: RequestInit = {},
-  ): Promise<ApiResponse<T>> {
-    const isFormData = data instanceof FormData;
-
-    const res = await this.fetchWithTimeout(this.buildUrl(url), {
-      ...options,
-      method: 'PUT',
-      headers: {
-        ...(isFormData ? {} : defaultHeaders),
-        ...options.headers,
-      },
-      body: data ? (isFormData ? data : JSON.stringify(data)) : undefined,
-    });
-    return this.handleResponse<T>(res);
-  }
-
-  async delete<T = unknown>(
-    url: string,
-    options: RequestInit = {},
-  ): Promise<ApiResponse<T>> {
-    const res = await this.fetchWithTimeout(this.buildUrl(url), {
-      ...options,
-      method: 'DELETE',
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-    });
-    return this.handleResponse<T>(res);
-  }
-
-  private async handleResponse<T = unknown>(
-    response: Response,
-  ): Promise<ApiResponse<T>> {
     if (!response.ok) {
-      const errorData: ErrorResponse = await response.json().catch(() => ({
-        message: response.statusText,
-        code: response.status,
-      }));
-
-      throw new APIError(
-        errorData.message || response.statusText,
-        response.status,
-        errorData,
-        errorData.code,
+      const error: ApiError = new Error(
+        response.statusText || 'Request Failed',
       );
-    }
-
-    // 204 No Content → retorna null
-    if (response.status === 204) {
-      return {
-        data: null,
+      error.response = {
+        data: responseData,
         status: response.status,
-        message: response.statusText,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
       };
+      throw error;
     }
-
-    const text = await response.text();
-    const data = text ? (JSON.parse(text) as T) : null;
 
     return {
-      data,
+      data: responseData,
       status: response.status,
-      message: response.statusText,
+      success: response.ok,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      config: options,
     };
+  } catch (error) {
+    console.error(
+      `[API Fetch Error] ${method} ${url}:`,
+      (error as ApiError).response || (error as Error).message,
+    );
+    throw error;
   }
-}
+};
 
-export const api = new FetchAPI();
+export const api = {
+  get: (url: string, config?: ApiConfig) => request('GET', url, null, config),
+  post: (url: string, data: unknown, config?: ApiConfig) =>
+    request('POST', url, data, config),
+  put: (url: string, data: unknown, config?: ApiConfig) =>
+    request('PUT', url, data, config),
+  patch: (url: string, data: unknown, config?: ApiConfig) =>
+    request('PATCH', url, data, config),
+  delete: (url: string, config?: ApiConfig) =>
+    request('DELETE', url, null, config),
+};

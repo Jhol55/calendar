@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionService } from '@/services/session';
-import { userService } from '@/services/user';
+import { verifyConfirmedEmailStatus } from '@/services/user';
 
 export async function middleware(request: NextRequest) {
   const session = await sessionService.getSession();
@@ -12,14 +12,14 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session && path !== '/' && path !== '/confirm') {
-    const response = await userService.verifyConfirmedEmailStatus(session);
+    const response = await verifyConfirmedEmailStatus(session);
     if (!response?.success) {
       return NextResponse.redirect(new URL('/confirm', request.url));
     }
   }
 
   if (session && path === '/confirm') {
-    const response = await userService.verifyConfirmedEmailStatus(session);
+    const response = await verifyConfirmedEmailStatus(session);
     if (response?.success) {
       return NextResponse.redirect(new URL('/index', request.url));
     }
