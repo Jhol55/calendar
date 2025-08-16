@@ -13,14 +13,16 @@ export async function middleware(request: NextRequest) {
 
   if (session && path !== '/' && path !== '/confirm') {
     const response = await verifyConfirmedEmailStatus(session);
-    if (!response?.success) {
+    const data = response?.data as { confirmed: boolean };
+    if (!data?.confirmed) {
       return NextResponse.redirect(new URL('/confirm', request.url));
     }
   }
 
   if (session && path === '/confirm') {
     const response = await verifyConfirmedEmailStatus(session);
-    if (response?.success) {
+    const data = response?.data as { confirmed: boolean };
+    if (data?.confirmed) {
       return NextResponse.redirect(new URL('/index', request.url));
     }
   }
