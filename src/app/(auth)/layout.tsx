@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useUser } from '@/hooks/use-user';
 import { getUser } from '@/services/user';
 import { Sidebar } from '@/features/layout/sidebar';
@@ -11,6 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const { setUser } = useUser();
+  const pathname = usePathname();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -22,8 +24,8 @@ export default function RootLayout({
 
   return (
     <>
-      <Sidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
+      {pathname !== '/confirm' && <Sidebar />}
+      {children}
     </>
   );
 }
