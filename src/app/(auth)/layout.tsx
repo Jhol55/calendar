@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useUser } from '@/hooks/use-user';
-import { userService } from '@/services/user';
+import { getUser } from '@/services/user';
 import { Sidebar } from '@/features/layout/sidebar';
 
 export default function RootLayout({
@@ -14,9 +14,8 @@ export default function RootLayout({
 
   useEffect(() => {
     const fetchUser = async () => {
-      const response = await userService.getUser();
-      console.log(response);
-      setUser(response);
+      const response = await getUser();
+      setUser(response.data);
     };
     fetchUser();
   }, [setUser]);
