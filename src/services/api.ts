@@ -1,19 +1,36 @@
 type RequestData = BodyInit | null | Record<string, unknown>;
 
 interface ApiResponse<T = unknown> {
-  data?: T;
-  success: boolean;
+  data: T | null;
+  status: number;
   message: string;
-  code: number;
 }
 
 interface ErrorResponse {
   message: string;
-  success: boolean;
-  code: number;
+  success?: boolean;
+  code?: number;
 }
 
-const headers = {
+class APIError extends Error {
+  status: number;
+  response?: unknown;
+  code?: number;
+
+  constructor(
+    message: string,
+    status: number,
+    response?: unknown,
+    code?: number,
+  ) {
+    super(message);
+    this.status = status;
+    this.response = response;
+    this.code = code;
+  }
+}
+
+const defaultHeaders = {
   'Content-Type': 'application/json',
 };
 
@@ -36,19 +53,37 @@ class FetchAPI {
     return this.baseURL + url;
   }
 
+  private async fetchWithTimeout(
+    url: string,
+    options: RequestInit,
+    timeout = 8000,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      return await fetch(url, {
+        cache: 'force-cache',
+        ...options,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
   async get<T = unknown>(
     url: string,
     options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
-    const res = await fetch(this.buildUrl(url), {
+    const res = await this.fetchWithTimeout(this.buildUrl(url), {
       ...options,
       method: 'GET',
       headers: {
-        ...headers,
+        ...defaultHeaders,
         ...options.headers,
       },
     });
-    return this.handleResponse(res);
+    return this.handleResponse<T>(res);
   }
 
   async post<T = unknown>(
@@ -56,16 +91,18 @@ class FetchAPI {
     data?: RequestData,
     options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
-    const res = await fetch(this.buildUrl(url), {
+    const isFormData = data instanceof FormData;
+
+    const res = await this.fetchWithTimeout(this.buildUrl(url), {
       ...options,
       method: 'POST',
       headers: {
-        ...headers,
+        ...(isFormData ? {} : defaultHeaders),
         ...options.headers,
       },
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? (isFormData ? data : JSON.stringify(data)) : undefined,
     });
-    return this.handleResponse(res);
+    return this.handleResponse<T>(res);
   }
 
   async put<T = unknown>(
@@ -73,44 +110,69 @@ class FetchAPI {
     data?: RequestData,
     options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
-    const res = await fetch(this.buildUrl(url), {
+    const isFormData = data instanceof FormData;
+
+    const res = await this.fetchWithTimeout(this.buildUrl(url), {
       ...options,
       method: 'PUT',
       headers: {
-        ...headers,
+        ...(isFormData ? {} : defaultHeaders),
         ...options.headers,
       },
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? (isFormData ? data : JSON.stringify(data)) : undefined,
     });
-    return this.handleResponse(res);
+    return this.handleResponse<T>(res);
   }
 
   async delete<T = unknown>(
     url: string,
     options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
-    const res = await fetch(this.buildUrl(url), {
+    const res = await this.fetchWithTimeout(this.buildUrl(url), {
       ...options,
       method: 'DELETE',
       headers: {
-        ...headers,
+        ...defaultHeaders,
         ...options.headers,
       },
     });
-    return this.handleResponse(res);
+    return this.handleResponse<T>(res);
   }
 
   private async handleResponse<T = unknown>(
     response: Response,
   ): Promise<ApiResponse<T>> {
     if (!response.ok) {
-      const errorData = await response
-        .json()
-        .catch(() => ({}) as ErrorResponse);
-      const errorMessage = errorData.message || response.statusText;
-      throw new Error(`Request Error: ${response.status} - ${errorMessage}`);
+      const errorData: ErrorResponse = await response.json().catch(() => ({
+        message: response.statusText,
+        code: response.status,
+      }));
+
+      throw new APIError(
+        errorData.message || response.statusText,
+        response.status,
+        errorData,
+        errorData.code,
+      );
     }
-    return response.json();
+
+    // 204 No Content → retorna null
+    if (response.status === 204) {
+      return {
+        data: null,
+        status: response.status,
+        message: response.statusText,
+      };
+    }
+
+    const text = await response.text();
+    const data = text ? (JSON.parse(text) as T) : null;
+
+    return {
+      data,
+      status: response.status,
+      message: response.statusText,
+    };
   }
 }
 
