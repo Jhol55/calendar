@@ -3,7 +3,6 @@
 import { sessionService } from '@/services/session';
 import { authService } from '@/services/auth';
 import { prisma } from '@/lib/prisma';
-import { RESPONSES } from '@/constants/responses';
 import { registerFormSchema } from '@/features/forms/register/register.schema';
 
 type RegisterResponse = {
@@ -37,9 +36,9 @@ export async function register(formData: FormData): Promise<RegisterResponse> {
 
   if (existingUser) {
     return {
-      success: RESPONSES.REGISTER.USER_ALREADY_EXISTS.success,
-      message: RESPONSES.REGISTER.USER_ALREADY_EXISTS.message,
-      code: RESPONSES.REGISTER.USER_ALREADY_EXISTS.code,
+      success: false,
+      message: 'Este e-mail já está em uso',
+      code: 409,
       field: 'email',
     };
   }
@@ -84,8 +83,8 @@ export async function register(formData: FormData): Promise<RegisterResponse> {
   );
 
   return {
-    success: RESPONSES.REGISTER.SUCCESS.success,
-    message: RESPONSES.REGISTER.SUCCESS.message,
-    code: RESPONSES.REGISTER.SUCCESS.code,
+    success: true,
+    message: 'Registro realizado com sucesso',
+    code: 201,
   };
 }

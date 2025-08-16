@@ -6,9 +6,9 @@ import { ErrorField } from '@/components/ui/error-field';
 import { confirmEmailFormMask } from '@/features/forms/confirm-email/confirm-email.mask';
 import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import { userService } from '@/services/user';
 import { useUser } from '@/hooks/use-user';
 import { FormControl } from '@/components/ui/form-control';
+import { confirmEmail } from '@/actions/user/confirm-email';
 
 export const ConfirmEmailForm = () => {
   const router = useRouter();
@@ -18,14 +18,16 @@ export const ConfirmEmailForm = () => {
     data: FieldValues,
     setError: UseFormSetError<FieldValues>,
   ) => {
-    const response = await userService.confirmEmail({
-      ...data,
-      email: user?.email,
-    });
+    const formData = new FormData();
 
-    if (!response?.success) {
-      setError('validationCode', {
-        message: 'Código inválido',
+    formData.append('email', user?.email || '');
+    formData.append('validationCode', data.validationCode);
+
+    const response = await confirmEmail(formData);
+
+    if (!response.success) {
+      setError(response.field as string, {
+        message: response.message,
       });
       return;
     }

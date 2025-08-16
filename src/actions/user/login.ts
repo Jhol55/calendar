@@ -2,7 +2,6 @@
 
 import { authService } from '@/services/auth';
 import { sessionService } from '@/services/session';
-import { RESPONSES } from '@/constants/responses';
 import { prisma } from '@/lib/prisma';
 import { loginFormSchema } from '@/features/forms/login/login.schema';
 
@@ -37,9 +36,9 @@ export async function login(formData: FormData): Promise<LoginResponse> {
 
   if (!user) {
     return {
-      success: RESPONSES.LOGIN.USER_NOT_FOUND.success,
-      message: RESPONSES.LOGIN.USER_NOT_FOUND.message,
-      code: RESPONSES.LOGIN.USER_NOT_FOUND.code,
+      success: false,
+      message: 'Email ou senha inválidos',
+      code: 404,
       field: 'email',
     };
   }
@@ -56,16 +55,16 @@ export async function login(formData: FormData): Promise<LoginResponse> {
     });
 
     return {
-      success: RESPONSES.LOGIN.SUCCESS.success,
-      message: RESPONSES.LOGIN.SUCCESS.message,
-      code: RESPONSES.LOGIN.SUCCESS.code,
+      success: true,
+      message: 'Login realizado com sucesso',
+      code: 200,
     };
   }
 
   return {
-    success: RESPONSES.LOGIN.INVALID_PASSWORD.success,
-    message: RESPONSES.LOGIN.INVALID_PASSWORD.message,
-    code: RESPONSES.LOGIN.INVALID_PASSWORD.code,
+    success: false,
+    message: 'Email ou senha inválidos',
+    code: 401,
     field: 'email',
   };
 }
