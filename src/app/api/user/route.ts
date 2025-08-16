@@ -1,8 +1,8 @@
-import { sessionService } from '@/services/session';
+import { getSession } from '@/utils/security/session';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const session = await sessionService.getSession();
+  const session = await getSession();
   const { email } = session?.user as { email: string };
 
   const data = { email: email };

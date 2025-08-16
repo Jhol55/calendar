@@ -1,7 +1,7 @@
 'use server';
 
-import { authService } from '@/services/auth';
-import { sessionService } from '@/services/session';
+import { verifyPassword } from '@/utils/security/auth';
+import { createSession } from '@/utils/security/session';
 import { prisma } from '@/lib/prisma';
 import { loginFormSchema } from '@/features/forms/login/login.schema';
 
@@ -43,13 +43,10 @@ export async function login(formData: FormData): Promise<LoginResponse> {
     };
   }
 
-  const success = await authService.verifyPassword(
-    data.password as string,
-    user.password,
-  );
+  const success = await verifyPassword(data.password as string, user.password);
 
   if (success) {
-    await sessionService.createSession({
+    await createSession({
       email: data.email as string,
       remember: data.remember as boolean,
     });

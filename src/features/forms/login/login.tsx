@@ -10,7 +10,7 @@ import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { loginFormSchema } from '@/features/forms/login/login.schema';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
-import { login } from '@/actions/user/login';
+import { login } from '@/actions/forms/login';
 
 export const LoginForm = ({
   className,

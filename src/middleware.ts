@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sessionService } from '@/services/session';
+import { getSession, updateSession } from '@/utils/security/session';
 import { verifyConfirmedEmailStatus } from '@/services/user';
 
 export async function middleware(request: NextRequest) {
-  const session = await sessionService.getSession();
-  const response = await sessionService.updateSession(request);
+  const session = await getSession();
+  const response = await updateSession(request);
   const path = request.nextUrl.pathname;
 
   if (!session && path !== '/') {

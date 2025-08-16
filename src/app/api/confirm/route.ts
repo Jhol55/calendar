@@ -1,4 +1,4 @@
-import { authService } from '@/services/auth';
+import { generateValidationCodeFromEmail } from '@/utils/security/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const requestData = await request.json();
-  const validationCode = await authService.generateValidationCodeFromEmail(
+  const validationCode = await generateValidationCodeFromEmail(
     requestData.email,
   );
 

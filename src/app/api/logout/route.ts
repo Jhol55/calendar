@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { sessionService } from '@/services/session';
+import { deleteSession } from '@/utils/security/session';
 
 export async function POST() {
-  await sessionService.deleteSession();
+  await deleteSession();
 
   return NextResponse.json({
     success: true,

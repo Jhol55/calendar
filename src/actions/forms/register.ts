@@ -1,7 +1,10 @@
 'use server';
 
-import { sessionService } from '@/services/session';
-import { authService } from '@/services/auth';
+import { deleteSession, createSession } from '@/utils/security/session';
+import {
+  hashPassword,
+  generateValidationCodeFromEmail,
+} from '@/utils/security/auth';
 import { prisma } from '@/lib/prisma';
 import { registerFormSchema } from '@/features/forms/register/register.schema';
 
@@ -51,7 +54,7 @@ export async function register(formData: FormData): Promise<RegisterResponse> {
 
   const encryptedData = {
     email: data.email as string,
-    password: await authService.hashPassword(data.password as string),
+    password: await hashPassword(data.password as string),
   };
 
   try {
@@ -70,17 +73,15 @@ export async function register(formData: FormData): Promise<RegisterResponse> {
     };
   }
 
-  await sessionService.deleteSession();
+  await deleteSession();
 
   const sessionData = {
     email: data.email as string,
     remember: true,
   };
-  await sessionService.createSession(sessionData);
+  await createSession(sessionData);
 
-  console.log(
-    await authService.generateValidationCodeFromEmail(data.email as string),
-  );
+  console.log(await generateValidationCodeFromEmail(data.email as string));
 
   return {
     success: true,

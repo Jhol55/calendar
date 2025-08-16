@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authService } from '@/services/auth';
-import { sessionService } from '@/services/session';
+import { verifyPassword } from '@/utils/security/auth';
+import { createSession } from '@/utils/security/session';
 import { RESPONSES } from '@/constants/responses';
 import { prisma } from '@/lib/prisma';
 
@@ -23,13 +23,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const success = await authService.verifyPassword(
-    requestData.password,
-    user.password,
-  );
+  const success = await verifyPassword(requestData.password, user.password);
 
   if (success) {
-    await sessionService.createSession(requestData);
+    await createSession(requestData);
 
     return NextResponse.json(
       {

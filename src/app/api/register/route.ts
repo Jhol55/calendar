@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sessionService } from '@/services/session';
-import { authService } from '@/services/auth';
-import { prisma } from '@/services/prisma';
+import { deleteSession, createSession } from '@/utils/security/session';
+import {
+  hashPassword,
+  generateValidationCodeFromEmail,
+} from '@/utils/security/auth';
+import { prisma } from '@/lib/prisma';
 import { RESPONSES } from '@/constants/responses';
 
 export async function POST(request: NextRequest) {
@@ -28,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   const encryptedData = {
     email: requestData.email,
-    password: await authService.hashPassword(requestData.password),
+    password: await hashPassword(requestData.password),
   };
 
   try {
@@ -39,12 +42,10 @@ export async function POST(request: NextRequest) {
     console.error('Erro na requisição:', error);
   }
 
-  await sessionService.deleteSession();
-  await sessionService.createSession(requestData);
+  await deleteSession();
+  await createSession(requestData);
 
-  console.log(
-    await authService.generateValidationCodeFromEmail(requestData.email),
-  );
+  console.log(await generateValidationCodeFromEmail(requestData.email));
 
   return NextResponse.json(
     {

@@ -1,6 +1,6 @@
 'use server';
 
-import { authService } from '@/services/auth';
+import { generateValidationCodeFromEmail } from '@/utils/security/auth';
 import { prisma } from '@/lib/prisma';
 import { confirmEmailFormSchema } from '@/features/forms/confirm-email/confirm-email.schema';
 
@@ -29,7 +29,7 @@ export async function confirmEmail(
     };
   }
 
-  const validationCode = await authService.generateValidationCodeFromEmail(
+  const validationCode = await generateValidationCodeFromEmail(
     data.email as string,
   );
 

@@ -8,7 +8,7 @@ import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/use-user';
 import { FormControl } from '@/components/ui/form-control';
-import { confirmEmail } from '@/actions/user/confirm-email';
+import { confirmEmail } from '@/actions/forms/confirm-email';
 
 export const ConfirmEmailForm = () => {
   const router = useRouter();
