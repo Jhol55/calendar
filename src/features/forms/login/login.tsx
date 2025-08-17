@@ -62,7 +62,7 @@ export const LoginForm = ({
   return (
     <Form
       className={cn(
-        'flex flex-col gap-2 w-full h-full overflow-y-auto md:rounded-l-3xl p-4 -z-50 bg-zinc-900',
+        'flex flex-col gap-2 w-full h-full overflow-y-auto md:rounded-l-3xl rounded-l-3xl p-4 -z-50 bg-zinc-900',
         className,
       )}
       zodSchema={loginFormSchema}
