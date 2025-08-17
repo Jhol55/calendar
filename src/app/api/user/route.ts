@@ -1,6 +1,6 @@
 import { getSession } from '@/utils/security/session';
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/services/prisma';
 
 interface SessionUser {
   user: {

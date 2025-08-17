@@ -1,7 +1,7 @@
 'use server';
 
 import { generateValidationCodeFromEmail } from '@/utils/security/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/services/prisma';
 import { confirmEmailFormSchema } from '@/features/forms/confirm-email/confirm-email.schema';
 
 type ConfirmEmailResponse = {

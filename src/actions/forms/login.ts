@@ -2,7 +2,7 @@
 
 import { verifyPassword } from '@/utils/security/auth';
 import { createSession } from '@/utils/security/session';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/services/prisma';
 import { loginFormSchema } from '@/features/forms/login/login.schema';
 
 type LoginResponse = {

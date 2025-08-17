@@ -5,7 +5,7 @@ import {
   hashPassword,
   generateValidationCodeFromEmail,
 } from '@/utils/security/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/services/prisma';
 import { registerFormSchema } from '@/features/forms/register/register.schema';
 
 type RegisterResponse = {
