@@ -3,6 +3,8 @@ export interface UserProps {
   username: string;
   email: string;
   confirmed: boolean;
+  name?: string;
+  avatar?: string;
 }
 
 export interface UserContextProps {

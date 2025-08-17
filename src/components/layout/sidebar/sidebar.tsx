@@ -12,11 +12,11 @@ import {
   Calendar,
   Users,
   Settings,
-  LogOut,
   Menu,
   X,
 } from 'lucide-react';
 import { MenuItem, SidebarProps, SidebarToggleProps } from './sidebar.type';
+import { UserProfile } from '../user-profile';
 
 const menuItems: MenuItem[] = [
   {
@@ -212,14 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer */}
         <div className={cn('p-4 border-t border-zinc-800/50', footerClassName)}>
-          <Button
-            variant="gradient"
-            className="w-full justify-start gap-3 px-4 py-3 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30"
-            onClick={() => console.log('Logout')}
-          >
-            <LogOut size={20} />
-            <Typography variant="span">Sair</Typography>
-          </Button>
+          <UserProfile />
         </div>
       </aside>
     </>
