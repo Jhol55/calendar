@@ -57,8 +57,9 @@ const nodeTypes = {
   webhook: WebhookNode,
 };
 
-let id = 2;
-const getId = () => `${id++}`;
+// Função para gerar IDs únicos
+const generateNodeId = () =>
+  `node_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
 function FlowEditorContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -105,7 +106,7 @@ function FlowEditorContent() {
       }) || { x: 0, y: 0 };
 
       const newNode: Node<NodeData> = {
-        id: getId(),
+        id: generateNodeId(),
         type,
         position,
         data: {
@@ -212,10 +213,45 @@ function FlowEditorContent() {
 
   const handleSelectFlow = useCallback(
     (flow: ChatbotFlow) => {
-      setNodes(flow.nodes || []);
-      setEdges(flow.edges || []);
-      setFlowName(flow.name);
-      setCurrentFlowId(flow.id);
+      // Limpar estado atual primeiro
+      setNodes([]);
+      setEdges([]);
+
+      // Pequeno delay para garantir que o estado seja limpo
+      setTimeout(() => {
+        // Garantir que os nodes tenham IDs únicos e válidos
+        const processedNodes = (flow.nodes || []).map(
+          (node: Node<NodeData>) => ({
+            ...node,
+            id: node.id || generateNodeId(), // Garantir que tenha ID
+            data: {
+              ...node.data,
+              // Garantir que o tipo esteja correto
+              type: node.type || node.data?.type,
+            },
+          }),
+        );
+
+        // Garantir que as edges tenham IDs únicos
+        const processedEdges = (flow.edges || []).map((edge: Edge) => ({
+          ...edge,
+          id:
+            edge.id ||
+            `edge_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        }));
+
+        console.log('Loading flow:', {
+          name: flow.name,
+          nodesCount: processedNodes.length,
+          edgesCount: processedEdges.length,
+          nodes: processedNodes.map((n) => ({ id: n.id, type: n.type })),
+        });
+
+        setNodes(processedNodes);
+        setEdges(processedEdges);
+        setFlowName(flow.name);
+        setCurrentFlowId(flow.id);
+      }, 100);
     },
     [setNodes, setEdges],
   );
