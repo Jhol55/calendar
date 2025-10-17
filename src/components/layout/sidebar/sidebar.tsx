@@ -99,8 +99,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           variant="ghost"
           className={cn(
             'w-full justify-start gap-3 px-4 py-3 text-left transition-all duration-300',
-            'hover:bg-zinc-800/50',
-            isActive && '!bg-zinc-800/50 shadow-lg',
+            'hover:bg-neutral-200',
+            isActive && '!bg-neutral-200 shadow-lg',
             level > 0 && 'ml-4 text-sm py-2 sm:w-[calc(100%-1rem)]',
             'bg-transparent border-none shadow-none',
             menuItemClassName,
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div
                 className={cn(
                   'transition-colors duration-200',
-                  isActive ? 'text-white' : 'text-zinc-300',
+                  isActive ? 'text-neutral-700' : 'text-neutral-500',
                 )}
               >
                 {item.icon}
@@ -127,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 variant="span"
                 className={cn(
                   'transition-colors duration-200',
-                  isActive ? 'text-white' : 'text-zinc-300',
+                  isActive ? 'text-neutral-700' : 'text-neutral-500',
                 )}
               >
                 {item.label}
@@ -168,51 +168,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 sm:top-0 top-10 sm:h-screen h-[calc(100vh-2.5rem)] bg-zinc-900/95 backdrop-blur-sm border-r border-zinc-800/50',
+          'fixed left-0 sm:top-0 top-10 h-screen bg-neutral-50 backdrop-blur-sm border-r border-neutral-200',
           'transition-transform duration-300 ease-in-out z-50',
           'flex flex-col',
           isOpen ? 'translate-y-0' : '-translate-y-full',
-          'sm:w-80 w-full md:relative md:translate-x-0',
+          'sm:w-[16rem] w-full md:relative md:translate-x-0',
           className,
         )}
       >
-        {/* Header with Logo */}
-        <div
-          className={cn(
-            'flex items-center justify-between p-6 border-b border-zinc-800/50',
-            headerClassName,
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                'w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center',
-                logoClassName,
-              )}
-            >
-              <Calendar size={24} className="text-white" />
-            </div>
-            <div>
-              <Typography variant="h5" className="text-white font-bold">
-                Calendar
-              </Typography>
-              <Typography variant="span" className="text-zinc-400 text-xs">
-                Sistema de Agendamento
-              </Typography>
+        <div className="flex flex-col h-full" style={{ zoom: 0.9 }}>
+          {/* Header with Logo */}
+          <div
+            className={cn(
+              'flex items-center justify-between p-6 border-b border-neutral-200',
+              headerClassName,
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={cn(
+                  'w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center',
+                  logoClassName,
+                )}
+              >
+                <Calendar size={24} className="text-white" />
+              </div>
+              <div>
+                <Typography variant="h5" className="text-white font-bold">
+                  Calendar
+                </Typography>
+                <Typography variant="span" className="text-zinc-400 text-xs">
+                  Sistema de Agendamento
+                </Typography>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Navigation Menu */}
-        <nav
-          className={cn('flex-1 p-4 space-y-2 overflow-y-auto', navClassName)}
-        >
-          {menuItems.map((item) => renderMenuItem(item))}
-        </nav>
-
-        {/* Footer */}
-        <div className={cn('p-4 border-t border-zinc-800/50', footerClassName)}>
-          <UserProfile />
+          {/* Navigation Menu */}
+          <nav
+            className={cn('flex-1 p-4 space-y-2 overflow-y-auto', navClassName)}
+          >
+            {menuItems.map((item) => renderMenuItem(item))}
+          </nav>
+          {/* Footer */}
+          <div
+            className={cn('p-4 border-t border-neutral-200', footerClassName)}
+          >
+            <UserProfile />
+          </div>
         </div>
       </aside>
     </>

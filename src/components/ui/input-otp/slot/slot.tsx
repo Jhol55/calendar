@@ -14,7 +14,7 @@ export const Slot = forwardRef<HTMLDivElement, ControlledInputOTPSlotProps>(
           'transition-all duration-100',
           'border-border border-y border-r first:border-l first:rounded-l-md last:rounded-r-md',
           'outline outline-0 outline-accent-foreground/20',
-          { 'outline-3 outline-emerald-400 border-emerald-400 z-10': isActive },
+          { 'outline-3 outline-[#5c5e5d] z-10': isActive },
           className,
         )}
         {...props}

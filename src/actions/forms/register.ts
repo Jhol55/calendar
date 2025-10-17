@@ -6,7 +6,7 @@ import {
   generateValidationCodeFromEmail,
 } from '@/utils/security/auth';
 import { prisma } from '@/services/prisma';
-import { registerFormSchema } from '@/features/forms/register/register.schema';
+import { registerFormSchema } from '@/components/features/forms/register/register.schema';
 
 type RegisterResponse = {
   success: boolean;

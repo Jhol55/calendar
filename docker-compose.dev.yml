@@ -1,3 +1,7 @@
+networks:
+  api-net:
+    driver: bridge
+
 services:
   postgres:
     container_name: db
@@ -7,7 +11,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=123456
-      - POSTGRES_DB=calendar
+      - POSTGRES_DB=wazzy
     volumes:
       - ./pgdata:/var/lib/postgresql/data
     restart: unless-stopped
@@ -16,15 +20,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - api-net
 
   pgweb:
     container_name: pgweb
     image: sosedoff/pgweb
     restart: always
     environment:
-      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/calendar?sslmode=disable # REMOVE SSL DISABLE
+      - PGWEB_DATABASE_URL=postgresql://postgres:123456@postgres:5432/wazzy?sslmode=disable
     ports:
       - '8081:8081'
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    networks:
+      - api-net
+
+
+
 

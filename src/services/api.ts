@@ -8,14 +8,14 @@ interface ApiResponse {
   config: RequestInit;
 }
 
-interface ApiErrorResponse {
+export interface ApiErrorResponse {
   data: object;
   status: number;
   statusText: string;
   headers: Record<string, string>;
 }
 
-interface ApiError extends Error {
+export interface ApiError extends Error {
   response?: ApiErrorResponse;
 }
 

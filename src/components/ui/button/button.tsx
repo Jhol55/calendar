@@ -9,7 +9,7 @@ const Button = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
     {
       variant = 'default',
       type = 'button',
-      bgHexColor = '#30c18c',
+      bgHexColor = '#545556',
       darkBgHexColor = '',
       darkenFactor = 0.22,
       animated = true,

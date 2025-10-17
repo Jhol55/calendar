@@ -14,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased !overflow-x-hidden" suppressHydrationWarning>
+      <body
+        className="antialiased !overflow-x-hidden flex"
+        suppressHydrationWarning
+      >
         <UserProvider>{children}</UserProvider>
       </body>
     </html>

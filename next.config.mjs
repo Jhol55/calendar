@@ -5,6 +5,18 @@ import TerserPlugin from 'terser-webpack-plugin';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'pps.whatsapp.net',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
   webpack: (config) => {
     if (process.env.NODE_ENV === 'production') {
       config.module.rules.push({

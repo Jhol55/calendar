@@ -9,7 +9,7 @@ export const FormControl = forwardRef<
   const Component = variant;
 
   const styles = {
-    label: `text-sm font-medium w-fit self-start`,
+    label: `text-sm font-medium w-fit self-start text-slate-600`,
     legend: '',
     fieldset: '',
   };

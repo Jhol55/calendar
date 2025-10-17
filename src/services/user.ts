@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api, ApiError } from './api';
 import { JWTPayload } from 'jose';
 
 export async function verifyConfirmedEmailStatus(session: JWTPayload) {
@@ -11,13 +11,13 @@ export async function verifyConfirmedEmailStatus(session: JWTPayload) {
     return response;
   } catch (error) {
     console.error('Erro ao consultar usuário', error);
+    const err = error as ApiError;
     return {
-      data: null,
-      status: 500,
+      data: err?.response?.data ?? null,
+      status: err?.response?.status ?? 500,
       success: false,
-      statusText: 'Erro ao consultar usuário',
-      headers: {},
-      config: {},
+      statusText: err?.response?.statusText ?? 'Erro ao consultar usuário',
+      headers: err?.response?.headers ?? {},
     };
   }
 }
@@ -28,13 +28,13 @@ export async function getUser() {
     return response;
   } catch (error) {
     console.error('Erro ao consultar usuário', error);
+    const err = error as ApiError;
     return {
-      data: null,
-      status: 500,
+      data: err?.response?.data ?? null,
+      status: err?.response?.status ?? 500,
       success: false,
-      statusText: 'Erro ao buscar usuário',
-      headers: {},
-      config: {},
+      statusText: err?.response?.statusText ?? 'Erro ao buscar usuário',
+      headers: err?.response?.headers ?? {},
     };
   }
 }
