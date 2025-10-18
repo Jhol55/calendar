@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Typography } from '@/components/ui/typography';
-import { MemoryConfig } from '../types';
+import { MemoryConfig, MemoryItem } from '../types';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,9 @@ import { memoryConfigSchema } from './memory-node-config.schema';
 import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { NodeConfigLayout } from './node-config-layout';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface MemoryNodeConfigProps {
   isOpen: boolean;
@@ -23,10 +24,10 @@ interface MemoryNodeConfigProps {
   flowId?: string;
 }
 
-const acaoOptions = [
-  { value: 'salvar', label: 'Salvar' },
-  { value: 'buscar', label: 'Buscar' },
-  { value: 'deletar', label: 'Deletar' },
+const actionOptions = [
+  { value: 'save', label: 'Salvar' },
+  { value: 'fetch', label: 'Buscar' },
+  { value: 'delete', label: 'Deletar' },
 ];
 
 const ttlPresets = [
@@ -38,56 +39,70 @@ const ttlPresets = [
   { value: 'custom', label: 'Personalizado' },
 ];
 
-function MemoryFormFields({ config }: { config?: MemoryConfig }) {
+function MemoryFormFields({
+  config,
+  items,
+  setItems,
+}: {
+  config?: MemoryConfig;
+  items: MemoryItem[];
+  setItems: React.Dispatch<React.SetStateAction<MemoryItem[]>>;
+}) {
   const { form, setValue, errors } = useForm();
-  const acao = (form.acao as 'salvar' | 'buscar' | 'deletar') || 'salvar';
-  const [ttlPreset, setTtlPreset] = useState<string>('never');
-  const [customTtl, setCustomTtl] = useState<string>('');
+  const action = (form.action as 'save' | 'fetch' | 'delete') || 'save';
+  const ttlPreset = (form.ttlPreset as string) || 'never';
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (config) {
-        setValue('acao', config.acao || 'salvar');
-        setValue('chave', config.chave || '');
-        setValue('valor', config.valor || '');
-        setValue('ttl', config.ttl || undefined);
-        setValue('valorPadrao', config.valorPadrao || '');
+        setValue('action', config.action || 'save');
+        setValue('memoryName', config.memoryName || '');
+        setValue('defaultValue', config.defaultValue || '');
+
+        // Sincronizar items com o formulário APENAS quando config mudar
+        if (config.items && config.items.length > 0) {
+          setValue('items', config.items);
+        }
 
         // Definir preset de TTL
         if (config.ttl) {
           const ttlString = String(config.ttl);
           const preset = ttlPresets.find((p) => p.value === ttlString);
           if (preset) {
-            setTtlPreset(preset.value);
+            setValue('ttlPreset', preset.value);
           } else {
-            setTtlPreset('custom');
-            setCustomTtl(ttlString);
+            setValue('ttlPreset', 'custom');
+            setValue('customTtl', ttlString);
           }
         } else {
-          setTtlPreset('never');
+          setValue('ttlPreset', 'never');
         }
+      } else {
+        // Se não tem config, setar items inicial
+        setValue('items', items);
       }
     }, 0);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, setValue]);
 
-  const handleTtlPresetChange = (value: string) => {
-    setTtlPreset(value);
-
-    if (value === 'custom') {
-      setValue('ttl', customTtl ? Number(customTtl) : undefined);
-    } else if (value === 'never') {
-      setValue('ttl', undefined);
-    } else {
-      setValue('ttl', Number(value));
-    }
+  const addItem = () => {
+    const newItems = [...items, { key: '', value: '' }];
+    setItems(newItems);
+    setValue('items', newItems);
   };
 
-  const handleCustomTtlChange = (value: string) => {
-    setCustomTtl(value);
-    if (ttlPreset === 'custom') {
-      setValue('ttl', value ? Number(value) : undefined);
-    }
+  const removeItem = (index: number) => {
+    const newItems = items.filter((_, i) => i !== index);
+    setItems(newItems);
+    setValue('items', newItems);
+  };
+
+  const updateItem = (index: number, field: 'key' | 'value', val: string) => {
+    const newItems = [...items];
+    newItems[index][field] = val;
+    setItems(newItems);
+    setValue('items', newItems);
   };
 
   return (
@@ -96,42 +111,77 @@ function MemoryFormFields({ config }: { config?: MemoryConfig }) {
       <div className="p-1">
         <FormControl variant="label">Ação *</FormControl>
         <FormSelect
-          fieldName="acao"
+          fieldName="action"
           placeholder="Selecione a ação"
-          options={acaoOptions}
+          options={actionOptions}
           className="w-full"
         />
-        <Typography variant="span" className="text-xs text-neutral-600 mt-1">
-          {acao === 'salvar' && 'Salvar ou atualizar uma memória'}
-          {acao === 'buscar' && 'Recuperar valor de uma memória salva'}
-          {acao === 'deletar' && 'Apagar uma memória'}
-        </Typography>
       </div>
 
-      {/* Chave */}
+      {/* Nome da Memória */}
       <div className="p-1">
-        <FormControl variant="label">Chave (Nome da Memória) *</FormControl>
+        <FormControl variant="label">Identificador Único *</FormControl>
         <Input
           type="text"
-          fieldName="chave"
-          placeholder="Ex: nomeCliente, emailCliente, preferencia"
+          fieldName="memoryName"
+          placeholder="Ex: dadosCliente, informacoesPedido"
         />
-        <Typography variant="span" className="text-xs text-neutral-600 mt-1">
-          Identificador único da memória (apenas letras, números, _ e -)
-        </Typography>
       </div>
 
-      {/* Valor - Apenas para SALVAR */}
-      {acao === 'salvar' && (
-        <div className="p-1">
-          <FormControl variant="label">Valor *</FormControl>
-          <Textarea
-            fieldName="valor"
-            placeholder="Digite o valor ou use variáveis: {{$node.input.message.text}}"
-            rows={4}
-          />
-          <Typography variant="span" className="text-xs text-neutral-600 mt-1">
-            Você pode usar variáveis dinâmicas:{' '}
+      {/* Items (Chave/Valor) - Apenas para SALVAR */}
+      {action === 'save' && (
+        <div className="p-1 relative mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <FormControl variant="label">Pares Chave/Valor *</FormControl>
+            <Button
+              type="button"
+              onClick={addItem}
+              variant="gradient"
+              className="gap-1 text-sm w-fit absolute right-0 -top-4"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {items.map((item, index) => (
+              <div
+                key={index}
+                className="flex gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200 items-center"
+              >
+                <div className="flex-1 space-y-2">
+                  <Input
+                    type="text"
+                    fieldName={`item_key_${index}`}
+                    placeholder="Chave (ex: etapa, nome)"
+                    value={item.key}
+                    onChange={(e) => updateItem(index, 'key', e.target.value)}
+                  />
+                  <Input
+                    type="text"
+                    fieldName={`item_value_${index}`}
+                    placeholder="Valor ou variável: {{$node.input.campo}}"
+                    value={item.value}
+                    onChange={(e) => updateItem(index, 'value', e.target.value)}
+                  />
+                </div>
+                {items.length > 1 && (
+                  <Button
+                    type="button"
+                    onClick={() => removeItem(index)}
+                    variant="ghost"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-fit w-fit"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <Typography variant="span" className="text-xs text-neutral-600 mt-2">
+            Você pode usar variáveis dinâmicas no valor:{' '}
             <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">
               {'{{$node.input.campo}}'}
             </code>
@@ -140,30 +190,34 @@ function MemoryFormFields({ config }: { config?: MemoryConfig }) {
               {'{{$nodes.nodeId.output.campo}}'}
             </code>
           </Typography>
+
+          {errors?.items && (
+            <Typography variant="span" className="text-xs text-red-500 mt-1">
+              {String(errors.items)}
+            </Typography>
+          )}
         </div>
       )}
 
       {/* TTL - Apenas para SALVAR */}
-      {acao === 'salvar' && (
+      {action === 'save' && (
         <div className="p-1">
           <FormControl variant="label">Tempo de Expiração (TTL)</FormControl>
           <FormSelect
             fieldName="ttlPreset"
             placeholder="Selecione o tempo"
             options={ttlPresets}
-            className="w-full mb-2"
-            onChange={(e) => handleTtlPresetChange(e.target.value)}
-            value={ttlPreset}
+            className="w-full"
           />
 
           {ttlPreset === 'custom' && (
-            <Input
-              type="number"
-              fieldName="customTtl"
-              placeholder="Tempo em segundos"
-              value={customTtl}
-              onChange={(e) => handleCustomTtlChange(e.target.value)}
-            />
+            <div className="mt-2">
+              <Input
+                type="number"
+                fieldName="customTtl"
+                placeholder="Tempo em segundos"
+              />
+            </div>
           )}
 
           <Typography variant="span" className="text-xs text-neutral-600 mt-1">
@@ -173,12 +227,12 @@ function MemoryFormFields({ config }: { config?: MemoryConfig }) {
       )}
 
       {/* Valor Padrão - Apenas para BUSCAR */}
-      {acao === 'buscar' && (
+      {action === 'fetch' && (
         <div className="p-1">
           <FormControl variant="label">Valor Padrão (Opcional)</FormControl>
           <Input
             type="text"
-            fieldName="valorPadrao"
+            fieldName="defaultValue"
             placeholder="Valor retornado se memória não existir"
           />
           <Typography variant="span" className="text-xs text-neutral-600 mt-1">
@@ -186,24 +240,6 @@ function MemoryFormFields({ config }: { config?: MemoryConfig }) {
           </Typography>
         </div>
       )}
-
-      {/* Info sobre acesso às memórias */}
-      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mt-4">
-        <Typography
-          variant="span"
-          className="block mb-2 text-sm font-semibold text-blue-900"
-        >
-          💡 Como usar memórias
-        </Typography>
-        <Typography variant="span" className="text-xs text-blue-800">
-          {acao === 'salvar' &&
-            'Após salvar, a memória estará disponível em nodes seguintes via {{$memory.chave}}'}
-          {acao === 'buscar' &&
-            'O valor encontrado será retornado e pode ser usado em nodes seguintes'}
-          {acao === 'deletar' &&
-            'A memória será removida permanentemente do banco de dados'}
-        </Typography>
-      </div>
 
       <SubmitButton
         variant="gradient"
@@ -224,13 +260,35 @@ export function MemoryNodeConfig({
   nodeId,
   flowId,
 }: MemoryNodeConfigProps) {
+  const [items, setItems] = useState<MemoryItem[]>([{ key: '', value: '' }]);
+
+  // Carregar items quando config mudar
+  useEffect(() => {
+    if (config?.items && config.items.length > 0) {
+      setItems(config.items);
+    } else {
+      setItems([{ key: '', value: '' }]);
+    }
+  }, [config]);
+
   const handleSubmit = async (data: FieldValues) => {
+    // Processar TTL baseado no preset selecionado
+    let ttl: number | undefined = undefined;
+    if (data.ttlPreset && data.ttlPreset !== 'never') {
+      if (data.ttlPreset === 'custom') {
+        ttl = data.customTtl ? Number(data.customTtl) : undefined;
+      } else {
+        ttl = Number(data.ttlPreset);
+      }
+    }
+
     const memoryConfig: MemoryConfig = {
-      acao: data.acao as 'salvar' | 'buscar' | 'deletar',
-      chave: data.chave,
-      valor: data.valor,
-      ttl: data.ttl,
-      valorPadrao: data.valorPadrao,
+      action: data.action as 'save' | 'fetch' | 'delete',
+      memoryName: data.memoryName,
+      // Items apenas para action "save"
+      items: data.action === 'save' ? (data.items as MemoryItem[]) : undefined,
+      ttl: ttl,
+      defaultValue: data.defaultValue,
     };
 
     onSave(memoryConfig);
@@ -246,12 +304,12 @@ export function MemoryNodeConfig({
       flowId={flowId}
     >
       <Form
-        key={`${isOpen}-${config?.chave || 'new'}`}
+        key={`${isOpen}-${config?.memoryName || 'new'}`}
         className="flex flex-col gap-4"
         zodSchema={memoryConfigSchema}
         onSubmit={handleSubmit}
       >
-        <MemoryFormFields config={config} />
+        <MemoryFormFields config={config} items={items} setItems={setItems} />
       </Form>
     </NodeConfigLayout>
   );

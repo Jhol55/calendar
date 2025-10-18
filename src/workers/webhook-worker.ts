@@ -565,12 +565,17 @@ async function processMessageNode(
 }
 
 // Interface para configuração de memória
+interface MemoryItem {
+  key: string;
+  value: string;
+}
+
 interface MemoryConfig {
-  acao: 'salvar' | 'buscar' | 'deletar';
-  chave: string;
-  valor?: string;
+  action: 'save' | 'fetch' | 'delete';
+  memoryName: string;
+  items?: MemoryItem[];
   ttl?: number;
-  valorPadrao?: string;
+  defaultValue?: string;
 }
 
 // Processador do Memory Node
@@ -582,14 +587,15 @@ async function processMemoryNode(
   console.log('🧠 Processing memory node');
 
   const memoryConfig = node.data?.memoryConfig as MemoryConfig | undefined;
+
   if (!memoryConfig) {
     throw new Error('Memory configuration not found');
   }
 
-  const { acao, chave, valor, ttl, valorPadrao } = memoryConfig;
+  const { action, memoryName, items, ttl, defaultValue } = memoryConfig;
 
-  if (!chave) {
-    throw new Error('Chave (key) is required');
+  if (!memoryName) {
+    throw new Error('memoryName (memory name) is required');
   }
 
   try {
@@ -634,83 +640,98 @@ async function processMemoryNode(
       $memory,
     };
 
-    // Resolver variáveis na chave
-    const resolvedKey = replaceVariables(chave, variableContext);
+    // Resolver variáveis no nome da memória
+    const resolvedMemoryName = replaceVariables(memoryName, variableContext);
 
-    console.log(`🧠 Memory action: ${acao} - key: ${resolvedKey}`);
+    console.log(`🧠 Memory action: ${action} - name: ${resolvedMemoryName}`);
 
     // Processar baseado na ação
-    switch (acao) {
-      case 'salvar': {
-        if (valor === undefined) {
-          throw new Error('Valor is required for action "salvar"');
+    switch (action) {
+      case 'save': {
+        if (!items || items.length === 0) {
+          throw new Error('Items are required for action "save"');
         }
 
-        // Substituir variáveis no valor
-        const resolvedValue = replaceVariables(valor, variableContext);
+        // Processar cada item e substituir variáveis
+        const resolvedItems = items.map((item) => ({
+          key: replaceVariables(item.key, variableContext),
+          value: replaceVariables(item.value, variableContext),
+        }));
 
-        // Salvar memória
+        // Salvar memória como array de objetos
         const saveResult = await salvarMemoria(
           userId,
-          resolvedKey,
-          resolvedValue,
+          resolvedMemoryName,
+          JSON.stringify(resolvedItems), // Salvar como JSON string
           ttl,
         );
 
-        console.log(`💾 Memory saved: ${resolvedKey} = ${resolvedValue}`);
+        console.log(
+          `💾 Memory saved: ${resolvedMemoryName} with ${resolvedItems.length} items`,
+        );
 
         return {
           type: 'memory',
-          action: 'salvar',
-          key: resolvedKey,
-          value: resolvedValue,
+          action: 'save',
+          name: resolvedMemoryName,
+          items: resolvedItems,
           success: saveResult.success,
           expiresAt: saveResult.expiresAt,
         };
       }
 
-      case 'buscar': {
+      case 'fetch': {
         // Buscar memória
         const searchResult = await buscarMemoria(
           userId,
-          resolvedKey,
-          valorPadrao,
+          resolvedMemoryName,
+          defaultValue,
         );
 
+        // Se encontrou, tentar parsear como JSON
+        let parsedValue = searchResult.value;
+        if (searchResult.found && typeof searchResult.value === 'string') {
+          try {
+            parsedValue = JSON.parse(searchResult.value);
+          } catch {
+            // Se não for JSON válido, manter como string
+          }
+        }
+
         console.log(
-          `🔍 Memory search: ${resolvedKey}, found: ${searchResult.found}`,
+          `🔍 Memory search: ${resolvedMemoryName}, found: ${searchResult.found}`,
         );
 
         return {
           type: 'memory',
-          action: 'buscar',
-          key: resolvedKey,
-          value: searchResult.value,
+          action: 'fetch',
+          name: resolvedMemoryName,
+          value: parsedValue,
           found: searchResult.found,
           expired: searchResult.expired,
           usedDefault: !searchResult.found,
         };
       }
 
-      case 'deletar': {
+      case 'delete': {
         // Deletar memória
-        const deleteResult = await deletarMemoria(userId, resolvedKey);
+        const deleteResult = await deletarMemoria(userId, resolvedMemoryName);
 
         console.log(
-          `🗑️ Memory deleted: ${resolvedKey}, found: ${deleteResult.found}`,
+          `🗑️ Memory deleted: ${resolvedMemoryName}, found: ${deleteResult.found}`,
         );
 
         return {
           type: 'memory',
-          action: 'deletar',
-          key: resolvedKey,
+          action: 'delete',
+          name: resolvedMemoryName,
           success: deleteResult.success,
           found: deleteResult.found,
         };
       }
 
       default:
-        throw new Error(`Unknown memory action: ${acao}`);
+        throw new Error(`Unknown memory action: ${action}`);
     }
   } catch (error) {
     console.error(`❌ Error processing memory node:`, error);

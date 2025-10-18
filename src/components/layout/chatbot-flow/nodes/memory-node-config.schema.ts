@@ -1,30 +1,63 @@
 import { z } from 'zod';
 
+// Schema sem validações obrigatórias (validação condicional no superRefine)
+export const memoryItemSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+});
+
 export const memoryConfigSchema = z
   .object({
-    acao: z.enum(['salvar', 'buscar', 'deletar'], {
+    action: z.enum(['save', 'fetch', 'delete'], {
       required_error: 'Selecione uma ação',
     }),
-    chave: z
+    memoryName: z
       .string()
-      .min(1, 'Chave é obrigatória')
-      .max(255, 'Chave muito longa (máx 255 caracteres)'),
-    valor: z.string().optional(),
+      .min(1, 'Nome da memória é obrigatório')
+      .max(255, 'Nome muito longo (máx 255 caracteres)'),
+    items: z.array(memoryItemSchema).optional(),
     ttl: z.number().optional(),
-    valorPadrao: z.string().optional(),
+    ttlPreset: z.string().optional(),
+    customTtl: z.string().optional(),
+    defaultValue: z.string().optional(),
   })
-  .refine(
-    (data) => {
-      // Se ação é "salvar", valor é obrigatório
-      if (data.acao === 'salvar' && !data.valor) {
-        return false;
+  .superRefine((data, ctx) => {
+    // Validar items apenas se a ação for "save"
+    if (data.action === 'save') {
+      if (!data.items || data.items.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Adicione pelo menos um par chave/valor para salvar',
+          path: ['items'],
+        });
+        return;
       }
-      return true;
-    },
-    {
-      message: 'Valor é obrigatório para ação "salvar"',
-      path: ['valor'],
-    },
-  );
+
+      // Validar cada item apenas se a ação for "save"
+      data.items.forEach((item, index) => {
+        if (!item.key || item.key.trim() === '') {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Chave é obrigatória',
+            path: ['items', index, 'key'],
+          });
+        }
+        if (item.key && item.key.length > 255) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Chave muito longa (máx 255 caracteres)',
+            path: ['items', index, 'key'],
+          });
+        }
+        if (!item.value || item.value.trim() === '') {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Valor é obrigatório',
+            path: ['items', index, 'value'],
+          });
+        }
+      });
+    }
+  });
 
 export type MemoryConfigFormData = z.infer<typeof memoryConfigSchema>;

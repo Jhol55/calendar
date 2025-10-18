@@ -52,12 +52,17 @@ export interface WebhookConfig {
   };
 }
 
+export interface MemoryItem {
+  key: string;
+  value: string;
+}
+
 export interface MemoryConfig {
-  acao: 'salvar' | 'buscar' | 'deletar';
-  chave: string;
-  valor?: string;
+  action: 'save' | 'fetch' | 'delete';
+  memoryName: string;
+  items?: MemoryItem[];
   ttl?: number;
-  valorPadrao?: string;
+  defaultValue?: string;
 }
 
 export interface NodeData {

@@ -6,27 +6,28 @@ import { Typography } from '@/components/ui/typography';
 
 export const MemoryNode = memo(({ data }: NodeProps<NodeData>) => {
   const memoryConfig = data.memoryConfig;
-  const acao = memoryConfig?.acao || 'salvar';
-  const chave = memoryConfig?.chave || 'memória';
+  const action = memoryConfig?.action || 'save';
+  const memoryName = memoryConfig?.memoryName || 'memória';
+  const itemCount = memoryConfig?.items?.length || 0;
 
   // Cores e ícones por ação
-  const getAcaoStyle = () => {
-    switch (acao) {
-      case 'salvar':
+  const getActionStyle = () => {
+    switch (action) {
+      case 'save':
         return {
           bgColor: 'bg-purple-500',
           borderColor: 'border-purple-600',
           icon: <Save className="w-4 h-4" />,
           label: 'Salvar',
         };
-      case 'buscar':
+      case 'fetch':
         return {
           bgColor: 'bg-blue-500',
           borderColor: 'border-blue-600',
           icon: <Search className="w-4 h-4" />,
           label: 'Buscar',
         };
-      case 'deletar':
+      case 'delete':
         return {
           bgColor: 'bg-red-500',
           borderColor: 'border-red-600',
@@ -43,7 +44,7 @@ export const MemoryNode = memo(({ data }: NodeProps<NodeData>) => {
     }
   };
 
-  const style = getAcaoStyle();
+  const style = getActionStyle();
 
   return (
     <div
@@ -67,25 +68,33 @@ export const MemoryNode = memo(({ data }: NodeProps<NodeData>) => {
               variant="span"
               className="px-2 py-1 bg-neutral-100 text-purple-600 rounded font-mono text-xs truncate block"
             >
-              {chave}
+              {memoryName}
             </Typography>
+            {action === 'save' && itemCount > 0 && (
+              <Typography
+                variant="span"
+                className="text-xs text-gray-500 mt-1 block"
+              >
+                {itemCount} {itemCount === 1 ? 'item' : 'items'}
+              </Typography>
+            )}
           </div>
         </div>
       </div>
 
       {/* Informações adicionais */}
-      {memoryConfig?.ttl && acao === 'salvar' && (
+      {memoryConfig?.ttl && action === 'save' && (
         <Typography variant="span" className="mt-2 text-xs text-gray-600 block">
           ⏰ TTL: {memoryConfig.ttl}s
         </Typography>
       )}
 
-      {memoryConfig?.valorPadrao && acao === 'buscar' && (
+      {memoryConfig?.defaultValue && action === 'fetch' && (
         <Typography
           variant="span"
           className="mt-2 text-xs text-gray-600 truncate block"
         >
-          📝 Padrão: {memoryConfig.valorPadrao}
+          📝 Padrão: {memoryConfig.defaultValue}
         </Typography>
       )}
 
