@@ -5,6 +5,7 @@ export type NodeType =
   | 'condition'
   | 'action'
   | 'webhook'
+  | 'memory'
   | 'end';
 
 export type MessageType =
@@ -51,12 +52,21 @@ export interface WebhookConfig {
   };
 }
 
+export interface MemoryConfig {
+  acao: 'salvar' | 'buscar' | 'deletar';
+  chave: string;
+  valor?: string;
+  ttl?: number;
+  valorPadrao?: string;
+}
+
 export interface NodeData {
   label: string;
   type: NodeType;
   content?: string;
   messageConfig?: MessageConfig;
   webhookConfig?: WebhookConfig;
+  memoryConfig?: MemoryConfig;
   conditions?: Array<{
     field: string;
     operator: string;

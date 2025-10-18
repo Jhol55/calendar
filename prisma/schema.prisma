@@ -144,3 +144,17 @@ model flow_executions {
   @@index([startTime])
   @@index([triggerType])
 }
+
+model chatbot_memories {
+  id        String    @id @default(uuid())
+  userId    String    @db.VarChar(255) // Email do usuário logado
+  chave     String    @db.VarChar(255) // Nome da memória
+  valor     Json      @db.JsonB        // Valor (JSON flexível)
+  expiresAt DateTime? // TTL - null = nunca expira
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, chave])
+  @@index([userId])
+  @@index([expiresAt])
+}

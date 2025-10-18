@@ -5,6 +5,7 @@ import {
   GitBranch,
   Zap,
   Webhook,
+  Brain,
 } from 'lucide-react';
 import { NodeType } from './types';
 
@@ -51,6 +52,13 @@ const nodeTemplates: NodeTemplate[] = [
     icon: <Webhook className="w-5 h-5" />,
     description: 'Receber requisições HTTP',
     color: 'bg-green-500',
+  },
+  {
+    type: 'memory',
+    label: 'Memória',
+    icon: <Brain className="w-5 h-5" />,
+    description: 'Salvar/buscar dados do usuário',
+    color: 'bg-purple-600',
   },
 ];
 

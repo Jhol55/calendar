@@ -1,5 +1,11 @@
 import { webhookQueue, WebhookJobData } from '../services/queue';
 import { prisma } from '../services/prisma';
+import {
+  salvarMemoria,
+  buscarMemoria,
+  deletarMemoria,
+  listarMemorias,
+} from './memory-helper';
 
 // Função para substituir variáveis no texto
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -277,6 +283,9 @@ async function processNode(
       case 'message':
         result = await processMessageNode(executionId, node, webhookData);
         break;
+      case 'memory':
+        result = await processMemoryNode(executionId, node, webhookData);
+        break;
       case 'condition':
         result = await processConditionNode();
         break;
@@ -399,6 +408,9 @@ async function processMessageNode(
     // Buscar execução para obter dados de todos os nodes
     const execution = await prisma.flow_executions.findUnique({
       where: { id: executionId },
+      include: {
+        flow: true,
+      },
     });
 
     const nodeExecutions =
@@ -415,6 +427,12 @@ async function processMessageNode(
       }
     });
 
+    // Buscar todas as memórias do usuário para o contexto
+    const userId = execution?.flow?.userId
+      ? String(execution.flow.userId)
+      : null;
+    const $memory = userId ? await listarMemorias(userId) : {};
+
     // Preparar contexto para substituição de variáveis
     const variableContext = {
       $node: {
@@ -426,6 +444,7 @@ async function processMessageNode(
         },
       },
       $nodes, // Adicionar todos os nodes anteriores
+      $memory, // Adicionar todas as memórias do usuário
     };
 
     // Debug: Log do contexto disponível
@@ -541,6 +560,160 @@ async function processMessageNode(
     };
   } catch (error) {
     console.error(`❌ Error sending message:`, error);
+    throw error;
+  }
+}
+
+// Interface para configuração de memória
+interface MemoryConfig {
+  acao: 'salvar' | 'buscar' | 'deletar';
+  chave: string;
+  valor?: string;
+  ttl?: number;
+  valorPadrao?: string;
+}
+
+// Processador do Memory Node
+async function processMemoryNode(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  console.log('🧠 Processing memory node');
+
+  const memoryConfig = node.data?.memoryConfig as MemoryConfig | undefined;
+  if (!memoryConfig) {
+    throw new Error('Memory configuration not found');
+  }
+
+  const { acao, chave, valor, ttl, valorPadrao } = memoryConfig;
+
+  if (!chave) {
+    throw new Error('Chave (key) is required');
+  }
+
+  try {
+    // Buscar execução para obter flow e userId
+    const execution = await prisma.flow_executions.findUnique({
+      where: { id: executionId },
+      include: {
+        flow: true,
+      },
+    });
+
+    if (!execution?.flow?.userId) {
+      throw new Error('UserId not found in flow');
+    }
+
+    const userId = String(execution.flow.userId);
+
+    // Buscar dados de todos os nodes anteriores
+    const nodeExecutions =
+      (execution.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+
+    // Criar objeto $nodes com saídas de todos os nodes anteriores
+    const $nodes: Record<string, { output: unknown }> = {};
+    Object.keys(nodeExecutions).forEach((nodeId) => {
+      const nodeExec = nodeExecutions[nodeId];
+      if (nodeExec?.result) {
+        $nodes[nodeId] = {
+          output: nodeExec.result,
+        };
+      }
+    });
+
+    // Buscar todas as memórias do usuário para o contexto
+    const $memory = await listarMemorias(userId);
+
+    // Preparar contexto para substituição de variáveis
+    const variableContext = {
+      $node: {
+        input: webhookData.body,
+      },
+      $nodes,
+      $memory,
+    };
+
+    // Resolver variáveis na chave
+    const resolvedKey = replaceVariables(chave, variableContext);
+
+    console.log(`🧠 Memory action: ${acao} - key: ${resolvedKey}`);
+
+    // Processar baseado na ação
+    switch (acao) {
+      case 'salvar': {
+        if (valor === undefined) {
+          throw new Error('Valor is required for action "salvar"');
+        }
+
+        // Substituir variáveis no valor
+        const resolvedValue = replaceVariables(valor, variableContext);
+
+        // Salvar memória
+        const saveResult = await salvarMemoria(
+          userId,
+          resolvedKey,
+          resolvedValue,
+          ttl,
+        );
+
+        console.log(`💾 Memory saved: ${resolvedKey} = ${resolvedValue}`);
+
+        return {
+          type: 'memory',
+          action: 'salvar',
+          key: resolvedKey,
+          value: resolvedValue,
+          success: saveResult.success,
+          expiresAt: saveResult.expiresAt,
+        };
+      }
+
+      case 'buscar': {
+        // Buscar memória
+        const searchResult = await buscarMemoria(
+          userId,
+          resolvedKey,
+          valorPadrao,
+        );
+
+        console.log(
+          `🔍 Memory search: ${resolvedKey}, found: ${searchResult.found}`,
+        );
+
+        return {
+          type: 'memory',
+          action: 'buscar',
+          key: resolvedKey,
+          value: searchResult.value,
+          found: searchResult.found,
+          expired: searchResult.expired,
+          usedDefault: !searchResult.found,
+        };
+      }
+
+      case 'deletar': {
+        // Deletar memória
+        const deleteResult = await deletarMemoria(userId, resolvedKey);
+
+        console.log(
+          `🗑️ Memory deleted: ${resolvedKey}, found: ${deleteResult.found}`,
+        );
+
+        return {
+          type: 'memory',
+          action: 'deletar',
+          key: resolvedKey,
+          success: deleteResult.success,
+          found: deleteResult.found,
+        };
+      }
+
+      default:
+        throw new Error(`Unknown memory action: ${acao}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error processing memory node:`, error);
     throw error;
   }
 }

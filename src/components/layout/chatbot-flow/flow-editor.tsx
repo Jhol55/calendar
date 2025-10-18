@@ -28,12 +28,14 @@ import {
   ConditionNode,
   ActionNode,
   WebhookNode,
+  MemoryNode,
 } from './nodes';
 import {
   NodeType,
   NodeData,
   MessageConfig,
   WebhookConfig,
+  MemoryConfig,
 } from '../../layout/chatbot-flow/types';
 import { Save, Download, Upload, Plus, Play } from 'lucide-react';
 import {
@@ -46,6 +48,7 @@ import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { CreateWorkflowDialog } from '@/components/features/dialogs/create-workflow-dialog';
 import { WebhookNodeConfig } from './nodes/webhook-node-config';
+import { MemoryNodeConfig } from './nodes/memory-node-config';
 import { ExecutionsPanel } from './executions-panel';
 
 const nodeTypes = {
@@ -55,6 +58,7 @@ const nodeTypes = {
   condition: ConditionNode,
   action: ActionNode,
   webhook: WebhookNode,
+  memory: MemoryNode,
 };
 
 // Função para gerar IDs únicos
@@ -70,6 +74,7 @@ function FlowEditorContent() {
   const [flowName, setFlowName] = useState('');
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [webhookConfigDialogOpen, setWebhookConfigDialogOpen] = useState(false);
+  const [memoryConfigDialogOpen, setMemoryConfigDialogOpen] = useState(false);
   const [nodeToConfig, setNodeToConfig] = useState<Node<NodeData> | null>(null);
   const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -313,6 +318,9 @@ function FlowEditorContent() {
       } else if (node.type === 'webhook') {
         setNodeToConfig(node);
         setWebhookConfigDialogOpen(true);
+      } else if (node.type === 'memory') {
+        setNodeToConfig(node);
+        setMemoryConfigDialogOpen(true);
       } else if (node.type === 'start' || node.type === 'end') {
         // Start e End nodes não têm configuração
         return;
@@ -342,6 +350,15 @@ function FlowEditorContent() {
     [nodeToConfig, handleNodeUpdate],
   );
 
+  const handleSaveMemoryConfig = useCallback(
+    (config: MemoryConfig) => {
+      if (nodeToConfig) {
+        handleNodeUpdate(nodeToConfig.id, { memoryConfig: config });
+      }
+    },
+    [nodeToConfig, handleNodeUpdate],
+  );
+
   const nodeColor = (node: Node) => {
     switch (node.type) {
       case 'start':
@@ -358,6 +375,8 @@ function FlowEditorContent() {
         return '#f97316';
       case 'webhook':
         return '#10b981';
+      case 'memory':
+        return '#9333ea';
       default:
         return '#6b7280';
     }
@@ -504,6 +523,18 @@ function FlowEditorContent() {
         }}
         config={nodeToConfig?.data.webhookConfig}
         onSave={handleSaveWebhookConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
+      />
+
+      <MemoryNodeConfig
+        isOpen={memoryConfigDialogOpen}
+        onClose={() => {
+          setMemoryConfigDialogOpen(false);
+          setNodeToConfig(null);
+        }}
+        config={nodeToConfig?.data.memoryConfig}
+        onSave={handleSaveMemoryConfig}
         nodeId={nodeToConfig?.id}
         flowId={currentFlowId || undefined}
       />

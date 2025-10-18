@@ -25,8 +25,16 @@ async function startWorker() {
     const workerPath = join(__dirname, '../src/workers/webhook-worker.ts');
     await import(`file://${workerPath.replace(/\\/g, '/')}`);
 
+    // Importar e iniciar o job de limpeza de memórias
+    const cleanupPath = join(__dirname, '../src/workers/memory-cleanup.ts');
+    const { iniciarJobLimpezaMemoria } = await import(
+      `file://${cleanupPath.replace(/\\/g, '/')}`
+    );
+    iniciarJobLimpezaMemoria();
+
     console.log('🚀 Queue worker started');
     console.log('📊 Monitoring queues: webhook, flow, notification');
+    console.log('🧹 Memory cleanup job scheduled (daily at 3:00 AM)');
     console.log('⏹️  Press Ctrl+C to stop');
   } catch (error) {
     console.error('❌ Error starting worker:', error);
