@@ -270,3 +270,37 @@ export async function createInstance(name: string): Promise<UazapiResponse> {
     };
   }
 }
+
+export async function getInstanceWebhook(
+  token: string,
+): Promise<UazapiResponse> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/debug/instance-webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      message: 'Webhook da instância obtido com sucesso',
+      code: response.status,
+      data: data,
+    };
+  } catch (error) {
+    console.error('Erro ao buscar webhook da instância:', error);
+    return {
+      success: false,
+      message: 'Erro ao buscar webhook da instância',
+      code: 500,
+    };
+  }
+}

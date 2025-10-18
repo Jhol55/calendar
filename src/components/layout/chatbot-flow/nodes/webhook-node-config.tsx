@@ -13,6 +13,7 @@ import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
 import { useUser } from '@/hooks/use-user';
 import { NodeConfigLayout } from './node-config-layout';
+import { getInstanceWebhook } from '@/actions/uazapi/instance';
 
 interface WebhookNodeConfigProps {
   isOpen: boolean;
@@ -260,17 +261,11 @@ export function WebhookNodeConfig({
     if (data.serviceType === 'whatsapp' && data.instanceToken) {
       // Para WhatsApp, buscar o webhook real da instância no banco PostgreSQL
       try {
-        const response = await fetch('/api/debug/instance-webhook', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: data.instanceToken }),
-        });
+        const result = await getInstanceWebhook(data.instanceToken);
 
-        const result = await response.json();
-
-        if (result.webhook) {
+        if (result.success && result.data && (result.data as any).webhook) {
           // Usar o webhook real da instância
-          finalWebhookId = result.webhook;
+          finalWebhookId = (result.data as any).webhook;
           console.log('✅ Using instance webhook:', finalWebhookId);
         } else {
           // Fallback: usar o token da instância

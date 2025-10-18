@@ -12,19 +12,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
-
-interface Execution {
-  id: string;
-  status: 'running' | 'success' | 'error' | 'stopped';
-  triggerType: 'webhook' | 'manual' | 'schedule';
-  startTime: string;
-  endTime?: string;
-  duration?: number;
-  error?: string;
-  data?: any;
-  result?: any;
-  nodeExecutions?: any;
-}
+import { listExecutions, type Execution } from '@/actions/executions';
 
 interface ExecutionsPanelProps {
   flowId: string;
@@ -48,11 +36,20 @@ export function ExecutionsPanel({
   const fetchExecutions = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/executions?flowId=${flowId}&limit=20`);
-      const data = await response.json();
-      setExecutions(data.executions || []);
+      const result = await listExecutions({
+        flowId,
+        limit: 20,
+      });
+
+      if (result.success && result.executions) {
+        setExecutions(result.executions);
+      } else {
+        console.error('Error fetching executions:', result.error);
+        setExecutions([]);
+      }
     } catch (error) {
       console.error('Error fetching executions:', error);
+      setExecutions([]);
     } finally {
       setLoading(false);
     }

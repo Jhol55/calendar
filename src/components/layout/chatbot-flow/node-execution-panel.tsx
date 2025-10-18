@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Typography } from '@/components/ui/typography';
 import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
+import { listExecutions } from '@/actions/executions';
+import { getFlow } from '@/actions/chatbot-flows/flows';
 
 interface ExecutionData {
   input?: any;
@@ -171,13 +173,17 @@ export function NodeExecutionPanel({
 
       // Se não houver execução selecionada, buscar a última
       if (!execution) {
-        const response = await fetch(
-          `/api/executions?flowId=${flowId}&limit=1`,
-        );
-        const data = await response.json();
+        const result = await listExecutions({
+          flowId,
+          limit: 1,
+        });
 
-        if (data.executions && data.executions.length > 0) {
-          execution = data.executions[0];
+        if (
+          result.success &&
+          result.executions &&
+          result.executions.length > 0
+        ) {
+          execution = result.executions[0];
         }
       }
 
@@ -192,11 +198,10 @@ export function NodeExecutionPanel({
         > = {};
 
         try {
-          const flowResponse = await fetch(`/api/chatbot-flows/${flowId}`);
-          if (flowResponse.ok) {
-            const flowData = await flowResponse.json();
-            const edges = flowData.flow?.edges || [];
-            const nodes = flowData.flow?.nodes || [];
+          const flowResult = await getFlow(flowId);
+          if (flowResult.success && flowResult.flow) {
+            const edges = flowResult.flow.edges || [];
+            const nodes = flowResult.flow.nodes || [];
 
             // Função recursiva para encontrar TODOS os nodes anteriores na cadeia
             const findAllPreviousNodes = (
