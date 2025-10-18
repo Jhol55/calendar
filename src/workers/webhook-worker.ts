@@ -65,12 +65,12 @@ webhookQueue.process('process-webhook', async (job) => {
         },
         data: data.body,
         nodeExecutions: {
-          webhook: {
-            nodeId: data.nodeId,
+          [data.nodeId]: {
             status: 'completed',
             startTime: new Date().toISOString(),
             endTime: new Date().toISOString(),
             data: data.body,
+            result: data.body, // Salvar o body como resultado para o próximo node
           },
         },
       },
@@ -142,9 +142,9 @@ interface FlowEdge {
 }
 
 // Função para executar o fluxo completo
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function executeFlow(
   executionId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   flow: any,
   webhookData: WebhookJobData,
 ) {

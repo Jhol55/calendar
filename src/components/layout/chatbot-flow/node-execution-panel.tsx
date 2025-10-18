@@ -2,11 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { Typography } from '@/components/ui/typography';
-import { ChevronRight, Copy, Check } from 'lucide-react';
+import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 
 interface ExecutionData {
   input?: any;
   output?: any;
+  previousNodesOutputs?: Record<
+    string,
+    { nodeId: string; nodeLabel: string; output: any }
+  >;
 }
 
 interface NodeExecutionPanelProps {
@@ -14,6 +18,62 @@ interface NodeExecutionPanelProps {
   flowId: string;
   mode: 'input' | 'output';
   onVariableSelect?: (variablePath: string) => void;
+}
+
+// Componente para dropdown de node anterior
+function PreviousNodeDropdown({
+  nodeLabel,
+  nodeId,
+  output,
+  renderJsonTree,
+}: {
+  nodeLabel: string;
+  nodeId: string;
+  output: any;
+  renderJsonTree: (
+    obj: any,
+    parentPath: string,
+    level: number,
+  ) => React.ReactNode;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="mb-2 border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 p-3 hover:bg-gray-50 transition-colors"
+      >
+        {isExpanded ? (
+          <ChevronDown className="w-4 h-4 text-gray-600" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-gray-600" />
+        )}
+        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+        <Typography
+          variant="span"
+          className="text-sm font-medium text-gray-800"
+        >
+          {nodeLabel}
+        </Typography>
+        <Typography variant="span" className="text-xs text-gray-400 font-mono">
+          ({nodeId.substring(0, 8)}...)
+        </Typography>
+      </button>
+
+      {isExpanded && (
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+          {output ? (
+            renderJsonTree(output, `$nodes.${nodeId}.output`, 0)
+          ) : (
+            <Typography variant="small" className="text-gray-400">
+              Sem dados de saída
+            </Typography>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Componente separado para cada item da árvore (resolve o problema de hooks)
@@ -125,10 +185,61 @@ export function NodeExecutionPanel({
         const nodeExecutions = execution.nodeExecutions || {};
         const nodeData = nodeExecutions[nodeId];
 
-        setExecutionData({
+        // Debug: Ver o que está vindo do backend
+        console.log('🔍 NodeExecutionPanel Debug:', {
+          nodeId,
+          executionId: execution.id,
+          hasNodeData: !!nodeData,
+          nodeData,
+          allNodeExecutions: Object.keys(nodeExecutions),
+        });
+
+        // Buscar o flow para obter edges e informações dos nodes
+        let previousNodesOutputs: Record<
+          string,
+          { nodeId: string; nodeLabel: string; output: any }
+        > = {};
+
+        try {
+          const flowResponse = await fetch(`/api/chatbot-flows/${flowId}`);
+          if (flowResponse.ok) {
+            const flowData = await flowResponse.json();
+            const edges = flowData.flow?.edges || [];
+            const nodes = flowData.flow?.nodes || [];
+
+            // Encontrar todos os nodes que têm uma edge conectando a este node
+            const previousNodeIds = edges
+              .filter((edge: any) => edge.target === nodeId)
+              .map((edge: any) => edge.source);
+
+            // Para cada node anterior, buscar sua saída
+            previousNodeIds.forEach((prevNodeId: string) => {
+              const prevNodeExecution = nodeExecutions[prevNodeId];
+              const prevNode = nodes.find((n: any) => n.id === prevNodeId);
+
+              if (prevNodeExecution?.result) {
+                previousNodesOutputs[prevNodeId] = {
+                  nodeId: prevNodeId,
+                  nodeLabel:
+                    prevNode?.data?.label || prevNode?.type || prevNodeId,
+                  output: prevNodeExecution.result,
+                };
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching flow data:', error);
+        }
+
+        const finalExecutionData = {
           input: nodeData?.data || execution.data,
           output: nodeData?.result || null,
-        });
+          previousNodesOutputs,
+        };
+
+        console.log('📦 Setting execution data:', finalExecutionData);
+
+        setExecutionData(finalExecutionData);
       }
     } catch (error) {
       console.error('Error fetching execution data:', error);
@@ -228,13 +339,35 @@ export function NodeExecutionPanel({
             ? 'Clique no ícone de cópia para usar a variável'
             : 'Dados retornados após execução'}
         </Typography>
-        {data ? (
+
+        {mode === 'input' ? (
+          // Modo Input: Mostrar apenas os dropdowns dos nodes anteriores
+          executionData.previousNodesOutputs &&
+          Object.keys(executionData.previousNodesOutputs).length > 0 ? (
+            <div>
+              {Object.values(executionData.previousNodesOutputs).map(
+                (prevNode) => (
+                  <PreviousNodeDropdown
+                    key={prevNode.nodeId}
+                    nodeLabel={prevNode.nodeLabel}
+                    nodeId={prevNode.nodeId}
+                    output={prevNode.output}
+                    renderJsonTree={renderJsonTree}
+                  />
+                ),
+              )}
+            </div>
+          ) : (
+            <Typography variant="p" className="text-gray-400">
+              Nenhum node anterior encontrado
+            </Typography>
+          )
+        ) : // Modo Output: Mostrar dados de saída normalmente
+        data ? (
           renderJsonTree(data, pathPrefix)
         ) : (
           <Typography variant="p" className="text-gray-400">
-            {mode === 'input'
-              ? 'Nenhum dado de entrada'
-              : 'Nenhum dado de saída'}
+            Nenhum dado de saída
           </Typography>
         )}
       </div>

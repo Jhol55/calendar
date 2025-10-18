@@ -503,6 +503,8 @@ function FlowEditorContent() {
         }}
         config={nodeToConfig?.data.webhookConfig}
         onSave={handleSaveWebhookConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
       />
 
       <ExecutionsPanel

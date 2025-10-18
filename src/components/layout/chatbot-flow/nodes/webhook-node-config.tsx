@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Dialog } from '@/components/ui/dialog';
 import { Typography } from '@/components/ui/typography';
 import { WebhookConfig, HttpMethod } from '../types';
 import { Form } from '@/components/ui/form';
@@ -13,12 +12,15 @@ import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
 import { useUser } from '@/hooks/use-user';
+import { NodeConfigLayout } from './node-config-layout';
 
 interface WebhookNodeConfigProps {
   isOpen: boolean;
   onClose: () => void;
   config?: WebhookConfig;
   onSave: (config: WebhookConfig) => void;
+  nodeId?: string;
+  flowId?: string;
 }
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -233,6 +235,8 @@ export function WebhookNodeConfig({
   onClose,
   config,
   onSave,
+  nodeId,
+  flowId,
 }: WebhookNodeConfigProps) {
   const [webhookId, setWebhookId] = useState(() => {
     // Se já tem config, usar o webhookId existente
@@ -305,25 +309,21 @@ export function WebhookNodeConfig({
   };
 
   return (
-    <Dialog
+    <NodeConfigLayout
       isOpen={isOpen}
       onClose={onClose}
-      contentClassName="max-w-2xl overflow-hidden"
+      title="⚙️ Configurar Webhook"
+      nodeId={nodeId}
+      flowId={flowId}
     >
-      <div className="p-6 flex flex-col h-full" style={{ zoom: 0.9 }}>
-        <Typography variant="h2" className="mb-6">
-          Configurar Webhook
-        </Typography>
-
-        <Form
-          key={`${isOpen}-${config?.webhookId || 'new'}-${webhookId}`}
-          className="flex flex-col gap-4 flex-1 overflow-y-auto"
-          zodSchema={webhookConfigSchema}
-          onSubmit={handleSubmit}
-        >
-          <WebhookFormFields config={config} webhookId={webhookId} />
-        </Form>
-      </div>
-    </Dialog>
+      <Form
+        key={`${isOpen}-${config?.webhookId || 'new'}-${webhookId}`}
+        className="flex flex-col gap-4"
+        zodSchema={webhookConfigSchema}
+        onSubmit={handleSubmit}
+      >
+        <WebhookFormFields config={config} webhookId={webhookId} />
+      </Form>
+    </NodeConfigLayout>
   );
 }
