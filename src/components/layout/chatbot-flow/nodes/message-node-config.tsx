@@ -57,9 +57,43 @@ function MessageFormFields({
     id: string;
     text: string;
     description: string;
+    actionType?: 'copy' | 'link' | 'call'; // Tipo de ação do botão
   }
+
+  interface ListCategory {
+    id: string;
+    name: string;
+    items: Choice[];
+  }
+
+  interface CarouselCard {
+    id: string;
+    title: string;
+    description: string;
+    imageUrl: string;
+    buttons: Choice[];
+  }
+
   const [choices, setChoices] = useState<Choice[]>([
-    { id: '', text: '', description: '' },
+    { id: '', text: '', description: '', actionType: undefined },
+  ]);
+
+  const [listCategories, setListCategories] = useState<ListCategory[]>([
+    {
+      id: crypto.randomUUID(),
+      name: '',
+      items: [{ id: '', text: '', description: '', actionType: undefined }],
+    },
+  ]);
+
+  const [carouselCards, setCarouselCards] = useState<CarouselCard[]>([
+    {
+      id: crypto.randomUUID(),
+      title: '',
+      description: '',
+      imageUrl: '',
+      buttons: [{ id: '', text: '', description: '', actionType: undefined }],
+    },
   ]);
 
   useEffect(() => {
@@ -97,29 +131,216 @@ function MessageFormFields({
             config.interactiveMenu.selectableCount?.toString() || '1',
           );
 
-          // Converter strings com pipe de volta para objetos
-          const parsedChoices = (config.interactiveMenu.choices || []).map(
-            (choice) => {
-              if (!choice || typeof choice !== 'string') {
-                return { id: '', text: '', description: '' };
+          // Se for tipo "list", parsear com categorias hierárquicas
+          if (config.interactiveMenu.type === 'list') {
+            const rawChoices = config.interactiveMenu.choices || [];
+            const categories: ListCategory[] = [];
+            let currentCategory: ListCategory | null = null;
+
+            rawChoices.forEach((choice) => {
+              if (!choice || typeof choice !== 'string') return;
+
+              // Se começa com [, é uma categoria
+              if (choice.startsWith('[') && choice.endsWith(']')) {
+                const categoryName = choice.slice(1, -1);
+                currentCategory = {
+                  id: crypto.randomUUID(),
+                  name: categoryName,
+                  items: [],
+                };
+                categories.push(currentCategory);
+              } else {
+                // É um item da categoria
+                const parts = choice.split('|');
+                const item = {
+                  text: parts[0] || '',
+                  id: parts[1] || '',
+                  description: parts[2] || '',
+                };
+
+                if (currentCategory) {
+                  currentCategory.items.push(item);
+                } else {
+                  // Se não há categoria, criar uma padrão
+                  if (categories.length === 0) {
+                    currentCategory = {
+                      id: crypto.randomUUID(),
+                      name: '',
+                      items: [],
+                    };
+                    categories.push(currentCategory);
+                  }
+                  categories[0].items.push(item);
+                }
               }
-              const parts = choice.split('|');
-              return {
-                text: parts[0] || '',
-                id: parts[1] || '',
-                description: parts[2] || '',
-              };
-            },
-          );
-          setChoices(
-            parsedChoices.length > 0
-              ? parsedChoices
-              : [{ id: '', text: '', description: '' }],
-          );
+            });
+
+            setListCategories(
+              categories.length > 0
+                ? categories
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      name: '',
+                      items: [{ id: '', text: '', description: '' }],
+                    },
+                  ],
+            );
+          } else if (config.interactiveMenu.type === 'carousel') {
+            // Parsear carousel cards
+            const rawChoices = config.interactiveMenu.choices || [];
+            const cards: CarouselCard[] = [];
+            let currentCard: CarouselCard | null = null;
+
+            rawChoices.forEach((choice) => {
+              if (!choice || typeof choice !== 'string') return;
+
+              // Se começa com [, é um título de cartão (formato: [Título\nDescrição])
+              if (choice.startsWith('[') && choice.endsWith(']')) {
+                const content = choice.slice(1, -1);
+                const parts = content.split('\n');
+                currentCard = {
+                  id: crypto.randomUUID(),
+                  title: parts[0] || '',
+                  description: parts[1] || '',
+                  imageUrl: '',
+                  buttons: [],
+                };
+                cards.push(currentCard);
+              } else if (choice.startsWith('{') && choice.endsWith('}')) {
+                // É a URL da imagem do cartão
+                if (currentCard) {
+                  currentCard.imageUrl = choice.slice(1, -1);
+                }
+              } else {
+                // É um botão do cartão
+                const parts = choice.split('|');
+                const rawId = parts[1] || '';
+
+                // Detectar tipo de ação
+                let actionType: 'copy' | 'link' | 'call' | undefined =
+                  undefined;
+                let cleanId = rawId;
+
+                if (rawId.startsWith('copy:')) {
+                  actionType = 'copy';
+                  cleanId = rawId.replace('copy:', '');
+                } else if (rawId.startsWith('call:')) {
+                  actionType = 'call';
+                  cleanId = rawId.replace('call:', '');
+                } else if (rawId.startsWith('http')) {
+                  actionType = 'link';
+                  cleanId = rawId;
+                }
+
+                const button = {
+                  text: parts[0] || '',
+                  id: cleanId,
+                  description: '',
+                  actionType,
+                };
+
+                if (currentCard) {
+                  currentCard.buttons.push(button);
+                }
+              }
+            });
+
+            setCarouselCards(
+              cards.length > 0
+                ? cards
+                : [
+                    {
+                      id: crypto.randomUUID(),
+                      title: '',
+                      description: '',
+                      imageUrl: '',
+                      buttons: [
+                        {
+                          id: '',
+                          text: '',
+                          description: '',
+                          actionType: undefined,
+                        },
+                      ],
+                    },
+                  ],
+            );
+
+            // Definir valores dos FormSelects de actionType para carousel buttons
+            cards.forEach((card) => {
+              card.buttons.forEach((button, buttonIndex) => {
+                if (button.actionType) {
+                  setValue(
+                    `card_${card.id}_button_actionType_${buttonIndex}`,
+                    button.actionType,
+                  );
+                }
+              });
+            });
+          } else {
+            // Para outros tipos (button, poll), usar o formato simples
+            const parsedChoices = (config.interactiveMenu.choices || []).map(
+              (choice) => {
+                if (!choice || typeof choice !== 'string') {
+                  return {
+                    id: '',
+                    text: '',
+                    description: '',
+                    actionType: undefined,
+                  };
+                }
+                const parts = choice.split('|');
+                const rawId = parts[1] || '';
+
+                // Detectar tipo de ação
+                let actionType: 'copy' | 'link' | 'call' | undefined =
+                  undefined;
+                let cleanId = rawId;
+
+                if (rawId.startsWith('copy:')) {
+                  actionType = 'copy';
+                  cleanId = rawId.replace('copy:', '');
+                } else if (rawId.startsWith('call:')) {
+                  actionType = 'call';
+                  cleanId = rawId.replace('call:', '');
+                } else if (rawId.startsWith('http')) {
+                  actionType = 'link';
+                  cleanId = rawId;
+                }
+
+                return {
+                  text: parts[0] || '',
+                  id: cleanId,
+                  description: parts[2] || '',
+                  actionType,
+                };
+              },
+            );
+            setChoices(
+              parsedChoices.length > 0
+                ? parsedChoices
+                : [
+                    {
+                      id: '',
+                      text: '',
+                      description: '',
+                      actionType: undefined,
+                    },
+                  ],
+            );
+
+            // Definir valores dos FormSelects de actionType para buttons
+            parsedChoices.forEach((choice, index) => {
+              if (choice.actionType) {
+                setValue(`choice_actionType_${index}`, choice.actionType);
+              }
+            });
+          }
 
           setValue(
             'interactiveMenuChoices',
-            JSON.stringify(config.interactiveMenu.choices || ['']),
+            JSON.stringify(config.interactiveMenu.choices || []),
           );
         }
       }
@@ -127,25 +348,119 @@ function MessageFormFields({
     return () => clearTimeout(timer);
   }, [config, setValue]);
 
+  // Sincronizar actionType dos FormSelects com o estado choices/carouselCards
+  useEffect(() => {
+    if (interactiveMenuType === 'button') {
+      choices.forEach((choice, index) => {
+        if (choice.actionType) {
+          setValue(`choice_actionType_${index}`, choice.actionType);
+        }
+      });
+    } else if (interactiveMenuType === 'carousel') {
+      carouselCards.forEach((card) => {
+        card.buttons.forEach((button, buttonIndex) => {
+          if (button.actionType) {
+            setValue(
+              `card_${card.id}_button_actionType_${buttonIndex}`,
+              button.actionType,
+            );
+          }
+        });
+      });
+    }
+  }, [choices, carouselCards, interactiveMenuType, setValue]);
+
   // Atualizar choices no formulário quando mudar (converter para strings com pipe)
   useEffect(() => {
-    // Converter objetos para strings no formato "texto|id|descrição"
-    const choicesStrings = choices
-      .map((choice) => {
-        // Se não tiver texto, não incluir essa opção
-        if (!choice.text || choice.text.trim() === '') return '';
+    if (interactiveMenuType === 'list') {
+      // Para tipo "list", serializar categorias e itens em formato hierárquico
+      const choicesStrings: string[] = [];
 
-        // Montar string: texto|id|descrição
-        // Sempre incluir os pipes, mesmo se id ou descrição estiverem vazios
-        return `${choice.text}|${choice.id || ''}|${choice.description || ''}`;
-      })
-      .filter((str) => str !== ''); // Remover strings vazias
+      listCategories.forEach((category) => {
+        // Adicionar categoria se tiver nome
+        if (category.name && category.name.trim() !== '') {
+          choicesStrings.push(`[${category.name}]`);
+        }
 
-    setValue('interactiveMenuChoices', JSON.stringify(choicesStrings));
-  }, [choices, setValue]);
+        // Adicionar itens da categoria
+        category.items.forEach((item) => {
+          if (item.text && item.text.trim() !== '') {
+            choicesStrings.push(
+              `${item.text}|${item.id || ''}|${item.description || ''}`,
+            );
+          }
+        });
+      });
 
+      setValue('interactiveMenuChoices', JSON.stringify(choicesStrings));
+    } else if (interactiveMenuType === 'carousel') {
+      // Para tipo "carousel", serializar cartões e botões
+      const choicesStrings: string[] = [];
+
+      carouselCards.forEach((card) => {
+        // Adicionar título e descrição do cartão (formato: [Título\nDescrição])
+        if (card.title && card.title.trim() !== '') {
+          const titleLine = card.description
+            ? `[${card.title}\n${card.description}]`
+            : `[${card.title}]`;
+          choicesStrings.push(titleLine);
+        }
+
+        // Adicionar URL da imagem (formato: {URL})
+        if (card.imageUrl && card.imageUrl.trim() !== '') {
+          choicesStrings.push(`{${card.imageUrl}}`);
+        }
+
+        // Adicionar botões do cartão
+        card.buttons.forEach((button) => {
+          if (button.text && button.text.trim() !== '') {
+            // Montar ID com prefixo baseado no actionType
+            let finalId = button.id || '';
+            if (button.actionType === 'copy') {
+              finalId = `copy:${button.id}`;
+            } else if (button.actionType === 'call') {
+              finalId = `call:${button.id}`;
+            }
+            // Para 'link', não adiciona prefixo (já é a URL completa)
+
+            choicesStrings.push(`${button.text}|${finalId}`);
+          }
+        });
+      });
+
+      setValue('interactiveMenuChoices', JSON.stringify(choicesStrings));
+    } else {
+      // Para outros tipos (button, poll), usar o formato simples
+      const choicesStrings = choices
+        .map((choice) => {
+          // Se não tiver texto, não incluir essa opção
+          if (!choice.text || choice.text.trim() === '') return '';
+
+          // Montar ID com prefixo baseado no actionType
+          let finalId = choice.id || '';
+          if (choice.actionType === 'copy') {
+            finalId = `copy:${choice.id}`;
+          } else if (choice.actionType === 'call') {
+            finalId = `call:${choice.id}`;
+          }
+          // Para 'link', não adiciona prefixo (já é a URL completa)
+
+          // Montar string: texto|id|descrição
+          // Sempre incluir os pipes, mesmo se id ou descrição estiverem vazios
+          return `${choice.text}|${finalId}|${choice.description || ''}`;
+        })
+        .filter((str) => str !== ''); // Remover strings vazias
+
+      setValue('interactiveMenuChoices', JSON.stringify(choicesStrings));
+    }
+  }, [choices, listCategories, carouselCards, interactiveMenuType, setValue]);
+
+  // Funções para gerenciar choices simples (button, poll)
   const addChoice = () => {
-    setChoices([...choices, { id: '', text: '', description: '' }]);
+    setChoices([
+      ...choices,
+      { id: '', text: '', description: '', actionType: undefined },
+    ]);
   };
 
   const removeChoice = (index: number) => {
@@ -156,7 +471,7 @@ function MessageFormFields({
 
   const updateChoice = (
     index: number,
-    field: 'id' | 'text' | 'description',
+    field: 'id' | 'text' | 'description' | 'actionType',
     value: string,
   ) => {
     const newChoices = [...choices];
@@ -165,6 +480,176 @@ function MessageFormFields({
       [field]: value,
     };
     setChoices(newChoices);
+
+    // Se for actionType, atualizar também o campo do formulário
+    if (field === 'actionType') {
+      setValue(`choice_actionType_${index}`, value);
+    }
+  };
+
+  // Funções para gerenciar categorias (tipo list)
+  const addCategory = () => {
+    setListCategories([
+      ...listCategories,
+      {
+        id: crypto.randomUUID(),
+        name: '',
+        items: [{ id: '', text: '', description: '', actionType: undefined }],
+      },
+    ]);
+  };
+
+  const removeCategory = (categoryId: string) => {
+    if (listCategories.length > 1) {
+      setListCategories(listCategories.filter((cat) => cat.id !== categoryId));
+    }
+  };
+
+  const updateCategoryName = (categoryId: string, name: string) => {
+    setListCategories(
+      listCategories.map((cat) =>
+        cat.id === categoryId ? { ...cat, name } : cat,
+      ),
+    );
+  };
+
+  const addItemToCategory = (categoryId: string) => {
+    setListCategories(
+      listCategories.map((cat) =>
+        cat.id === categoryId
+          ? {
+              ...cat,
+              items: [
+                ...cat.items,
+                { id: '', text: '', description: '', actionType: undefined },
+              ],
+            }
+          : cat,
+      ),
+    );
+  };
+
+  const removeItemFromCategory = (categoryId: string, itemIndex: number) => {
+    setListCategories(
+      listCategories.map((cat) => {
+        if (cat.id === categoryId && cat.items.length > 1) {
+          return {
+            ...cat,
+            items: cat.items.filter((_, i) => i !== itemIndex),
+          };
+        }
+        return cat;
+      }),
+    );
+  };
+
+  const updateCategoryItem = (
+    categoryId: string,
+    itemIndex: number,
+    field: 'id' | 'text' | 'description',
+    value: string,
+  ) => {
+    setListCategories(
+      listCategories.map((cat) => {
+        if (cat.id === categoryId) {
+          const newItems = [...cat.items];
+          newItems[itemIndex] = {
+            ...newItems[itemIndex],
+            [field]: value,
+          };
+          return { ...cat, items: newItems };
+        }
+        return cat;
+      }),
+    );
+  };
+
+  // Funções para gerenciar carousel cards
+  const addCarouselCard = () => {
+    setCarouselCards([
+      ...carouselCards,
+      {
+        id: crypto.randomUUID(),
+        title: '',
+        description: '',
+        imageUrl: '',
+        buttons: [{ id: '', text: '', description: '', actionType: undefined }],
+      },
+    ]);
+  };
+
+  const removeCarouselCard = (cardId: string) => {
+    if (carouselCards.length > 1) {
+      setCarouselCards(carouselCards.filter((card) => card.id !== cardId));
+    }
+  };
+
+  const updateCarouselCard = (
+    cardId: string,
+    field: 'title' | 'description' | 'imageUrl',
+    value: string,
+  ) => {
+    setCarouselCards(
+      carouselCards.map((card) =>
+        card.id === cardId ? { ...card, [field]: value } : card,
+      ),
+    );
+  };
+
+  const addButtonToCard = (cardId: string) => {
+    setCarouselCards(
+      carouselCards.map((card) =>
+        card.id === cardId
+          ? {
+              ...card,
+              buttons: [
+                ...card.buttons,
+                { id: '', text: '', description: '', actionType: undefined },
+              ],
+            }
+          : card,
+      ),
+    );
+  };
+
+  const removeButtonFromCard = (cardId: string, buttonIndex: number) => {
+    setCarouselCards(
+      carouselCards.map((card) => {
+        if (card.id === cardId && card.buttons.length > 1) {
+          return {
+            ...card,
+            buttons: card.buttons.filter((_, i) => i !== buttonIndex),
+          };
+        }
+        return card;
+      }),
+    );
+  };
+
+  const updateCardButton = (
+    cardId: string,
+    buttonIndex: number,
+    field: 'id' | 'text' | 'actionType',
+    value: string,
+  ) => {
+    setCarouselCards(
+      carouselCards.map((card) => {
+        if (card.id === cardId) {
+          const newButtons = [...card.buttons];
+          newButtons[buttonIndex] = {
+            ...newButtons[buttonIndex],
+            [field]: value,
+          };
+          return { ...card, buttons: newButtons };
+        }
+        return card;
+      }),
+    );
+
+    // Se for actionType, atualizar também o campo do formulário
+    if (field === 'actionType') {
+      setValue(`card_${cardId}_button_actionType_${buttonIndex}`, value);
+    }
   };
 
   return (
@@ -314,134 +799,575 @@ function MessageFormFields({
 
           {/* Choices */}
           <div className="p-1">
-            <FormControl variant="label">
-              Opções *{' '}
-              <Typography
-                variant="span"
-                className="text-xs text-gray-500 font-normal"
-              >
-                {interactiveMenuType === 'button' &&
-                  '- Configure botões com ações'}
-                {interactiveMenuType === 'list' &&
-                  '- Use [Seção] no texto para criar seções'}
-                {interactiveMenuType === 'poll' &&
-                  '- Configure as opções de votação'}
-                {interactiveMenuType === 'carousel' &&
-                  '- Use [Título] no texto, {URL} no ID para imagens'}
-              </Typography>
-            </FormControl>
-            <div className="space-y-3 mt-2">
-              {choices.map((choice, index) => (
-                <div
-                  key={index}
-                  className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2"
+            {(interactiveMenuType === 'list' ||
+              interactiveMenuType === 'carousel') && (
+              <div className="flex items-center justify-between gap-2 relative mt-4">
+                <FormControl variant="label">
+                  {interactiveMenuType === 'list'
+                    ? 'Categorias e Opções *'
+                    : 'Cartões *'}{' '}
+                </FormControl>
+                <Button
+                  type="button"
+                  variant="gradient"
+                  onClick={
+                    interactiveMenuType === 'list'
+                      ? addCategory
+                      : addCarouselCard
+                  }
+                  className="w-fit gap-2 absolute right-0 -top-5"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <Typography
-                      variant="span"
-                      className="text-sm font-medium text-gray-700"
-                    >
-                      Opção {index + 1}
-                    </Typography>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => removeChoice(index)}
-                      disabled={choices.length === 1}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <Plus className="w-4 h-4" />
+                  {interactiveMenuType === 'list'
+                    ? 'Adicionar Nova Categoria'
+                    : 'Adicionar Novo Cartão'}
+                </Button>
+              </div>
+            )}
 
-                  <div>
-                    <FormControl variant="label">
-                      <Typography variant="span" className="text-sm">
-                        Texto *
-                      </Typography>
-                    </FormControl>
-                    <Input
-                      type="text"
-                      fieldName={`choice_text_${index}`}
-                      value={choice.text}
-                      onChange={(e) =>
-                        updateChoice(index, 'text', e.target.value)
-                      }
-                      placeholder={
-                        interactiveMenuType === 'button'
-                          ? 'Ex: Suporte Técnico'
-                          : interactiveMenuType === 'list'
-                            ? 'Ex: Smartphones ou [Eletrônicos]'
-                            : interactiveMenuType === 'carousel'
-                              ? 'Ex: [Produto XYZ]'
-                              : 'Ex: Manhã (8h-12h)'
-                      }
-                    />
-                  </div>
+            {/* UI Hierárquica para tipo LIST */}
+            {interactiveMenuType === 'list' ? (
+              <div className="space-y-4 mt-2">
+                {listCategories.map((category, catIndex) => (
+                  <div
+                    key={category.id}
+                    className="p-4 border-2 border-neutral-200 rounded-lg bg-white"
+                  >
+                    {/* Header da Categoria */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex flex-1 flex-col">
+                        <div className="flex items-center justify-between gap-2 relative">
+                          <FormControl variant="label" className="mb-2">
+                            <Typography
+                              variant="span"
+                              className="font-semibold"
+                            >
+                              Categoria {catIndex + 1}{' '}
+                              {catIndex + 1 === 1 && (
+                                <Typography
+                                  variant="span"
+                                  className="text-sm text-gray-600 mt-1 whitespace-nowrap"
+                                >
+                                  (Deixe vazio para não criar seção)
+                                </Typography>
+                              )}
+                            </Typography>
+                          </FormControl>
+                          {listCategories?.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => removeCategory(category.id)}
+                              disabled={listCategories.length === 1}
+                              className="absolute right-0 -top-3 text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-fit w-fit"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <Input
+                          type="text"
+                          fieldName={`category_name_${category.id}`}
+                          value={category.name}
+                          onChange={(e) =>
+                            updateCategoryName(category.id, e.target.value)
+                          }
+                          placeholder="Ex: Eletrônicos, Acessórios, etc (opcional)"
+                        />
+                      </div>
+                    </div>
 
-                  <div>
-                    <FormControl variant="label">
-                      <Typography variant="span" className="text-sm">
-                        Identificador
-                      </Typography>
-                    </FormControl>
-                    <Input
-                      type="text"
-                      fieldName={`choice_id_${index}`}
-                      value={choice.id}
-                      onChange={(e) =>
-                        updateChoice(index, 'id', e.target.value)
-                      }
-                      placeholder={
-                        interactiveMenuType === 'button'
-                          ? 'Ex: suporte ou https://... ou call:+5511...'
-                          : interactiveMenuType === 'list'
-                            ? 'Ex: phones'
-                            : interactiveMenuType === 'carousel'
-                              ? 'Ex: {https://img.jpg} ou copy:PROMO'
-                              : 'Deixe vazio para enquetes'
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <FormControl variant="label">
-                      <Typography variant="span" className="text-sm">
-                        Descrição{' '}
-                        <Typography
-                          variant="span"
-                          className="text-xs text-gray-500 font-normal"
+                    {/* Itens da Categoria */}
+                    <div className="space-y-2 ml-4 pl-4 border-l-2 border-neutral-300">
+                      {category.items.map((item, itemIndex) => (
+                        <div
+                          key={itemIndex}
+                          className="p-3 border border-gray-300 rounded-lg bg-white space-y-2"
                         >
-                          (opcional)
-                        </Typography>
-                      </Typography>
-                    </FormControl>
-                    <Input
-                      type="text"
-                      fieldName={`choice_description_${index}`}
-                      value={choice.description}
-                      onChange={(e) =>
-                        updateChoice(index, 'description', e.target.value)
-                      }
-                      placeholder={
-                        interactiveMenuType === 'list'
-                          ? 'Ex: Últimos lançamentos'
-                          : 'Descrição adicional (opcional)'
-                      }
-                    />
+                          <div className="flex items-center justify-between mb-2">
+                            <Typography
+                              variant="span"
+                              className="text-sm font-semibold text-gray-600"
+                            >
+                              Opção {itemIndex + 1}
+                            </Typography>
+                            {choices?.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() =>
+                                  removeItemFromCategory(category.id, itemIndex)
+                                }
+                                disabled={category.items.length === 1}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <div>
+                            <FormControl variant="label">
+                              <Typography variant="span" className="text-sm">
+                                Texto *
+                              </Typography>
+                            </FormControl>
+                            <Input
+                              type="text"
+                              fieldName={`category_${category.id}_item_text_${itemIndex}`}
+                              value={item.text}
+                              onChange={(e) =>
+                                updateCategoryItem(
+                                  category.id,
+                                  itemIndex,
+                                  'text',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Ex: Smartphones"
+                            />
+                          </div>
+
+                          <div>
+                            <FormControl variant="label">
+                              <Typography variant="span" className="text-SM">
+                                ID
+                              </Typography>
+                            </FormControl>
+                            <Input
+                              type="text"
+                              fieldName={`category_${category.id}_item_id_${itemIndex}`}
+                              value={item.id}
+                              onChange={(e) =>
+                                updateCategoryItem(
+                                  category.id,
+                                  itemIndex,
+                                  'id',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Ex: phones"
+                            />
+                          </div>
+
+                          <div>
+                            <FormControl variant="label">
+                              <Typography variant="span" className="text-sm">
+                                Descrição
+                              </Typography>
+                            </FormControl>
+                            <Input
+                              type="text"
+                              fieldName={`category_${category.id}_item_desc_${itemIndex}`}
+                              value={item.description}
+                              onChange={(e) =>
+                                updateCategoryItem(
+                                  category.id,
+                                  itemIndex,
+                                  'description',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Ex: Últimos lançamentos"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="default"
+                        onClick={() => addItemToCategory(category.id)}
+                        className="w-full gap-2 text-sm"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Adicionar Item nesta Categoria
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="gradient"
-                onClick={addChoice}
-                className="w-full gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Adicionar Opção
-              </Button>
-            </div>
+                ))}
+              </div>
+            ) : interactiveMenuType === 'carousel' ? (
+              // UI Hierárquica para tipo CAROUSEL
+              <div className="space-y-4 mt-2">
+                {carouselCards.map((card, cardIndex) => (
+                  <div
+                    key={card.id}
+                    className="p-4 border-2 border-neutral-200 rounded-lg bg-white"
+                  >
+                    {/* Header do Cartão */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex flex-1 flex-col space-y-3">
+                        <div className="flex items-center justify-between gap-2 relative">
+                          <FormControl variant="label" className="mb-2">
+                            <Typography
+                              variant="span"
+                              className="font-semibold"
+                            >
+                              🎴 Cartão {cardIndex + 1}
+                            </Typography>
+                          </FormControl>
+                          {carouselCards?.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => removeCarouselCard(card.id)}
+                              disabled={carouselCards.length === 1}
+                              className="absolute right-0 -top-3 text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-fit w-fit"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Título do Cartão */}
+                        <div>
+                          <FormControl variant="label">
+                            <Typography variant="span" className="text-sm">
+                              Título *
+                            </Typography>
+                          </FormControl>
+                          <Input
+                            type="text"
+                            fieldName={`card_title_${card.id}`}
+                            value={card.title}
+                            onChange={(e) =>
+                              updateCarouselCard(
+                                card.id,
+                                'title',
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Ex: Smartphone XYZ"
+                          />
+                        </div>
+
+                        {/* Descrição do Cartão */}
+                        <div>
+                          <FormControl variant="label">
+                            <Typography variant="span" className="text-sm">
+                              Descrição{' '}
+                              <Typography
+                                variant="span"
+                                className="text-xs text-gray-500 font-normal"
+                              >
+                                (opcional)
+                              </Typography>
+                            </Typography>
+                          </FormControl>
+                          <Textarea
+                            fieldName={`card_description_${card.id}`}
+                            value={card.description}
+                            onChange={(e) =>
+                              updateCarouselCard(
+                                card.id,
+                                'description',
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Ex: O mais avançado smartphone da linha"
+                            rows={2}
+                          />
+                        </div>
+
+                        {/* URL da Imagem */}
+                        <div>
+                          <FormControl variant="label">
+                            <Typography variant="span" className="text-sm">
+                              URL da Imagem *
+                            </Typography>
+                          </FormControl>
+                          <Input
+                            type="url"
+                            fieldName={`card_image_${card.id}`}
+                            value={card.imageUrl}
+                            onChange={(e) =>
+                              updateCarouselCard(
+                                card.id,
+                                'imageUrl',
+                                e.target.value,
+                              )
+                            }
+                            placeholder="https://exemplo.com/produto.jpg"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botões do Cartão */}
+                    <div className="space-y-2 ml-4 pl-4 border-l-2 border-neutral-300">
+                      <Typography
+                        variant="span"
+                        className="text-sm font-medium text-gray-700"
+                      >
+                        Botões do cartão:
+                      </Typography>
+                      {card.buttons.map((button, buttonIndex) => (
+                        <div
+                          key={buttonIndex}
+                          className="p-3 border border-gray-300 rounded-lg bg-white space-y-2"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <Typography
+                              variant="span"
+                              className="text-sm font-semibold text-gray-600"
+                            >
+                              Botão {buttonIndex + 1}
+                            </Typography>
+                            {card.buttons?.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() =>
+                                  removeButtonFromCard(card.id, buttonIndex)
+                                }
+                                disabled={card.buttons.length === 1}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <div>
+                            <FormControl variant="label">
+                              <Typography variant="span" className="text-sm">
+                                Texto do Botão *
+                              </Typography>
+                            </FormControl>
+                            <Input
+                              type="text"
+                              fieldName={`card_${card.id}_button_text_${buttonIndex}`}
+                              value={button.text}
+                              onChange={(e) =>
+                                updateCardButton(
+                                  card.id,
+                                  buttonIndex,
+                                  'text',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Ex: Copiar Código"
+                            />
+                          </div>
+
+                          <div>
+                            <FormControl variant="label">
+                              <Typography variant="span" className="text-sm">
+                                Tipo de Ação *
+                              </Typography>
+                            </FormControl>
+                            <FormSelect
+                              fieldName={`card_${card.id}_button_actionType_${buttonIndex}`}
+                              placeholder="Selecione o tipo"
+                              options={[
+                                { value: 'copy', label: '📋 Copiar' },
+                                { value: 'link', label: '🔗 Link' },
+                                { value: 'call', label: '📞 Ligação' },
+                              ]}
+                              onValueChange={(value) =>
+                                updateCardButton(
+                                  card.id,
+                                  buttonIndex,
+                                  'actionType',
+                                  value,
+                                )
+                              }
+                              className="w-full"
+                            />
+                          </div>
+
+                          <div>
+                            <FormControl variant="label">
+                              <Typography variant="span" className="text-sm">
+                                {button.actionType === 'copy' &&
+                                  'Código para Copiar *'}
+                                {button.actionType === 'link' &&
+                                  'URL do Link *'}
+                                {button.actionType === 'call' &&
+                                  'Número para Ligar *'}
+                                {!button.actionType && 'Valor *'}
+                              </Typography>
+                            </FormControl>
+                            <Input
+                              type="text"
+                              fieldName={`card_${card.id}_button_id_${buttonIndex}`}
+                              value={button.id}
+                              onChange={(e) =>
+                                updateCardButton(
+                                  card.id,
+                                  buttonIndex,
+                                  'id',
+                                  e.target.value,
+                                )
+                              }
+                              placeholder={
+                                button.actionType === 'copy'
+                                  ? 'Ex: PROMO123'
+                                  : button.actionType === 'link'
+                                    ? 'Ex: https://exemplo.com'
+                                    : button.actionType === 'call'
+                                      ? 'Ex: +5511999999999'
+                                      : 'Selecione o tipo de ação primeiro'
+                              }
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="default"
+                        onClick={() => addButtonToCard(card.id)}
+                        className="w-full gap-2 text-sm"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Adicionar Botão neste Cartão
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              // UI Simples para outros tipos (button, poll)
+              <div className="space-y-3 mt-4">
+                <FormControl variant="label">Opções *</FormControl>
+                {choices.map((choice, index) => (
+                  <div
+                    key={index}
+                    className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Typography
+                        variant="span"
+                        className="text-sm font-medium text-gray-700"
+                      >
+                        Opção {index + 1}
+                      </Typography>
+                      {choices?.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => removeChoice(index)}
+                          disabled={choices.length === 1}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <div>
+                      <FormControl variant="label">
+                        <Typography variant="span" className="text-sm">
+                          Texto *
+                        </Typography>
+                      </FormControl>
+                      <Input
+                        type="text"
+                        fieldName={`choice_text_${index}`}
+                        value={choice.text}
+                        onChange={(e) =>
+                          updateChoice(index, 'text', e.target.value)
+                        }
+                        placeholder={
+                          interactiveMenuType === 'button'
+                            ? 'Ex: Suporte Técnico'
+                            : 'Ex: Manhã (8h-12h)'
+                        }
+                      />
+                    </div>
+
+                    {interactiveMenuType === 'button' && (
+                      <>
+                        <div>
+                          <FormControl variant="label">
+                            <Typography variant="span" className="text-sm">
+                              Tipo de Ação *
+                            </Typography>
+                          </FormControl>
+                          <FormSelect
+                            fieldName={`choice_actionType_${index}`}
+                            placeholder="Selecione o tipo"
+                            options={[
+                              { value: 'copy', label: '📋 Copiar' },
+                              { value: 'link', label: '🔗 Link' },
+                              { value: 'call', label: '📞 Ligação' },
+                            ]}
+                            onValueChange={(value) =>
+                              updateChoice(index, 'actionType', value)
+                            }
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <FormControl variant="label">
+                            <Typography variant="span" className="text-sm">
+                              {choice.actionType === 'copy' &&
+                                'Código para Copiar *'}
+                              {choice.actionType === 'link' && 'URL do Link *'}
+                              {choice.actionType === 'call' &&
+                                'Número para Ligar *'}
+                              {!choice.actionType && 'Valor *'}
+                            </Typography>
+                          </FormControl>
+                          <Input
+                            type="text"
+                            fieldName={`choice_id_${index}`}
+                            value={choice.id}
+                            onChange={(e) =>
+                              updateChoice(index, 'id', e.target.value)
+                            }
+                            placeholder={
+                              choice.actionType === 'copy'
+                                ? 'Ex: PROMO123'
+                                : choice.actionType === 'link'
+                                  ? 'Ex: https://exemplo.com'
+                                  : choice.actionType === 'call'
+                                    ? 'Ex: +5511999999999'
+                                    : 'Selecione o tipo de ação primeiro'
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {interactiveMenuType === 'button' && (
+                      <div>
+                        <FormControl variant="label">
+                          <Typography variant="span" className="text-sm">
+                            Descrição{' '}
+                            <Typography
+                              variant="span"
+                              className="text-xs text-gray-500 font-normal"
+                            >
+                              (opcional)
+                            </Typography>
+                          </Typography>
+                        </FormControl>
+                        <Input
+                          type="text"
+                          fieldName={`choice_description_${index}`}
+                          value={choice.description}
+                          onChange={(e) =>
+                            updateChoice(index, 'description', e.target.value)
+                          }
+                          placeholder="Descrição adicional (opcional)"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="gradient"
+                  onClick={addChoice}
+                  className="w-full gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Opção
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Campos Opcionais baseados no tipo */}

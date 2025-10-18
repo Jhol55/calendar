@@ -69,7 +69,7 @@ export const messageConfigSchema = baseSchema.refine(
         const choices = data.interactiveMenuChoices
           ? JSON.parse(data.interactiveMenuChoices)
           : [];
-        if (!Array.isArray(choices) || choices.length === 0) return false;
+        if (!Array.isArray(choices) || choices.length <= 1) return false;
 
         // Validações específicas por tipo
         if (
