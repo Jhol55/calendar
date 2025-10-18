@@ -42,13 +42,27 @@ function validateAuth(
   return false;
 }
 
-// Função para buscar o webhook no banco de dados
+// Função para buscar o webhook no banco de dados - RETORNA TODOS OS MATCHES
 async function findWebhookInFlows(webhookId: string) {
   console.log('🔍 Searching for webhook:', webhookId);
 
-  // Buscar todos os fluxos
-  const flows = await prisma.chatbot_flows.findMany();
-  console.log(`📊 Found ${flows.length} flows in database`);
+  // Buscar apenas fluxos ATIVOS
+  const flows = await prisma.chatbot_flows.findMany({
+    where: {
+      isActive: true, // ✅ Apenas fluxos ativos
+    },
+  });
+  console.log(`📊 Found ${flows.length} ACTIVE flows in database`);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const matches: Array<{
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    flow: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    node: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    config: any;
+  }> = [];
 
   for (const flow of flows) {
     console.log(`\n🔄 Checking flow: ${flow.name} (ID: ${flow.id})`);
@@ -103,51 +117,70 @@ async function findWebhookInFlows(webhookId: string) {
         id: string;
         data: { webhookConfig: unknown };
       };
-      console.log('🎯 Returning webhook data:', {
+      console.log('🎯 Found webhook match:', {
         flowId: flow.id,
         flowName: flow.name,
         nodeId: node.id,
         webhookConfig: node.data.webhookConfig,
       });
-      return {
+
+      matches.push({
         flow,
         node,
         config: node.data.webhookConfig,
-      };
-    }
-  }
-
-  console.log('❌ No webhook found with ID:', webhookId);
-  console.log('📋 All webhook IDs found in database:');
-
-  // Listar todos os webhookIds para debug
-  for (const flow of flows) {
-    const nodes = flow.nodes as unknown[];
-    if (Array.isArray(nodes)) {
-      nodes.forEach((node) => {
-        const n = node as {
-          type?: string;
-          data?: { webhookConfig?: { webhookId?: string } };
-        };
-        if (n.type === 'webhook' && n.data?.webhookConfig?.webhookId) {
-          console.log(
-            `  - Flow "${flow.name}": ${n.data.webhookConfig.webhookId}`,
-          );
-        }
       });
     }
   }
 
-  return null;
+  if (matches.length === 0) {
+    console.log('❌ No webhook found with ID:', webhookId);
+    console.log('📋 All webhook IDs found in database:');
+
+    // Listar todos os webhookIds para debug
+    for (const flow of flows) {
+      const nodes = flow.nodes as unknown[];
+      if (Array.isArray(nodes)) {
+        nodes.forEach((node) => {
+          const n = node as {
+            type?: string;
+            data?: { webhookConfig?: { webhookId?: string } };
+          };
+          if (n.type === 'webhook' && n.data?.webhookConfig?.webhookId) {
+            console.log(
+              `  - Flow "${flow.name}": ${n.data.webhookConfig.webhookId}`,
+            );
+          }
+        });
+      }
+    }
+  } else {
+    console.log(`✅ Found ${matches.length} flow(s) with webhook ${webhookId}`);
+  }
+
+  return matches;
 }
 
-// Função para buscar webhook por instância WhatsApp
+// Função para buscar webhook por instância WhatsApp - RETORNA TODOS OS MATCHES
 async function findWebhookByInstance(instanceToken: string) {
   console.log('🔍 Searching for WhatsApp instance webhook:', instanceToken);
 
-  // Buscar todos os fluxos
-  const flows = await prisma.chatbot_flows.findMany();
-  console.log(`📊 Found ${flows.length} flows in database`);
+  // Buscar apenas fluxos ATIVOS
+  const flows = await prisma.chatbot_flows.findMany({
+    where: {
+      isActive: true, // ✅ Apenas fluxos ativos
+    },
+  });
+  console.log(`📊 Found ${flows.length} ACTIVE flows in database`);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const matches: Array<{
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    flow: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    node: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    config: any;
+  }> = [];
 
   for (const flow of flows) {
     console.log(`\n🔄 Checking flow: ${flow.name} (ID: ${flow.id})`);
@@ -202,16 +235,23 @@ async function findWebhookByInstance(instanceToken: string) {
         id: string;
         data: { webhookConfig: unknown };
       };
-      return {
+      matches.push({
         flow,
         node,
         config: node.data.webhookConfig,
-      };
+      });
     }
   }
 
-  console.log('❌ No WhatsApp webhook found for instance:', instanceToken);
-  return null;
+  if (matches.length === 0) {
+    console.log('❌ No WhatsApp webhook found for instance:', instanceToken);
+  } else {
+    console.log(
+      `✅ Found ${matches.length} flow(s) with WhatsApp instance ${instanceToken}`,
+    );
+  }
+
+  return matches;
 }
 
 async function handleWebhook(
@@ -228,7 +268,8 @@ async function handleWebhook(
       console.log('🔧 Extracted webhook ID from URL:', webhookId);
     }
 
-    let webhookData;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let webhookMatches: Array<{ flow: any; node: any; config: any }> = [];
 
     // Verificar se é webhook de instância WhatsApp (pode ser token direto ou webhook URL)
     const isInstanceWebhook = webhookId.includes('-') && webhookId.length > 20; // Token format
@@ -254,46 +295,20 @@ async function handleWebhook(
         );
       }
 
-      // Buscar fluxo que usa esta instância
-      webhookData = await findWebhookByInstance(instance.token);
+      // Buscar todos os fluxos que usam esta instância
+      webhookMatches = await findWebhookByInstance(instance.token);
     } else {
-      // Webhook manual
-      webhookData = await findWebhookInFlows(webhookId);
+      // Webhook manual - buscar todos os fluxos com este webhookId
+      webhookMatches = await findWebhookInFlows(webhookId);
     }
 
-    console.log('Webhook data:', webhookData);
+    console.log('Webhook matches:', webhookMatches);
 
-    if (!webhookData) {
+    if (!webhookMatches || webhookMatches.length === 0) {
       return NextResponse.json({ error: 'Webhook not found' }, { status: 404 });
     }
 
-    const { config, flow } = webhookData;
-
-    // Validar método HTTP (apenas para webhooks manuais)
-    const webhookConfig = config as {
-      serviceType?: string;
-      methods?: string[];
-      authentication?: {
-        type: 'none' | 'basic' | 'bearer';
-        username?: string;
-        password?: string;
-        token?: string;
-      };
-    };
-
-    if (webhookConfig.serviceType === 'manual') {
-      if (!webhookConfig.methods || !webhookConfig.methods.includes(method)) {
-        return NextResponse.json(
-          { error: `Method ${method} not allowed for this webhook` },
-          { status: 405 },
-        );
-      }
-
-      // Validar autenticação (apenas para webhooks manuais)
-      if (!validateAuth(request, webhookConfig.authentication)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-    }
+    console.log(`🔥 Found ${webhookMatches.length} flow(s) to execute`);
 
     // Extrair dados da requisição
     let requestData: Record<string, unknown> = {};
@@ -317,7 +332,7 @@ async function handleWebhook(
       headers[key] = value;
     });
 
-    // Criar registro do webhook recebido (você pode salvar em uma tabela de logs se quiser)
+    // Criar registro do webhook recebido
     const webhookEvent = {
       webhookId,
       method,
@@ -329,39 +344,90 @@ async function handleWebhook(
 
     console.log('Webhook received:', webhookEvent);
 
-    // Preparar dados para a fila
-    const webhookJobData: WebhookJobData = {
-      webhookId,
-      method,
-      headers,
-      queryParams,
-      body: requestData,
-      timestamp: webhookEvent.timestamp,
-      flowId: flow.id,
-      nodeId: webhookData.node.id,
-      config: webhookConfig,
-    };
+    // Processar cada fluxo encontrado
+    const jobs = [];
+    const flowResults = [];
 
-    // Adicionar job à fila
-    const job = await addWebhookJob(webhookJobData, {
-      priority: 1, // Prioridade alta
-      delay: 0, // Processar imediatamente
-    });
+    for (const webhookData of webhookMatches) {
+      const { config, flow, node } = webhookData;
 
-    console.log(`📋 Webhook job ${job.id} added to queue`);
+      // Validar método HTTP (apenas para webhooks manuais)
+      const webhookConfig = config as {
+        serviceType?: string;
+        methods?: string[];
+        authentication?: {
+          type: 'none' | 'basic' | 'bearer';
+          username?: string;
+          password?: string;
+          token?: string;
+        };
+      };
+
+      // Validação apenas se for manual
+      if (webhookConfig.serviceType === 'manual') {
+        if (!webhookConfig.methods || !webhookConfig.methods.includes(method)) {
+          console.log(
+            `⚠️ Method ${method} not allowed for flow ${flow.name}, skipping...`,
+          );
+          continue;
+        }
+
+        // Validar autenticação (apenas para webhooks manuais)
+        if (!validateAuth(request, webhookConfig.authentication)) {
+          console.log(`⚠️ Auth failed for flow ${flow.name}, skipping...`);
+          continue;
+        }
+      }
+
+      // Preparar dados para a fila
+      const webhookJobData: WebhookJobData = {
+        webhookId,
+        method,
+        headers,
+        queryParams,
+        body: requestData,
+        timestamp: webhookEvent.timestamp,
+        flowId: flow.id,
+        nodeId: node.id,
+        config: webhookConfig,
+      };
+
+      // Adicionar job à fila
+      const job = await addWebhookJob(webhookJobData, {
+        priority: 1, // Prioridade alta
+        delay: 0, // Processar imediatamente
+      });
+
+      console.log(
+        `📋 Webhook job ${job.id} added to queue for flow: ${flow.name}`,
+      );
+
+      jobs.push(job);
+      flowResults.push({
+        flowId: flow.id,
+        flowName: flow.name,
+        jobId: job.id,
+      });
+    }
+
+    // Se nenhum job foi criado (por validação/auth)
+    if (jobs.length === 0) {
+      return NextResponse.json(
+        { error: 'No valid flows found for this webhook' },
+        { status: 403 },
+      );
+    }
 
     // Resposta imediata (não bloqueia)
     const responseData = {
       status: 'received',
-      message: 'Webhook received and queued for processing',
-      flowId: flow.id,
-      flowName: flow.name,
-      jobId: job.id,
+      message: `Webhook received and queued for ${jobs.length} flow(s)`,
+      flows: flowResults,
       data: requestData,
       timestamp: webhookEvent.timestamp,
     };
 
-    console.log('✅ Webhook queued successfully:', job.id);
+    console.log(`✅ ${jobs.length} webhook job(s) queued successfully`);
 
     return NextResponse.json(responseData, { status: 200 });
   } catch (error) {

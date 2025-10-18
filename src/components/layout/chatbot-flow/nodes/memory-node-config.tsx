@@ -241,11 +241,7 @@ function MemoryFormFields({
         </div>
       )}
 
-      <SubmitButton
-        variant="gradient"
-        className="mt-4"
-        onClick={() => console.log(errors)}
-      >
+      <SubmitButton variant="gradient" className="mt-4">
         Salvar Configuração
       </SubmitButton>
     </>
@@ -304,7 +300,7 @@ export function MemoryNodeConfig({
       flowId={flowId}
     >
       <Form
-        key={`${isOpen}-${config?.memoryName || 'new'}`}
+        key={`${isOpen}-${config?.memoryName || 'novo'}`}
         className="flex flex-col gap-4"
         zodSchema={memoryConfigSchema}
         onSubmit={handleSubmit}

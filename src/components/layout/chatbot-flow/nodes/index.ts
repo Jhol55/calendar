@@ -5,3 +5,4 @@ export { ConditionNode } from './condition-node';
 export { ActionNode } from './action-node';
 export { WebhookNode } from './webhook-node';
 export { MemoryNode } from './memory-node';
+export { TransformationNode } from './transformation-node';

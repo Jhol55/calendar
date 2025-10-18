@@ -6,6 +6,7 @@ import {
   Zap,
   Webhook,
   Brain,
+  Settings,
 } from 'lucide-react';
 import { NodeType } from './types';
 
@@ -59,6 +60,13 @@ const nodeTemplates: NodeTemplate[] = [
     icon: <Brain className="w-5 h-5" />,
     description: 'Salvar/buscar dados do usuário',
     color: 'bg-purple-600',
+  },
+  {
+    type: 'transformation',
+    label: 'Transformação',
+    icon: <Settings className="w-5 h-5" />,
+    description: 'Transformar e processar dados',
+    color: 'bg-amber-600',
   },
 ];
 

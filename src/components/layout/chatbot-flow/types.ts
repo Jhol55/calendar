@@ -6,6 +6,7 @@ export type NodeType =
   | 'action'
   | 'webhook'
   | 'memory'
+  | 'transformation'
   | 'end';
 
 export type MessageType =
@@ -65,6 +66,88 @@ export interface MemoryConfig {
   defaultValue?: string;
 }
 
+export type TransformationType =
+  | 'string'
+  | 'number'
+  | 'date'
+  | 'array'
+  | 'object'
+  | 'validation';
+
+export type StringOperation =
+  | 'uppercase'
+  | 'lowercase'
+  | 'trim'
+  | 'replace'
+  | 'substring'
+  | 'split'
+  | 'concat'
+  | 'capitalize';
+
+export type NumberOperation =
+  | 'add'
+  | 'subtract'
+  | 'multiply'
+  | 'divide'
+  | 'round'
+  | 'formatCurrency'
+  | 'toPercent';
+
+export type DateOperation =
+  | 'format'
+  | 'addDays'
+  | 'subtractDays'
+  | 'diffDays'
+  | 'extractPart'
+  | 'now';
+
+export type ArrayOperation =
+  | 'filter'
+  | 'map'
+  | 'sort'
+  | 'first'
+  | 'last'
+  | 'join'
+  | 'unique'
+  | 'length'
+  | 'sum';
+
+export type ObjectOperation =
+  | 'extract'
+  | 'merge'
+  | 'keys'
+  | 'values'
+  | 'stringify'
+  | 'parse';
+
+export type ValidationOperation =
+  | 'validateEmail'
+  | 'validatePhone'
+  | 'formatPhone'
+  | 'removeMask'
+  | 'sanitize';
+
+export type TransformationOperation =
+  | StringOperation
+  | NumberOperation
+  | DateOperation
+  | ArrayOperation
+  | ObjectOperation
+  | ValidationOperation;
+
+export interface TransformationStep {
+  id: string; // ID único para cada step do pipeline
+  type: TransformationType;
+  operation: TransformationOperation;
+  input: string; // Suporta variáveis dinâmicas
+  params?: Record<string, any>; // Parâmetros extras baseados na operação
+}
+
+export interface TransformationConfig {
+  steps: TransformationStep[]; // Pipeline de transformações
+  outputAs?: string; // Nome da variável de saída (opcional)
+}
+
 export interface NodeData {
   label: string;
   type: NodeType;
@@ -72,6 +155,7 @@ export interface NodeData {
   messageConfig?: MessageConfig;
   webhookConfig?: WebhookConfig;
   memoryConfig?: MemoryConfig;
+  transformationConfig?: TransformationConfig;
   conditions?: Array<{
     field: string;
     operator: string;

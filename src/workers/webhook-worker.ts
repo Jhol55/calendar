@@ -6,6 +6,7 @@ import {
   deletarMemoria,
   listarMemorias,
 } from './memory-helper';
+import * as transformations from './transformation-helper';
 
 // Função para substituir variáveis no texto
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -285,6 +286,13 @@ async function processNode(
         break;
       case 'memory':
         result = await processMemoryNode(executionId, node, webhookData);
+        break;
+      case 'transformation':
+        result = await processTransformationNode(
+          executionId,
+          node,
+          webhookData,
+        );
         break;
       case 'condition':
         result = await processConditionNode();
@@ -736,6 +744,364 @@ async function processMemoryNode(
   } catch (error) {
     console.error(`❌ Error processing memory node:`, error);
     throw error;
+  }
+}
+
+// Tipos para Transformation Node
+interface TransformationStep {
+  id: string;
+  type: string;
+  operation: string;
+  input: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params?: Record<string, any>;
+}
+
+interface TransformationConfig {
+  steps: TransformationStep[];
+  outputAs?: string;
+}
+
+// Processador do Transformation Node
+async function processTransformationNode(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  console.log('🔧 Processing transformation node');
+
+  const transformationConfig = node.data?.transformationConfig as
+    | TransformationConfig
+    | undefined;
+
+  if (!transformationConfig) {
+    throw new Error('Transformation configuration not found');
+  }
+
+  const { steps, outputAs } = transformationConfig;
+
+  if (!steps || steps.length === 0) {
+    throw new Error('No transformation steps defined');
+  }
+
+  try {
+    // Buscar execução para obter contexto de variáveis
+    const execution = await prisma.flow_executions.findUnique({
+      where: { id: executionId },
+      include: {
+        flow: true,
+      },
+    });
+
+    if (!execution) {
+      throw new Error('Execution not found');
+    }
+
+    // Preparar contexto de variáveis (igual ao processMessageNode)
+    const nodeExecutions =
+      (execution.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+
+    const $nodes: Record<string, { output: unknown }> = {};
+    Object.keys(nodeExecutions).forEach((nodeId) => {
+      const nodeExec = nodeExecutions[nodeId];
+      if (nodeExec?.result) {
+        $nodes[nodeId] = {
+          output: nodeExec.result,
+        };
+      }
+    });
+
+    // Buscar memórias do usuário
+    const userId = execution?.flow?.userId
+      ? String(execution.flow.userId)
+      : null;
+    const $memory = userId ? await listarMemorias(userId) : {};
+
+    const variableContext = {
+      $node: {
+        input: webhookData.body,
+        webhook: {
+          body: webhookData.body,
+          headers: webhookData.headers,
+          queryParams: webhookData.queryParams,
+        },
+      },
+      $nodes,
+      $memory,
+    };
+
+    // Executar pipeline de transformações
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let currentValue: any = null;
+
+    for (let index = 0; index < steps.length; index++) {
+      const step = steps[index];
+      console.log(
+        `📝 Executing step ${index + 1}/${steps.length}: ${step.operation}`,
+      );
+
+      // SEMPRE usar o input configurado no step (resolvendo variáveis dinâmicas)
+      const inputValue = replaceVariables(step.input || '', variableContext);
+      console.log(`  📥 Input for step ${index + 1}: "${inputValue}"`);
+
+      // Executar transformação baseada no tipo e operação
+      try {
+        currentValue = await executeTransformation(
+          step.type,
+          step.operation,
+          inputValue,
+          step.params || {},
+          variableContext,
+        );
+
+        results.push({
+          step: index + 1,
+          operation: step.operation,
+          input: inputValue,
+          output: currentValue,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        console.error(`❌ Error in transformation step ${index + 1}:`, error);
+        throw new Error(
+          `Transformation step ${index + 1} failed: ${error.message}`,
+        );
+      }
+    }
+
+    // Retornar resultado final
+    return {
+      finalValue: currentValue,
+      steps: results,
+      outputAs: outputAs || 'transformation_result',
+    };
+  } catch (error) {
+    console.error(`❌ Error processing transformation node:`, error);
+    throw error;
+  }
+}
+
+// Função auxiliar para executar uma transformação
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function executeTransformation(
+  type: string,
+  operation: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  variableContext: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  // Resolver parâmetros com variáveis dinâmicas
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resolvedParams: Record<string, any> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === 'string') {
+      resolvedParams[key] = replaceVariables(value, variableContext);
+    } else {
+      resolvedParams[key] = value;
+    }
+  }
+
+  switch (type) {
+    case 'string':
+      return executeStringTransformation(operation, input, resolvedParams);
+    case 'number':
+      return executeNumberTransformation(operation, input, resolvedParams);
+    case 'date':
+      return executeDateTransformation(operation, input, resolvedParams);
+    case 'array':
+      return executeArrayTransformation(operation, input, resolvedParams);
+    case 'object':
+      return executeObjectTransformation(operation, input, resolvedParams);
+    case 'validation':
+      return executeValidationTransformation(operation, input);
+    default:
+      throw new Error(`Unknown transformation type: ${type}`);
+  }
+}
+
+// Executar transformações de string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function executeStringTransformation(
+  operation: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  switch (operation) {
+    case 'uppercase':
+      return transformations.uppercase(input);
+    case 'lowercase':
+      return transformations.lowercase(input);
+    case 'trim':
+      return transformations.trim(input);
+    case 'replace':
+      return transformations.replace(
+        input,
+        params.searchValue,
+        params.replaceValue,
+      );
+    case 'substring':
+      return transformations.substring(input, params.start, params.end);
+    case 'split':
+      return transformations.split(input, params.separator);
+    case 'concat':
+      return transformations.concat(input, params.value);
+    case 'capitalize':
+      return transformations.capitalize(input);
+    default:
+      throw new Error(`Unknown string operation: ${operation}`);
+  }
+}
+
+// Executar transformações de número
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function executeNumberTransformation(
+  operation: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  switch (operation) {
+    case 'add':
+      return transformations.add(input, params.value);
+    case 'subtract':
+      return transformations.subtract(input, params.value);
+    case 'multiply':
+      return transformations.multiply(input, params.value);
+    case 'divide':
+      return transformations.divide(input, params.value);
+    case 'round':
+      return transformations.round(input, params.decimals);
+    case 'formatCurrency':
+      return transformations.formatCurrency(input);
+    case 'toPercent':
+      return transformations.toPercent(input);
+    default:
+      throw new Error(`Unknown number operation: ${operation}`);
+  }
+}
+
+// Executar transformações de data
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function executeDateTransformation(
+  operation: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  switch (operation) {
+    case 'format':
+      return transformations.formatDate(input, params.format);
+    case 'addDays':
+      return transformations.addDays(input, params.days);
+    case 'subtractDays':
+      return transformations.subtractDays(input, params.days);
+    case 'diffDays':
+      return transformations.diffDays(input, params.compareDate);
+    case 'extractPart':
+      return transformations.extractPart(input, params.part);
+    case 'now':
+      return transformations.now();
+    default:
+      throw new Error(`Unknown date operation: ${operation}`);
+  }
+}
+
+// Executar transformações de array
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function executeArrayTransformation(
+  operation: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  switch (operation) {
+    case 'filter':
+      return transformations.filterArray(input, params.condition);
+    case 'map':
+      return transformations.mapArray(input, params.transformation);
+    case 'sort':
+      return transformations.sortArray(input, params.order);
+    case 'first':
+      return transformations.firstElement(input);
+    case 'last':
+      return transformations.lastElement(input);
+    case 'join':
+      return transformations.joinArray(input, params.separator);
+    case 'unique':
+      return transformations.uniqueArray(input);
+    case 'length':
+      return transformations.arrayLength(input);
+    case 'sum':
+      return transformations.sumArray(input);
+    default:
+      throw new Error(`Unknown array operation: ${operation}`);
+  }
+}
+
+// Executar transformações de objeto
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function executeObjectTransformation(
+  operation: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  switch (operation) {
+    case 'extract':
+      return transformations.extractField(input, params.field);
+    case 'merge':
+      return transformations.mergeObjects(input, params.mergeWith);
+    case 'keys':
+      return transformations.objectKeys(input);
+    case 'values':
+      return transformations.objectValues(input);
+    case 'stringify':
+      return transformations.stringifyObject(input);
+    case 'parse':
+      return transformations.parseJSON(input);
+    default:
+      throw new Error(`Unknown object operation: ${operation}`);
+  }
+}
+
+// Executar transformações de validação
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function executeValidationTransformation(
+  operation: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  switch (operation) {
+    case 'validateEmail':
+      return transformations.validateEmail(input);
+    case 'validatePhone':
+      return transformations.validatePhone(input);
+    case 'formatPhone':
+      return transformations.formatPhone(input);
+    case 'removeMask':
+      return transformations.removeMask(input);
+    case 'sanitize':
+      return transformations.sanitize(input);
+    default:
+      throw new Error(`Unknown validation operation: ${operation}`);
   }
 }
 

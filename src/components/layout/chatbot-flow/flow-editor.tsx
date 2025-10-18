@@ -29,6 +29,7 @@ import {
   ActionNode,
   WebhookNode,
   MemoryNode,
+  TransformationNode,
 } from './nodes';
 import {
   NodeType,
@@ -36,6 +37,7 @@ import {
   MessageConfig,
   WebhookConfig,
   MemoryConfig,
+  TransformationConfig,
 } from '../../layout/chatbot-flow/types';
 import { Save, Download, Upload, Plus, Play } from 'lucide-react';
 import {
@@ -49,6 +51,7 @@ import { Button } from '@/components/ui/button';
 import { CreateWorkflowDialog } from '@/components/features/dialogs/create-workflow-dialog';
 import { WebhookNodeConfig } from './nodes/webhook-node-config';
 import { MemoryNodeConfig } from './nodes/memory-node-config';
+import { TransformationNodeConfig } from './nodes/transformation-node-config';
 import { ExecutionsPanel } from './executions-panel';
 
 const nodeTypes = {
@@ -59,6 +62,7 @@ const nodeTypes = {
   action: ActionNode,
   webhook: WebhookNode,
   memory: MemoryNode,
+  transformation: TransformationNode,
 };
 
 // Função para gerar IDs únicos
@@ -75,6 +79,8 @@ function FlowEditorContent() {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [webhookConfigDialogOpen, setWebhookConfigDialogOpen] = useState(false);
   const [memoryConfigDialogOpen, setMemoryConfigDialogOpen] = useState(false);
+  const [transformationConfigDialogOpen, setTransformationConfigDialogOpen] =
+    useState(false);
   const [nodeToConfig, setNodeToConfig] = useState<Node<NodeData> | null>(null);
   const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -321,6 +327,9 @@ function FlowEditorContent() {
       } else if (node.type === 'memory') {
         setNodeToConfig(node);
         setMemoryConfigDialogOpen(true);
+      } else if (node.type === 'transformation') {
+        setNodeToConfig(node);
+        setTransformationConfigDialogOpen(true);
       } else if (node.type === 'start' || node.type === 'end') {
         // Start e End nodes não têm configuração
         return;
@@ -354,6 +363,15 @@ function FlowEditorContent() {
     (config: MemoryConfig) => {
       if (nodeToConfig) {
         handleNodeUpdate(nodeToConfig.id, { memoryConfig: config });
+      }
+    },
+    [nodeToConfig, handleNodeUpdate],
+  );
+
+  const handleSaveTransformationConfig = useCallback(
+    (config: TransformationConfig) => {
+      if (nodeToConfig) {
+        handleNodeUpdate(nodeToConfig.id, { transformationConfig: config });
       }
     },
     [nodeToConfig, handleNodeUpdate],
@@ -535,6 +553,18 @@ function FlowEditorContent() {
         }}
         config={nodeToConfig?.data.memoryConfig}
         onSave={handleSaveMemoryConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
+      />
+
+      <TransformationNodeConfig
+        isOpen={transformationConfigDialogOpen}
+        onClose={() => {
+          setTransformationConfigDialogOpen(false);
+          setNodeToConfig(null);
+        }}
+        config={nodeToConfig?.data.transformationConfig}
+        onSave={handleSaveTransformationConfig}
         nodeId={nodeToConfig?.id}
         flowId={currentFlowId || undefined}
       />
