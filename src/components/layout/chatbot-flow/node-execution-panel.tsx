@@ -361,7 +361,7 @@ export function NodeExecutionPanel({
           // Modo Input: Mostrar apenas os dropdowns dos nodes anteriores
           executionData.previousNodesOutputs &&
           Object.keys(executionData.previousNodesOutputs).length > 0 ? (
-            <div>
+            <div className="mt-2">
               {Object.values(executionData.previousNodesOutputs).map(
                 (prevNode) => (
                   <PreviousNodeDropdown

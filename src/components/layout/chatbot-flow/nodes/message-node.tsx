@@ -2,6 +2,7 @@ import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { MessageSquare, Settings } from 'lucide-react';
 import { NodeData } from '../types';
+import { Typography } from '@/components/ui/typography';
 
 export function MessageNode({ data, selected }: NodeProps<NodeData>) {
   const messageConfig = data.messageConfig;
@@ -52,14 +53,16 @@ export function MessageNode({ data, selected }: NodeProps<NodeData>) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-blue-500" />
-            <h3 className="font-semibold text-sm">Enviar Mensagem</h3>
+            <Typography variant="h3" className="font-semibold text-sm">
+              Enviar Mensagem
+            </Typography>
           </div>
           <Settings className="w-4 h-4 text-gray-400" />
         </div>
 
         {messageConfig && (
           <div className="mb-2 flex items-center gap-2 text-xs">
-            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+            <span className="px-2 py-1 bg-neutral-100 text-blue-600 rounded">
               {getMessageTypeLabel()}
             </span>
             {messageConfig.phoneNumber && (

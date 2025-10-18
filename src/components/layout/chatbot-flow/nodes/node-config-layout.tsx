@@ -39,10 +39,10 @@ export function NodeConfigLayout({
         {showExecutionPanel && nodeId && flowId && (
           <div className="w-1/4 h-screen border-r bg-gray-50 flex flex-col">
             <div className="p-4 border-b bg-white">
-              <Typography variant="h3" className="text-sm font-semibold">
+              <Typography variant="h3" className="font-semibold">
                 📥 Entrada
               </Typography>
-              <Typography variant="span" className="text-neutral-600 text-xs">
+              <Typography variant="span" className="text-neutral-600">
                 Dados recebidos
               </Typography>
             </div>
@@ -90,10 +90,10 @@ export function NodeConfigLayout({
         {showExecutionPanel && nodeId && flowId && (
           <div className="w-1/4 h-screen border-l bg-gray-50 flex flex-col">
             <div className="p-4 border-b bg-white">
-              <Typography variant="h3" className="text-sm font-semibold">
+              <Typography variant="h3" className="font-semibold">
                 📤 Saída
               </Typography>
-              <Typography variant="span" className="text-neutral-600 text-xs">
+              <Typography variant="span" className="text-neutral-600">
                 Resultado da execução
               </Typography>
             </div>
