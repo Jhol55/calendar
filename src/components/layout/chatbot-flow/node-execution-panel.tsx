@@ -185,15 +185,6 @@ export function NodeExecutionPanel({
         const nodeExecutions = execution.nodeExecutions || {};
         const nodeData = nodeExecutions[nodeId];
 
-        // Debug: Ver o que está vindo do backend
-        console.log('🔍 NodeExecutionPanel Debug:', {
-          nodeId,
-          executionId: execution.id,
-          hasNodeData: !!nodeData,
-          nodeData,
-          allNodeExecutions: Object.keys(nodeExecutions),
-        });
-
         // Buscar o flow para obter edges e informações dos nodes
         let previousNodesOutputs: Record<
           string,
@@ -207,13 +198,40 @@ export function NodeExecutionPanel({
             const edges = flowData.flow?.edges || [];
             const nodes = flowData.flow?.nodes || [];
 
-            // Encontrar todos os nodes que têm uma edge conectando a este node
-            const previousNodeIds = edges
-              .filter((edge: any) => edge.target === nodeId)
-              .map((edge: any) => edge.source);
+            // Função recursiva para encontrar TODOS os nodes anteriores na cadeia
+            const findAllPreviousNodes = (
+              currentNodeId: string,
+              visited = new Set<string>(),
+            ): string[] => {
+              if (visited.has(currentNodeId)) {
+                return []; // Evitar loops infinitos
+              }
+              visited.add(currentNodeId);
+
+              // Encontrar nodes diretamente conectados a este node
+              const directPreviousNodeIds = edges
+                .filter((edge: any) => edge.target === currentNodeId)
+                .map((edge: any) => edge.source);
+
+              // Recursivamente buscar os anteriores dos anteriores
+              const allPreviousNodeIds: string[] = [];
+              directPreviousNodeIds.forEach((prevNodeId: string) => {
+                allPreviousNodeIds.push(prevNodeId);
+                const nestedPrevious = findAllPreviousNodes(
+                  prevNodeId,
+                  visited,
+                );
+                allPreviousNodeIds.push(...nestedPrevious);
+              });
+
+              return allPreviousNodeIds;
+            };
+
+            // Buscar TODOS os nodes anteriores na cadeia
+            const allPreviousNodeIds = findAllPreviousNodes(nodeId);
 
             // Para cada node anterior, buscar sua saída
-            previousNodeIds.forEach((prevNodeId: string) => {
+            allPreviousNodeIds.forEach((prevNodeId: string) => {
               const prevNodeExecution = nodeExecutions[prevNodeId];
               const prevNode = nodes.find((n: any) => n.id === prevNodeId);
 
@@ -231,15 +249,11 @@ export function NodeExecutionPanel({
           console.error('Error fetching flow data:', error);
         }
 
-        const finalExecutionData = {
+        setExecutionData({
           input: nodeData?.data || execution.data,
           output: nodeData?.result || null,
           previousNodesOutputs,
-        };
-
-        console.log('📦 Setting execution data:', finalExecutionData);
-
-        setExecutionData(finalExecutionData);
+        });
       }
     } catch (error) {
       console.error('Error fetching execution data:', error);
