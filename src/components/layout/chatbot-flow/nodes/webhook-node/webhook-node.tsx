@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Webhook, Settings, Copy, CheckCircle } from 'lucide-react';
-import { NodeData } from '../types';
+import { NodeData } from '../../types';
 import { useState } from 'react';
 import { Typography } from '@/components/ui/typography/typography';
 import { cn } from '@/lib/utils';

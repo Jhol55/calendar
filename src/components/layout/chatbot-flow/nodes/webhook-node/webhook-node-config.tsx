@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Typography } from '@/components/ui/typography';
-import { WebhookConfig, HttpMethod } from '../types';
+import { WebhookConfig, HttpMethod } from '../../types';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
 import { useUser } from '@/hooks/use-user';
-import { NodeConfigLayout } from './node-config-layout';
+import { NodeConfigLayout } from '../node-config-layout';
 import { getInstanceWebhook } from '@/actions/uazapi/instance';
 
 interface WebhookNodeConfigProps {

@@ -1,11 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import {
-  MessageConfig,
-  MessageType,
-  InteractiveMenuType,
-} from '../../../layout/chatbot-flow/types';
+import { MessageConfig, MessageType, InteractiveMenuType } from '../../types';
 import { Typography } from '@/components/ui/typography';
 import { useUser } from '@/hooks/use-user';
 import { Form } from '@/components/ui/form';
@@ -20,7 +16,7 @@ import { InstanceProps } from '@/contexts/user/user-context.type';
 // import { sendMessage } from '@/actions/uazapi/message';
 import { FormSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { NodeConfigLayout } from './node-config-layout';
+import { NodeConfigLayout } from '../node-config-layout';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface MessageNodeConfigProps {

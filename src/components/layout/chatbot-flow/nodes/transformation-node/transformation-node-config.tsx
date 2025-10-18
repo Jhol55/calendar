@@ -10,13 +10,13 @@ import { Typography } from '@/components/ui/typography';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
 import { SubmitButton } from '@/components/ui/submit-button';
-import { NodeConfigLayout } from './node-config-layout';
+import { NodeConfigLayout } from '../node-config-layout';
 import {
   transformationConfigSchema,
   OPERATIONS_BY_TYPE,
   OPERATION_PARAMS,
 } from './transformation-node-config.schema';
-import { TransformationConfig, TransformationStep } from '../types';
+import { TransformationConfig, TransformationStep } from '../../types';
 import { Plus, Trash2, MoveUp, MoveDown } from 'lucide-react';
 
 interface TransformationNodeConfigProps {

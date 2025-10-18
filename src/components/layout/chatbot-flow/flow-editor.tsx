@@ -19,7 +19,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 import { Sidebar } from '../../layout/chatbot-flow/sidebar';
-import { MessageNodeConfig } from './nodes/message-node-config';
+import { MessageNodeConfig } from './nodes/message-node/message-node-config';
 import { FlowsListSidebar } from './flows-list-sidebar';
 import {
   EndNode,
@@ -49,9 +49,9 @@ import { useUser } from '@/hooks/use-user';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { CreateWorkflowDialog } from '@/components/features/dialogs/create-workflow-dialog';
-import { WebhookNodeConfig } from './nodes/webhook-node-config';
-import { MemoryNodeConfig } from './nodes/memory-node-config';
-import { TransformationNodeConfig } from './nodes/transformation-node-config';
+import { WebhookNodeConfig } from './nodes/webhook-node/webhook-node-config';
+import { MemoryNodeConfig } from './nodes/memory-node/memory-node-config';
+import { TransformationNodeConfig } from './nodes/transformation-node/transformation-node-config';
 import { ExecutionsPanel } from './executions-panel';
 
 const nodeTypes = {

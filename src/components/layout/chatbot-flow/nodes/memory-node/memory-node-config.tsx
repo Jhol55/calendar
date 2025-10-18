@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Typography } from '@/components/ui/typography';
-import { MemoryConfig, MemoryItem } from '../types';
+import { MemoryConfig, MemoryItem } from '../../types';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { NodeConfigLayout } from './node-config-layout';
+import { NodeConfigLayout } from '../node-config-layout';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface MemoryNodeConfigProps {

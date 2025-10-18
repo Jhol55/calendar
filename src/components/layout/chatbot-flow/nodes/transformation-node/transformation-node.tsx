@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { NodeData } from '../types';
+import { NodeData } from '../../types';
 import {
   Settings,
   Type,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { MessageSquare, Settings } from 'lucide-react';
-import { NodeData } from '../types';
+import { NodeData } from '../../types';
 import { Typography } from '@/components/ui/typography';
 
 export function MessageNode({ data, selected }: NodeProps<NodeData>) {
