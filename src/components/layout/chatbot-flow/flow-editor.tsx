@@ -384,6 +384,7 @@ function FlowEditorContent() {
           onNodeDoubleClick={onNodeDoubleClick}
           nodeTypes={nodeTypes}
           fitView
+          proOptions={{ hideAttribution: true }}
           className="bg-gray-50"
         >
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
