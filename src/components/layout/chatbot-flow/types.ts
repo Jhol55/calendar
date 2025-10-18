@@ -16,6 +16,18 @@ export type MessageType =
   | 'location'
   | 'interactive_menu';
 
+export type InteractiveMenuType = 'button' | 'list' | 'poll' | 'carousel';
+
+export interface InteractiveMenuConfig {
+  type: InteractiveMenuType;
+  text: string;
+  choices: string[];
+  footerText?: string;
+  listButton?: string;
+  selectableCount?: number;
+  imageButton?: string;
+}
+
 export interface MessageConfig {
   token?: string;
   phoneNumber?: string;
@@ -27,11 +39,8 @@ export interface MessageConfig {
   contactPhone?: string;
   latitude?: number;
   longitude?: number;
-  menuOptions?: Array<{
-    id: string;
-    title: string;
-    description?: string;
-  }>;
+  // Configuração de menu interativo
+  interactiveMenu?: InteractiveMenuConfig;
 }
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

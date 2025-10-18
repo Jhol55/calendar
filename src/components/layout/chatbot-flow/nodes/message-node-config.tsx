@@ -1,12 +1,17 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { MessageConfig, MessageType } from '../../../layout/chatbot-flow/types';
+import React, { useEffect, useState } from 'react';
+import {
+  MessageConfig,
+  MessageType,
+  InteractiveMenuType,
+} from '../../../layout/chatbot-flow/types';
 import { Typography } from '@/components/ui/typography';
 import { useUser } from '@/hooks/use-user';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { messageConfigSchema } from './message-node-config.schema';
 import { FieldValues } from 'react-hook-form';
@@ -16,6 +21,7 @@ import { InstanceProps } from '@/contexts/user/user-context.type';
 import { FormSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { NodeConfigLayout } from './node-config-layout';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface MessageNodeConfigProps {
   isOpen: boolean;
@@ -43,6 +49,18 @@ function MessageFormFields({
 }) {
   const { form, setValue } = useForm();
   const messageType = (form.messageType as MessageType) || 'text';
+  const interactiveMenuType =
+    (form.interactiveMenuType as InteractiveMenuType) || 'button';
+
+  // Gerenciar choices do menu interativo como objetos estruturados
+  interface Choice {
+    id: string;
+    text: string;
+    description: string;
+  }
+  const [choices, setChoices] = useState<Choice[]>([
+    { id: '', text: '', description: '' },
+  ]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -57,10 +75,97 @@ function MessageFormFields({
         setValue('contactPhone', config.contactPhone || '');
         setValue('latitude', config.latitude?.toString() || '');
         setValue('longitude', config.longitude?.toString() || '');
+
+        // Carregar configuração de menu interativo
+        if (config.interactiveMenu) {
+          setValue('interactiveMenuType', config.interactiveMenu.type);
+          setValue('interactiveMenuText', config.interactiveMenu.text);
+          setValue(
+            'interactiveMenuFooter',
+            config.interactiveMenu.footerText || '',
+          );
+          setValue(
+            'interactiveMenuListButton',
+            config.interactiveMenu.listButton || '',
+          );
+          setValue(
+            'interactiveMenuImageButton',
+            config.interactiveMenu.imageButton || '',
+          );
+          setValue(
+            'interactiveMenuSelectableCount',
+            config.interactiveMenu.selectableCount?.toString() || '1',
+          );
+
+          // Converter strings com pipe de volta para objetos
+          const parsedChoices = (config.interactiveMenu.choices || []).map(
+            (choice) => {
+              if (!choice || typeof choice !== 'string') {
+                return { id: '', text: '', description: '' };
+              }
+              const parts = choice.split('|');
+              return {
+                text: parts[0] || '',
+                id: parts[1] || '',
+                description: parts[2] || '',
+              };
+            },
+          );
+          setChoices(
+            parsedChoices.length > 0
+              ? parsedChoices
+              : [{ id: '', text: '', description: '' }],
+          );
+
+          setValue(
+            'interactiveMenuChoices',
+            JSON.stringify(config.interactiveMenu.choices || ['']),
+          );
+        }
       }
     }, 0);
     return () => clearTimeout(timer);
   }, [config, setValue]);
+
+  // Atualizar choices no formulário quando mudar (converter para strings com pipe)
+  useEffect(() => {
+    // Converter objetos para strings no formato "texto|id|descrição"
+    const choicesStrings = choices
+      .map((choice) => {
+        // Se não tiver texto, não incluir essa opção
+        if (!choice.text || choice.text.trim() === '') return '';
+
+        // Montar string: texto|id|descrição
+        // Sempre incluir os pipes, mesmo se id ou descrição estiverem vazios
+        return `${choice.text}|${choice.id || ''}|${choice.description || ''}`;
+      })
+      .filter((str) => str !== ''); // Remover strings vazias
+
+    setValue('interactiveMenuChoices', JSON.stringify(choicesStrings));
+  }, [choices, setValue]);
+
+  const addChoice = () => {
+    setChoices([...choices, { id: '', text: '', description: '' }]);
+  };
+
+  const removeChoice = (index: number) => {
+    if (choices.length > 1) {
+      setChoices(choices.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateChoice = (
+    index: number,
+    field: 'id' | 'text' | 'description',
+    value: string,
+  ) => {
+    const newChoices = [...choices];
+    newChoices[index] = {
+      ...newChoices[index],
+      [field]: value,
+    };
+    setChoices(newChoices);
+  };
 
   return (
     <>
@@ -166,11 +271,234 @@ function MessageFormFields({
       )}
 
       {messageType === 'interactive_menu' && (
-        <div>
-          <FormControl variant="label">Menu Interativo</FormControl>
-          <Typography variant="p" className="text-gray-500">
-            Configuração de menu interativo em desenvolvimento
+        <div className="space-y-4 border-t pt-4">
+          <Typography variant="h5" className="font-semibold">
+            Configuração de Menu Interativo
           </Typography>
+
+          {/* Tipo de Menu */}
+          <div className="p-1">
+            <FormControl variant="label">Tipo de Menu *</FormControl>
+            <FormSelect
+              fieldName="interactiveMenuType"
+              placeholder="Selecione o tipo"
+              options={[
+                { value: 'button', label: 'Botões' },
+                { value: 'list', label: 'Lista' },
+                { value: 'poll', label: 'Enquete' },
+                { value: 'carousel', label: 'Carrossel' },
+              ]}
+              className="w-full"
+            />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              {interactiveMenuType === 'button' &&
+                'Cria botões de resposta, URL, chamada ou cópia'}
+              {interactiveMenuType === 'list' &&
+                'Cria um menu organizado em seções'}
+              {interactiveMenuType === 'poll' &&
+                'Cria uma enquete para votação'}
+              {interactiveMenuType === 'carousel' &&
+                'Cria um carrossel de cartões com imagens'}
+            </Typography>
+          </div>
+
+          {/* Texto Principal */}
+          <div className="p-1">
+            <FormControl variant="label">Texto Principal *</FormControl>
+            <Textarea
+              fieldName="interactiveMenuText"
+              placeholder="Digite o texto da mensagem..."
+              rows={3}
+            />
+          </div>
+
+          {/* Choices */}
+          <div className="p-1">
+            <FormControl variant="label">
+              Opções *{' '}
+              <Typography
+                variant="span"
+                className="text-xs text-gray-500 font-normal"
+              >
+                {interactiveMenuType === 'button' &&
+                  '- Configure botões com ações'}
+                {interactiveMenuType === 'list' &&
+                  '- Use [Seção] no texto para criar seções'}
+                {interactiveMenuType === 'poll' &&
+                  '- Configure as opções de votação'}
+                {interactiveMenuType === 'carousel' &&
+                  '- Use [Título] no texto, {URL} no ID para imagens'}
+              </Typography>
+            </FormControl>
+            <div className="space-y-3 mt-2">
+              {choices.map((choice, index) => (
+                <div
+                  key={index}
+                  className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Typography
+                      variant="span"
+                      className="text-sm font-medium text-gray-700"
+                    >
+                      Opção {index + 1}
+                    </Typography>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => removeChoice(index)}
+                      disabled={choices.length === 1}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div>
+                    <FormControl variant="label">
+                      <Typography variant="span" className="text-sm">
+                        Texto *
+                      </Typography>
+                    </FormControl>
+                    <Input
+                      type="text"
+                      fieldName={`choice_text_${index}`}
+                      value={choice.text}
+                      onChange={(e) =>
+                        updateChoice(index, 'text', e.target.value)
+                      }
+                      placeholder={
+                        interactiveMenuType === 'button'
+                          ? 'Ex: Suporte Técnico'
+                          : interactiveMenuType === 'list'
+                            ? 'Ex: Smartphones ou [Eletrônicos]'
+                            : interactiveMenuType === 'carousel'
+                              ? 'Ex: [Produto XYZ]'
+                              : 'Ex: Manhã (8h-12h)'
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <FormControl variant="label">
+                      <Typography variant="span" className="text-sm">
+                        Identificador
+                      </Typography>
+                    </FormControl>
+                    <Input
+                      type="text"
+                      fieldName={`choice_id_${index}`}
+                      value={choice.id}
+                      onChange={(e) =>
+                        updateChoice(index, 'id', e.target.value)
+                      }
+                      placeholder={
+                        interactiveMenuType === 'button'
+                          ? 'Ex: suporte ou https://... ou call:+5511...'
+                          : interactiveMenuType === 'list'
+                            ? 'Ex: phones'
+                            : interactiveMenuType === 'carousel'
+                              ? 'Ex: {https://img.jpg} ou copy:PROMO'
+                              : 'Deixe vazio para enquetes'
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <FormControl variant="label">
+                      <Typography variant="span" className="text-sm">
+                        Descrição{' '}
+                        <Typography
+                          variant="span"
+                          className="text-xs text-gray-500 font-normal"
+                        >
+                          (opcional)
+                        </Typography>
+                      </Typography>
+                    </FormControl>
+                    <Input
+                      type="text"
+                      fieldName={`choice_description_${index}`}
+                      value={choice.description}
+                      onChange={(e) =>
+                        updateChoice(index, 'description', e.target.value)
+                      }
+                      placeholder={
+                        interactiveMenuType === 'list'
+                          ? 'Ex: Últimos lançamentos'
+                          : 'Descrição adicional (opcional)'
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="gradient"
+                onClick={addChoice}
+                className="w-full gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar Opção
+              </Button>
+            </div>
+          </div>
+
+          {/* Campos Opcionais baseados no tipo */}
+          {(interactiveMenuType === 'button' ||
+            interactiveMenuType === 'list') && (
+            <div className="p-1">
+              <FormControl variant="label">
+                Texto do Rodapé (opcional)
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="interactiveMenuFooter"
+                placeholder="Texto exibido no rodapé..."
+              />
+            </div>
+          )}
+
+          {interactiveMenuType === 'list' && (
+            <div className="p-1">
+              <FormControl variant="label">
+                Texto do Botão da Lista *
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="interactiveMenuListButton"
+                placeholder="Ex: Ver opções"
+              />
+            </div>
+          )}
+
+          {interactiveMenuType === 'button' && (
+            <div className="p-1">
+              <FormControl variant="label">
+                URL da Imagem (opcional)
+              </FormControl>
+              <Input
+                type="url"
+                fieldName="interactiveMenuImageButton"
+                placeholder="https://exemplo.com/imagem.jpg"
+              />
+            </div>
+          )}
+
+          {interactiveMenuType === 'poll' && (
+            <div className="p-1">
+              <FormControl variant="label">Opções Selecionáveis</FormControl>
+              <Input
+                type="number"
+                fieldName="interactiveMenuSelectableCount"
+                placeholder="1"
+                min="1"
+              />
+              <Typography variant="span" className="text-xs text-gray-500 mt-1">
+                Quantas opções o usuário pode selecionar
+              </Typography>
+            </div>
+          )}
         </div>
       )}
 
@@ -204,6 +532,26 @@ export function MessageNodeConfig({
       latitude: data.latitude ? parseFloat(data.latitude) : undefined,
       longitude: data.longitude ? parseFloat(data.longitude) : undefined,
     };
+
+    // Se for menu interativo, adicionar configuração
+    if (data.messageType === 'interactive_menu') {
+      const choices = data.interactiveMenuChoices
+        ? JSON.parse(data.interactiveMenuChoices)
+        : [];
+
+      messageConfig.interactiveMenu = {
+        type: data.interactiveMenuType as InteractiveMenuType,
+        text: data.interactiveMenuText,
+        choices: choices.filter((c: string) => c.trim() !== ''),
+        footerText: data.interactiveMenuFooter || undefined,
+        listButton: data.interactiveMenuListButton || undefined,
+        imageButton: data.interactiveMenuImageButton || undefined,
+        selectableCount: data.interactiveMenuSelectableCount
+          ? parseInt(data.interactiveMenuSelectableCount)
+          : undefined,
+      };
+    }
+
     onSave(messageConfig);
     onClose();
   };

@@ -7,6 +7,11 @@ import {
   listarMemorias,
 } from './memory-helper';
 import * as transformations from './transformation-helper';
+import type {
+  MessageConfig,
+  MessageType,
+  InteractiveMenuConfig,
+} from '../components/layout/chatbot-flow/types';
 
 // Função para substituir variáveis no texto
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -361,20 +366,6 @@ async function processNode(
   }
 }
 
-// Interfaces para configuração de mensagem
-interface MessageConfig {
-  token: string;
-  phoneNumber: string;
-  messageType?: 'text' | 'media' | 'contact' | 'location';
-  text?: string;
-  mediaUrl?: string;
-  caption?: string;
-  contactName?: string;
-  contactPhone?: string;
-  latitude?: number;
-  longitude?: number;
-}
-
 // Processadores para diferentes tipos de nós
 async function processMessageNode(
   executionId: string,
@@ -402,6 +393,7 @@ async function processMessageNode(
     contactPhone,
     latitude,
     longitude,
+    interactiveMenu,
   } = messageConfig;
 
   if (!token || !phoneNumber) {
@@ -485,7 +477,8 @@ async function processMessageNode(
     }
 
     // Preparar dados baseado no tipo de mensagem
-    const formData: Record<string, string | number> = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const formData: Record<string, any> = {
       number: resolvedPhoneNumber,
     };
 
@@ -515,6 +508,54 @@ async function processMessageNode(
         formData.longitude = longitude;
         break;
 
+      case 'interactive_menu':
+        if (!interactiveMenu) {
+          throw new Error('Interactive menu configuration is required');
+        }
+
+        // Resolver variáveis dinâmicas nos campos do menu
+        const resolvedMenuText = replaceVariables(
+          interactiveMenu.text,
+          variableContext,
+        );
+        const resolvedMenuChoices = interactiveMenu.choices.map(
+          (choice: string) => replaceVariables(choice, variableContext),
+        );
+        const resolvedMenuFooter = interactiveMenu.footerText
+          ? replaceVariables(interactiveMenu.footerText, variableContext)
+          : undefined;
+        const resolvedMenuListButton = interactiveMenu.listButton
+          ? replaceVariables(interactiveMenu.listButton, variableContext)
+          : undefined;
+        const resolvedMenuImageButton = interactiveMenu.imageButton
+          ? replaceVariables(interactiveMenu.imageButton, variableContext)
+          : undefined;
+
+        // Montar payload conforme documentação UAZAPI
+        formData.type = interactiveMenu.type;
+        formData.text = resolvedMenuText;
+        formData.choices = resolvedMenuChoices; // Array direto, não JSON string
+
+        if (resolvedMenuFooter) {
+          formData.footerText = resolvedMenuFooter;
+        }
+        if (resolvedMenuListButton) {
+          formData.listButton = resolvedMenuListButton;
+        }
+        if (resolvedMenuImageButton) {
+          formData.imageButton = resolvedMenuImageButton;
+        }
+        if (interactiveMenu.selectableCount) {
+          formData.selectableCount = interactiveMenu.selectableCount;
+        }
+
+        console.log('📋 Interactive menu payload:', {
+          type: formData.type,
+          text: formData.text,
+          choicesCount: resolvedMenuChoices.length,
+        });
+        break;
+
       default:
         // Se não especificar tipo, assume texto
         if (!resolvedText) throw new Error('Text message content is required');
@@ -523,8 +564,14 @@ async function processMessageNode(
 
     console.log('📦 FormData:', formData);
 
+    // Determinar endpoint baseado no tipo de mensagem
+    const endpoint =
+      messageType === 'interactive_menu' ? '/send/menu' : '/send/text';
+
+    console.log(`🔗 Using endpoint: ${endpoint}`);
+
     // Chamar API diretamente (sem usar Server Action)
-    const response = await fetch(`${process.env.UAZAPI_URL}/send/text`, {
+    const response = await fetch(`${process.env.UAZAPI_URL}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

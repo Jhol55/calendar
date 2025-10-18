@@ -17,6 +17,16 @@ const baseSchema = z.object({
   contactPhone: z.string().optional(),
   latitude: z.union([z.string(), z.number()]).optional(),
   longitude: z.union([z.string(), z.number()]).optional(),
+  // Campos do menu interativo
+  interactiveMenuType: z
+    .enum(['button', 'list', 'poll', 'carousel'])
+    .optional(),
+  interactiveMenuText: z.string().optional(),
+  interactiveMenuFooter: z.string().optional(),
+  interactiveMenuListButton: z.string().optional(),
+  interactiveMenuImageButton: z.string().optional(),
+  interactiveMenuSelectableCount: z.union([z.string(), z.number()]).optional(),
+  interactiveMenuChoices: z.string().optional(), // JSON stringified array
 });
 
 export const messageConfigSchema = baseSchema.refine(
@@ -49,6 +59,29 @@ export const messageConfigSchema = baseSchema.refine(
         !isNaN(parseFloat(lng))
       );
     }
+    if (data.messageType === 'interactive_menu') {
+      // Validar menu interativo
+      if (!data.interactiveMenuType) return false;
+      if (!data.interactiveMenuText || data.interactiveMenuText.length === 0)
+        return false;
+
+      try {
+        const choices = data.interactiveMenuChoices
+          ? JSON.parse(data.interactiveMenuChoices)
+          : [];
+        if (!Array.isArray(choices) || choices.length === 0) return false;
+
+        // Validações específicas por tipo
+        if (
+          data.interactiveMenuType === 'list' &&
+          !data.interactiveMenuListButton
+        ) {
+          return false;
+        }
+      } catch {
+        return false;
+      }
+    }
     return true;
   },
   (data) => {
@@ -69,6 +102,12 @@ export const messageConfigSchema = baseSchema.refine(
       return {
         message: 'Digite latitude e longitude válidas',
         path: ['latitude'],
+      };
+    }
+    if (data.messageType === 'interactive_menu') {
+      return {
+        message: 'Configure o menu interativo corretamente',
+        path: ['interactiveMenuType'],
       };
     }
     return { message: 'Erro de validação', path: [] };

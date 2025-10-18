@@ -171,7 +171,7 @@ function MemoryFormFields({
                     type="button"
                     onClick={() => removeItem(index)}
                     variant="ghost"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-fit w-fit"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

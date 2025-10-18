@@ -189,7 +189,7 @@ export function FlowsListSidebar({
                   <Button
                     onClick={(e) => handleDelete(flow.id, e)}
                     variant="ghost"
-                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 w-fit"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
                     title="Deletar fluxo"
                   >
                     <Trash2 className="w-4 h-4 text-red-500" />
