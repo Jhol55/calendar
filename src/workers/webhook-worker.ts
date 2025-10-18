@@ -275,7 +275,7 @@ async function processNode(
 
     switch (node.type) {
       case 'message':
-        result = await processMessageNode(node, webhookData);
+        result = await processMessageNode(executionId, node, webhookData);
         break;
       case 'condition':
         result = await processConditionNode();
@@ -360,6 +360,7 @@ interface MessageConfig {
 
 // Processadores para diferentes tipos de nós
 async function processMessageNode(
+  executionId: string,
   node: FlowNode,
   webhookData: WebhookJobData,
 ): Promise<unknown> {
@@ -395,6 +396,25 @@ async function processMessageNode(
       `📤 Sending ${messageType || 'text'} message to ${phoneNumber}`,
     );
 
+    // Buscar execução para obter dados de todos os nodes
+    const execution = await prisma.flow_executions.findUnique({
+      where: { id: executionId },
+    });
+
+    const nodeExecutions =
+      (execution?.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+
+    // Criar objeto $nodes com saídas de todos os nodes anteriores
+    const $nodes: Record<string, { output: unknown }> = {};
+    Object.keys(nodeExecutions).forEach((nodeId) => {
+      const nodeExec = nodeExecutions[nodeId];
+      if (nodeExec?.result) {
+        $nodes[nodeId] = {
+          output: nodeExec.result,
+        };
+      }
+    });
+
     // Preparar contexto para substituição de variáveis
     const variableContext = {
       $node: {
@@ -405,12 +425,33 @@ async function processMessageNode(
           queryParams: webhookData.queryParams,
         },
       },
+      $nodes, // Adicionar todos os nodes anteriores
     };
 
-    // Substituir variáveis no número de telefone e texto
+    // Debug: Log do contexto disponível
+    console.log('🔍 Variable context available:', {
+      hasNodeInput: !!variableContext.$node.input,
+      availableNodes: Object.keys(variableContext.$nodes),
+    });
+
+    // Substituir variáveis em todos os campos
     const resolvedPhoneNumber = replaceVariables(phoneNumber, variableContext);
     const resolvedText = text ? replaceVariables(text, variableContext) : text;
+    const resolvedMediaUrl = mediaUrl
+      ? replaceVariables(mediaUrl, variableContext)
+      : mediaUrl;
+    const resolvedCaption = caption
+      ? replaceVariables(caption, variableContext)
+      : caption;
+    const resolvedContactName = contactName
+      ? replaceVariables(contactName, variableContext)
+      : contactName;
+    const resolvedContactPhone = contactPhone
+      ? replaceVariables(contactPhone, variableContext)
+      : contactPhone;
 
+    console.log(`📝 Original text: ${text}`);
+    console.log(`📝 Resolved text: ${resolvedText}`);
     console.log(`📝 Resolved phone: ${resolvedPhoneNumber}`);
     if (resolvedText && resolvedText !== text) {
       console.log(`📝 Variables replaced in text`);
@@ -428,16 +469,16 @@ async function processMessageNode(
         break;
 
       case 'media':
-        if (!mediaUrl) throw new Error('Media URL is required');
-        formData.mediaUrl = mediaUrl;
-        if (caption) formData.caption = caption;
+        if (!resolvedMediaUrl) throw new Error('Media URL is required');
+        formData.mediaUrl = resolvedMediaUrl;
+        if (resolvedCaption) formData.caption = resolvedCaption;
         break;
 
       case 'contact':
-        if (!contactName || !contactPhone)
+        if (!resolvedContactName || !resolvedContactPhone)
           throw new Error('Contact name and phone are required');
-        formData.contactName = contactName;
-        formData.contactPhone = contactPhone;
+        formData.contactName = resolvedContactName;
+        formData.contactPhone = resolvedContactPhone;
         break;
 
       case 'location':
@@ -449,8 +490,8 @@ async function processMessageNode(
 
       default:
         // Se não especificar tipo, assume texto
-        if (!text) throw new Error('Text message content is required');
-        formData.text = text;
+        if (!resolvedText) throw new Error('Text message content is required');
+        formData.text = resolvedText;
     }
 
     console.log('📦 FormData:', formData);
