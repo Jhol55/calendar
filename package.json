@@ -15,16 +15,20 @@
     "obfuscate": "node ./scripts/obfuscate.js",
     "build:obfuscated": "npm run build && npm run obfuscate",
     "docker-up:dev": "docker compose -f docker-compose.dev.yml up -d",
-    "docker-up": "docker compose up -d"
+    "docker-up": "docker compose up -d",
+    "worker": "tsx scripts/start-worker.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
     "@prisma/client": "^6.13.0",
     "@radix-ui/react-select": "^2.2.6",
     "@reactflow/node-resizer": "^2.2.14",
+    "@types/bull": "^3.15.9",
+    "bull": "^4.16.5",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.0",
     "groq-sdk": "^0.9.0",
+    "ioredis": "^5.8.1",
     "jose": "^5.9.6",
     "lucide-react": "^0.454.0",
     "next": "^14.2.15",
@@ -62,6 +66,8 @@
     "terser": "^5.43.1",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.20.6",
     "typescript": "^5",
     "webpack-obfuscator": "^3.5.1"
   },

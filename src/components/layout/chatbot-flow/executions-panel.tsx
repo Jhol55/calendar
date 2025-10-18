@@ -30,12 +30,14 @@ interface ExecutionsPanelProps {
   flowId: string;
   isOpen: boolean;
   onClose: () => void;
+  onExecutionSelect?: (execution: Execution) => void;
 }
 
 export function ExecutionsPanel({
   flowId,
   isOpen,
   onClose,
+  onExecutionSelect,
 }: ExecutionsPanelProps) {
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(false);
@@ -192,6 +194,21 @@ export function ExecutionsPanel({
                         <div>Duração: {formatDuration(execution.duration)}</div>
                         <div>Tipo: {execution.triggerType}</div>
                       </div>
+
+                      {selectedExecution?.id === execution.id &&
+                        onExecutionSelect && (
+                          <Button
+                            variant="gradient"
+                            className="mt-3 w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onExecutionSelect(execution);
+                              onClose();
+                            }}
+                          >
+                            🔍 Visualizar no Fluxo
+                          </Button>
+                        )}
                     </div>
                   ))}
                 </div>

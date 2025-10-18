@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Dialog } from '@/components/ui/dialog';
 import { MessageConfig, MessageType } from '../../../layout/chatbot-flow/types';
 import { Typography } from '@/components/ui/typography';
 import { useUser } from '@/hooks/use-user';
@@ -13,15 +12,18 @@ import { messageConfigSchema } from './message-node-config.schema';
 import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { InstanceProps } from '@/contexts/user/user-context.type';
-import { sendMessage } from '@/actions/uazapi/message';
+// import { sendMessage } from '@/actions/uazapi/message';
 import { FormSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { NodeConfigLayout } from './node-config-layout';
 
 interface MessageNodeConfigProps {
   isOpen: boolean;
   onClose: () => void;
   config?: MessageConfig;
   onSave: (config: MessageConfig) => void;
+  nodeId?: string;
+  flowId?: string;
 }
 
 const messageTypes: { value: MessageType; label: string }[] = [
@@ -43,18 +45,21 @@ function MessageFormFields({
   const messageType = (form.messageType as MessageType) || 'text';
 
   useEffect(() => {
-    if (config) {
-      setValue('token', config.token || '');
-      setValue('phoneNumber', config.phoneNumber || '');
-      setValue('messageType', config.messageType || 'text');
-      setValue('text', config.text || '');
-      setValue('mediaUrl', config.mediaUrl || '');
-      setValue('caption', config.caption || '');
-      setValue('contactName', config.contactName || '');
-      setValue('contactPhone', config.contactPhone || '');
-      setValue('latitude', config.latitude?.toString() || '');
-      setValue('longitude', config.longitude?.toString() || '');
-    }
+    const timer = setTimeout(() => {
+      if (config) {
+        setValue('token', config.token || '');
+        setValue('phoneNumber', config.phoneNumber || '');
+        setValue('messageType', config.messageType || 'text');
+        setValue('text', config.text || '');
+        setValue('mediaUrl', config.mediaUrl || '');
+        setValue('caption', config.caption || '');
+        setValue('contactName', config.contactName || '');
+        setValue('contactPhone', config.contactPhone || '');
+        setValue('latitude', config.latitude?.toString() || '');
+        setValue('longitude', config.longitude?.toString() || '');
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [config, setValue]);
 
   return (
@@ -181,6 +186,8 @@ export function MessageNodeConfig({
   onClose,
   config,
   onSave,
+  nodeId,
+  flowId,
 }: MessageNodeConfigProps) {
   const { instances } = useUser();
 
@@ -201,36 +208,21 @@ export function MessageNodeConfig({
     onClose();
   };
 
-  const handleSendMessage = async () => {
-    const response = await sendMessage({
-      token: instances[0].token,
-      formData: {
-        number: '5519971302477',
-        text: 'Olá! Como posso ajudar?',
-      },
-    });
-    console.log(response);
-  };
-
   return (
-    <Dialog
+    <NodeConfigLayout
       isOpen={isOpen}
       onClose={onClose}
-      contentClassName="max-w-lg overflow-hidden"
+      title="⚙️ Configurar Mensagem"
+      nodeId={nodeId}
+      flowId={flowId}
     >
-      <div className="p-6 flex flex-col h-full" style={{ zoom: 0.9 }}>
-        <Typography variant="h2" className="mb-6">
-          Configurar Mensagem
-        </Typography>
-
-        <Form
-          className="flex flex-col gap-4 flex-1 overflow-y-auto"
-          zodSchema={messageConfigSchema}
-          onSubmit={handleSubmit}
-        >
-          <MessageFormFields instances={instances} config={config} />
-        </Form>
-      </div>
-    </Dialog>
+      <Form
+        className="flex flex-col gap-4"
+        zodSchema={messageConfigSchema}
+        onSubmit={handleSubmit}
+      >
+        <MessageFormFields instances={instances} config={config} />
+      </Form>
+    </NodeConfigLayout>
   );
 }

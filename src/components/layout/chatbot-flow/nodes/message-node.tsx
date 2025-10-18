@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { MessageSquare, Settings } from 'lucide-react';
-import { NodeData } from '../../../../features/forms/chatbot-flow/types';
+import { NodeData } from '../types';
 
 export function MessageNode({ data, selected }: NodeProps<NodeData>) {
   const messageConfig = data.messageConfig;

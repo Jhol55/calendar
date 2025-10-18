@@ -491,6 +491,8 @@ function FlowEditorContent() {
         }}
         config={nodeToConfig?.data.messageConfig}
         onSave={handleSaveMessageConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
       />
 
       <WebhookNodeConfig
@@ -507,6 +509,40 @@ function FlowEditorContent() {
         flowId={currentFlowId || ''}
         isOpen={isExecutionsPanelOpen}
         onClose={() => setIsExecutionsPanelOpen(false)}
+        onExecutionSelect={(execution) => {
+          // Salvar execução selecionada no sessionStorage
+          sessionStorage.setItem(
+            'selectedExecution',
+            JSON.stringify(execution),
+          );
+
+          // Destacar nós executados
+          if (execution.nodeExecutions) {
+            const updatedNodes = nodes.map((node) => {
+              const nodeExecution = execution.nodeExecutions[node.id];
+              if (nodeExecution) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    executionStatus: nodeExecution.status,
+                  },
+                  style: {
+                    ...node.style,
+                    boxShadow:
+                      nodeExecution.status === 'completed'
+                        ? '0 0 0 3px rgba(34, 197, 94, 0.5)'
+                        : nodeExecution.status === 'error'
+                          ? '0 0 0 3px rgba(239, 68, 68, 0.5)'
+                          : '0 0 0 3px rgba(59, 130, 246, 0.5)',
+                  },
+                };
+              }
+              return node;
+            });
+            setNodes(updatedNodes);
+          }
+        }}
       />
     </div>
   );

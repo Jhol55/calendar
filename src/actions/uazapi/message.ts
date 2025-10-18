@@ -57,16 +57,16 @@ export async function sendMessage({
     return {
       success: response.ok,
       message: response.ok
-        ? 'Instância conectada com sucesso'
+        ? 'Mensagem enviada com sucesso'
         : response.statusText,
       code: response.status,
       data: data,
     };
   } catch (error) {
-    console.error('Erro ao conectar instância:', error);
+    console.error('Erro ao enviar mensagem:', error);
     return {
       success: false,
-      message: 'Erro ao conectar instância',
+      message: 'Erro ao enviar mensagem',
       code: 500,
     };
   }

@@ -137,10 +137,10 @@ export function FlowsListSidebar({
           <div className="p-8 text-center">
             <FileText className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
             <Typography variant="p" className="text-neutral-600 text-sm">
-              Nenhum fluxo criado ainda
+              Nenhum workflow criado ainda
             </Typography>
             <Typography variant="p" className="mt-1">
-              Crie seu primeiro fluxo!
+              Crie seu primeiro workflow!
             </Typography>
             <Button
               onClick={() => setIsCreateDialogOpen(true)}

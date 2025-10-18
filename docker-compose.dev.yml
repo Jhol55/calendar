@@ -23,6 +23,18 @@ services:
     networks:
       - api-net
 
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - api-net
+
   pgweb:
     container_name: pgweb
     image: sosedoff/pgweb
@@ -37,6 +49,5 @@ services:
     networks:
       - api-net
 
-
-
-
+volumes:
+  redis_data:

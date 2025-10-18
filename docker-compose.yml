@@ -13,11 +13,33 @@ services:
       - DATABASE_URL=postgresql://postgres:123456@postgres:5432/calendar
       - SECRET_KEY=supersecret123
       - NEXT_PUBLIC_API_URL=https://teste21-calendar.awmygg.easypanel.host/api
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     command: sh -c "npx prisma migrate deploy && npm start"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/calendar
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: npm run worker
 
   postgres:
     container_name: db
@@ -48,6 +70,16 @@ services:
     depends_on:
       - postgres
 
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
   uazapi:
     build:
       context: ./uazapi
@@ -64,4 +96,7 @@ services:
     depends_on:
       - postgres
     restart: unless-stopped
+
+volumes:
+  redis_data:
 

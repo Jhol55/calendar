@@ -44,7 +44,6 @@ function WebhookFormFields({
     // Usar setTimeout para garantir que o formulário esteja pronto
     const timer = setTimeout(() => {
       if (config) {
-        // Carregar configuração existente
         if (config.serviceType) {
           setValue('serviceType', config.serviceType);
         }
@@ -70,7 +69,7 @@ function WebhookFormFields({
         setValue('authenticationType', 'none');
         setSelectedMethods(['POST']);
       }
-    }, 100);
+    }, 0);
 
     return () => clearTimeout(timer);
   }, [config, webhookId, setValue]);

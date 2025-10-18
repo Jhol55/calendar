@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
+import { addWebhookJob, WebhookJobData } from '@/services/queue';
 
 // Função auxiliar para validar autenticação
 function validateAuth(
@@ -219,7 +220,6 @@ async function handleWebhook(
 ) {
   let webhookId = params.webhookId;
   const method = request.method;
-  let execution: { id: string } | null = null;
 
   try {
     // Se for uma URL completa, extrair apenas o ID
@@ -329,91 +329,50 @@ async function handleWebhook(
 
     console.log('Webhook received:', webhookEvent);
 
-    // Criar execução no banco de dados
-    execution = await prisma.flow_executions.create({
-      data: {
-        flowId: flow.id,
-        status: 'running',
-        triggerType: 'webhook',
-        triggerData: {
-          webhookId,
-          method,
-          headers,
-          queryParams,
-          timestamp: webhookEvent.timestamp,
-        },
-        data: JSON.parse(JSON.stringify(requestData)),
-        nodeExecutions: JSON.parse(
-          JSON.stringify({
-            webhook: {
-              nodeId: webhookData.node.id,
-              status: 'completed',
-              startTime: new Date().toISOString(),
-              endTime: new Date().toISOString(),
-              data: requestData,
-            },
-          }),
-        ),
-      },
-    });
-
-    console.log('✅ Execution created:', execution.id);
-
-    // TODO: Executar o fluxo associado ao webhook
-    // O fluxo começa a partir do próximo nó conectado ao webhook
-    console.log('Flow to execute:', {
+    // Preparar dados para a fila
+    const webhookJobData: WebhookJobData = {
+      webhookId,
+      method,
+      headers,
+      queryParams,
+      body: requestData,
+      timestamp: webhookEvent.timestamp,
       flowId: flow.id,
-      flowName: flow.name,
-      webhookNode: webhookData.node.id,
-      executionId: execution.id,
+      nodeId: webhookData.node.id,
+      config: webhookConfig,
+    };
+
+    // Adicionar job à fila
+    const job = await addWebhookJob(webhookJobData, {
+      priority: 1, // Prioridade alta
+      delay: 0, // Processar imediatamente
     });
 
-    // Preparar resposta
+    console.log(`📋 Webhook job ${job.id} added to queue`);
+
+    // Resposta imediata (não bloqueia)
     const responseData = {
-      status: 'success',
-      message: 'Webhook received successfully',
+      status: 'received',
+      message: 'Webhook received and queued for processing',
       flowId: flow.id,
       flowName: flow.name,
-      executionId: execution.id,
+      jobId: job.id,
       data: requestData,
       timestamp: webhookEvent.timestamp,
     };
 
-    // Finalizar execução
-    const endTime = new Date();
-    const duration = endTime.getTime() - new Date().getTime();
-
-    await prisma.flow_executions.update({
-      where: { id: execution.id },
-      data: {
-        status: 'success',
-        endTime,
-        duration,
-      },
-    });
-
-    console.log('✅ Execution completed:', execution.id);
+    console.log('✅ Webhook queued successfully:', job.id);
 
     return NextResponse.json(responseData, { status: 200 });
   } catch (error) {
     console.error('Error processing webhook:', error);
 
-    // Se houver execução criada, marcar como erro
-    if (execution) {
-      await prisma.flow_executions
-        .update({
-          where: { id: execution.id },
-          data: {
-            status: 'error',
-            endTime: new Date(),
-            error: error instanceof Error ? error.message : 'Unknown error',
-          },
-        })
-        .catch(() => {}); // Ignorar erro se não conseguir atualizar
-    }
-
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        message: 'Failed to queue webhook for processing',
+        timestamp: new Date().toISOString(),
+      },
       { status: 500 },
     );
   }

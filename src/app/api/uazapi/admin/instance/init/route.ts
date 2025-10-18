@@ -74,6 +74,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await fetch(`${process.env.UAZAPI_URL}/webhook`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        token: data.instance.token,
+      },
+      body: JSON.stringify({
+        enabled: true,
+        url: webhookUrl,
+        events: ['messages', 'connection'],
+        excludeMessages: ['wasSentByApi', 'isGroupNo'],
+      }),
+    });
+
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error fetching instances:', error);
