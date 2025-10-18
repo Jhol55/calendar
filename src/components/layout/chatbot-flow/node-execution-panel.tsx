@@ -66,7 +66,7 @@ function PreviousNodeDropdown({
           {output ? (
             renderJsonTree(output, `$nodes.${nodeId}.output`, 0)
           ) : (
-            <Typography variant="small" className="text-gray-400">
+            <Typography variant="span" className="text-neutral-600">
               Sem dados de saída
             </Typography>
           )}
@@ -186,7 +186,7 @@ export function NodeExecutionPanel({
         const nodeData = nodeExecutions[nodeId];
 
         // Buscar o flow para obter edges e informações dos nodes
-        let previousNodesOutputs: Record<
+        const previousNodesOutputs: Record<
           string,
           { nodeId: string; nodeLabel: string; output: any }
         > = {};
@@ -331,10 +331,13 @@ export function NodeExecutionPanel({
   if (!executionData) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-4">
-        <Typography variant="p" className="text-gray-500 text-center">
+        <Typography variant="p" className="text-neutral-600 text-center">
           Nenhuma execução encontrada.
         </Typography>
-        <Typography variant="small" className="text-gray-400 text-center mt-2">
+        <Typography
+          variant="span"
+          className="text-neutral-600 text-center mt-2"
+        >
           Execute o fluxo para ver os dados aqui.
         </Typography>
       </div>
@@ -348,7 +351,7 @@ export function NodeExecutionPanel({
     <div className="h-full flex flex-col">
       {/* Content */}
       <div className="flex-1 overflow-auto p-4">
-        <Typography variant="small" className="text-gray-500 mb-3">
+        <Typography variant="span" className="text-neutral-600 mb-3">
           {mode === 'input'
             ? 'Clique no ícone de cópia para usar a variável'
             : 'Dados retornados após execução'}
