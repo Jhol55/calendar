@@ -85,3 +85,31 @@ export async function getExecution(id: string) {
     return { success: false, error: 'Erro ao buscar execução' };
   }
 }
+
+// Parar execução em andamento
+export async function stopExecution(id: string) {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/executions/${id}/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`,
+      );
+    }
+
+    const data = await response.json();
+    return { success: true, execution: data };
+  } catch (error) {
+    console.error('Error stopping execution:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Erro ao parar execução',
+    };
+  }
+}

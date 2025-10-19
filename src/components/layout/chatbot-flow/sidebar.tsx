@@ -7,6 +7,7 @@ import {
   Webhook,
   Brain,
   Settings,
+  Database,
 } from 'lucide-react';
 import { NodeType } from './types';
 
@@ -37,8 +38,8 @@ const nodeTemplates: NodeTemplate[] = [
     type: 'condition',
     label: 'Condição',
     icon: <GitBranch className="w-5 h-5" />,
-    description: 'Criar ramificação lógica',
-    color: 'bg-yellow-500',
+    description: 'IF/SWITCH - Decisões e ramificações',
+    color: 'bg-purple-500',
   },
   {
     type: 'action',
@@ -67,6 +68,13 @@ const nodeTemplates: NodeTemplate[] = [
     icon: <Settings className="w-5 h-5" />,
     description: 'Transformar e processar dados',
     color: 'bg-amber-600',
+  },
+  {
+    type: 'database',
+    label: 'Database',
+    icon: <Database className="w-5 h-5" />,
+    description: 'Gerenciar tabelas de dados',
+    color: 'bg-purple-500',
   },
 ];
 

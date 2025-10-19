@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         enabled: true,
         url: webhookUrl,
         events: ['messages', 'connection'],
-        excludeMessages: ['wasSentByApi', 'isGroupNo'],
+        excludeMessages: ['wasSentByApi', 'isGroupYes', 'fromMeYes'],
       }),
     });
 

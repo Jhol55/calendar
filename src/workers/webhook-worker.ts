@@ -7,11 +7,8 @@ import {
   listarMemorias,
 } from './memory-helper';
 import * as transformations from './transformation-helper';
-import type {
-  MessageConfig,
-  MessageType,
-  InteractiveMenuConfig,
-} from '../components/layout/chatbot-flow/types';
+import executeDatabaseNode from './database-node-executor';
+import type { MessageConfig } from '../components/layout/chatbot-flow/types';
 
 // Função para substituir variáveis no texto
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,7 +34,20 @@ function replaceVariables(text: string, context: any): string {
       }
 
       // Converter para string se necessário
-      return value !== null && value !== undefined ? String(value) : match;
+      if (value === null || value === undefined) {
+        return match;
+      }
+
+      // Se for objeto ou array, converter para JSON
+      if (typeof value === 'object') {
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      }
+
+      return String(value);
     } catch (error) {
       console.error(`Error replacing variable ${path}:`, error);
       return match;
@@ -97,11 +107,13 @@ webhookQueue.process('process-webhook', async (job) => {
     await executeFlow(execution.id, flow, data);
 
     // Atualizar status da execução
+    const duration = Date.now() - new Date(execution.startTime).getTime();
     await prisma.flow_executions.update({
       where: { id: execution.id },
       data: {
         status: 'success',
         endTime: new Date(),
+        duration,
       },
     });
 
@@ -118,6 +130,20 @@ webhookQueue.process('process-webhook', async (job) => {
     // Se houver execução criada, marcar como erro
     if (data.flowId) {
       try {
+        // Buscar execução para calcular duração
+        const runningExecution = await prisma.flow_executions.findFirst({
+          where: {
+            flowId: data.flowId,
+            status: 'running',
+            triggerType: 'webhook',
+          },
+          select: { startTime: true },
+        });
+
+        const duration = runningExecution?.startTime
+          ? Date.now() - new Date(runningExecution.startTime).getTime()
+          : undefined;
+
         await prisma.flow_executions.updateMany({
           where: {
             flowId: data.flowId,
@@ -127,6 +153,7 @@ webhookQueue.process('process-webhook', async (job) => {
           data: {
             status: 'error',
             endTime: new Date(),
+            duration,
             error: error instanceof Error ? error.message : 'Unknown error',
           },
         });
@@ -135,7 +162,17 @@ webhookQueue.process('process-webhook', async (job) => {
       }
     }
 
-    throw error; // Re-throw para que o Bull possa fazer retry
+    console.log(
+      `❌ Webhook job ${job.id} failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+
+    // NÃO fazer throw para evitar retry automático
+    // Retornar erro mas marcar job como "processado"
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Execution failed',
+      error: true,
+    };
   }
 });
 
@@ -151,6 +188,8 @@ interface FlowEdge {
   id?: string;
   source: string;
   target: string;
+  sourceHandle?: string; // Para identificar qual handle de saída foi usado
+  targetHandle?: string; // Para identificar qual handle de entrada foi usado
 }
 
 // Função para executar o fluxo completo
@@ -168,6 +207,9 @@ async function executeFlow(
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
     throw new Error('Invalid flow structure');
   }
+
+  console.log(`📊 Flow has ${nodes.length} nodes and ${edges.length} edges`);
+  console.log(`🔗 ALL EDGES IN FLOW:`, JSON.stringify(edges, null, 2));
 
   // Encontrar o nó webhook
   const webhookNode = nodes.find((node) => node.id === webhookData.nodeId);
@@ -205,6 +247,17 @@ async function processNodeChain(
   edges: FlowEdge[],
   webhookData: WebhookJobData,
 ) {
+  // 🛑 VERIFICAR SE A EXECUÇÃO FOI PARADA
+  const execution = await prisma.flow_executions.findUnique({
+    where: { id: executionId },
+    select: { status: true },
+  });
+
+  if (execution?.status === 'stopped') {
+    console.log(`🛑 Execution ${executionId} was stopped by user. Aborting.`);
+    throw new Error('Execution stopped by user');
+  }
+
   const currentNode = nodes.find((node) => node.id === currentNodeId);
   if (!currentNode) {
     console.log(`⚠️ Node ${currentNodeId} not found`);
@@ -212,10 +265,67 @@ async function processNodeChain(
   }
 
   // Processar o nó atual
-  await processNode(executionId, currentNode, webhookData);
+  let result: unknown;
+  try {
+    result = await processNode(executionId, currentNode, webhookData);
+  } catch (error) {
+    // 🛑 Se o node falhar, NÃO continuar para os próximos nodes
+    console.error(`🛑 Node ${currentNode.id} failed. Stopping execution.`);
+    console.error(
+      `   Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+
+    // Atualizar status da execução para 'error'
+    try {
+      const execution = await prisma.flow_executions.findUnique({
+        where: { id: executionId },
+        select: { startTime: true },
+      });
+
+      const duration = execution?.startTime
+        ? Date.now() - new Date(execution.startTime).getTime()
+        : undefined;
+
+      await prisma.flow_executions.update({
+        where: { id: executionId },
+        data: {
+          status: 'error',
+          endTime: new Date(),
+          duration,
+          error:
+            error instanceof Error ? error.message : 'Node execution failed',
+        },
+      });
+    } catch (updateError) {
+      console.error('Error updating execution status:', updateError);
+    }
+
+    // Re-lançar o erro para parar completamente
+    throw error;
+  }
 
   // Encontrar próximos nós conectados
-  const nextEdges = edges.filter((edge) => edge.source === currentNodeId);
+  let nextEdges = edges.filter((edge) => edge.source === currentNodeId);
+
+  console.log(
+    `🔍 Next edges from ${currentNodeId}:`,
+    JSON.stringify(nextEdges, null, 2),
+  );
+
+  // Se o nó for de condição e tiver selectedHandle, filtrar edges
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectedHandle = (result as any)?.selectedHandle;
+  if (currentNode.type === 'condition' && selectedHandle) {
+    console.log(`🔀 Condition node selected handle: ${selectedHandle}`);
+    // Filtrar edges baseado no sourceHandle (ReactFlow usa sourceHandle para identificar handles)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nextEdges = nextEdges.filter(
+      (edge: any) => edge.sourceHandle === selectedHandle,
+    );
+    console.log(
+      `🔀 Filtered to ${nextEdges.length} edge(s) matching handle "${selectedHandle}"`,
+    );
+  }
 
   if (nextEdges.length > 0) {
     console.log(
@@ -224,6 +334,20 @@ async function processNodeChain(
 
     // Processar cada nó seguinte
     for (const edge of nextEdges) {
+      const targetNode = nodes.find((n) => n.id === edge.target);
+      console.log(`  ↪️ Following edge to node: ${edge.target}`);
+      console.log(`     Node type: ${targetNode?.type}, ID: ${targetNode?.id}`);
+
+      // 🚨 DETECÇÃO DE LOOP CIRCULAR
+      if (edge.target === currentNodeId) {
+        console.error(
+          `🔴 LOOP DETECTED! Node ${currentNodeId} connects to itself!`,
+        );
+        throw new Error(
+          `Circular loop detected: node ${currentNodeId} connects back to itself`,
+        );
+      }
+
       await processNodeChain(
         executionId,
         edge.target,
@@ -292,6 +416,9 @@ async function processNode(
       case 'memory':
         result = await processMemoryNode(executionId, node, webhookData);
         break;
+      case 'database':
+        result = await processDatabaseNode(executionId, node, webhookData);
+        break;
       case 'transformation':
         result = await processTransformationNode(
           executionId,
@@ -300,7 +427,7 @@ async function processNode(
         );
         break;
       case 'condition':
-        result = await processConditionNode();
+        result = await processConditionNode(executionId, node, webhookData);
         break;
       case 'api':
         result = await processApiNode();
@@ -647,7 +774,8 @@ async function processMemoryNode(
     throw new Error('Memory configuration not found');
   }
 
-  const { action, memoryName, items, ttl, defaultValue } = memoryConfig;
+  const { action, memoryName, items, ttl, defaultValue, saveMode } =
+    memoryConfig as MemoryConfig & { saveMode?: 'overwrite' | 'append' };
 
   if (!memoryName) {
     throw new Error('memoryName (memory name) is required');
@@ -713,16 +841,54 @@ async function processMemoryNode(
           value: replaceVariables(item.value, variableContext),
         }));
 
-        // Salvar memória como array de objetos
+        let finalValue: string;
+
+        if (saveMode === 'append') {
+          // Modo APPEND: Adicionar à lista existente
+          const existingMemory = await buscarMemoria(
+            userId,
+            resolvedMemoryName,
+          );
+          let existingItems: Array<{ key: string; value: string }> = [];
+
+          if (
+            existingMemory.found &&
+            existingMemory.value &&
+            typeof existingMemory.value === 'string'
+          ) {
+            try {
+              existingItems = JSON.parse(existingMemory.value);
+              if (!Array.isArray(existingItems)) {
+                existingItems = [];
+              }
+            } catch {
+              // Se não for JSON válido, começar com array vazio
+              existingItems = [];
+            }
+          }
+
+          // Adicionar novos items à lista existente
+          const combinedItems = [...existingItems, ...resolvedItems];
+          finalValue = JSON.stringify(combinedItems);
+
+          console.log(
+            `➕ Memory append: ${resolvedMemoryName} - added ${resolvedItems.length} items to existing ${existingItems.length} items`,
+          );
+        } else {
+          // Modo OVERWRITE: Substituir completamente
+          finalValue = JSON.stringify(resolvedItems);
+
+          console.log(
+            `🔄 Memory overwrite: ${resolvedMemoryName} with ${resolvedItems.length} items`,
+          );
+        }
+
+        // Salvar memória
         const saveResult = await salvarMemoria(
           userId,
           resolvedMemoryName,
-          JSON.stringify(resolvedItems), // Salvar como JSON string
+          finalValue,
           ttl,
-        );
-
-        console.log(
-          `💾 Memory saved: ${resolvedMemoryName} with ${resolvedItems.length} items`,
         );
 
         return {
@@ -730,6 +896,7 @@ async function processMemoryNode(
           action: 'save',
           name: resolvedMemoryName,
           items: resolvedItems,
+          saveMode: saveMode || 'overwrite',
           success: saveResult.success,
           expiresAt: saveResult.expiresAt,
         };
@@ -790,6 +957,78 @@ async function processMemoryNode(
     }
   } catch (error) {
     console.error(`❌ Error processing memory node:`, error);
+    throw error;
+  }
+}
+
+// Processador do Database Node
+async function processDatabaseNode(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  console.log('🗄️ Processing database node');
+
+  try {
+    // Buscar execução para obter flow e userId
+    const execution = await prisma.flow_executions.findUnique({
+      where: { id: executionId },
+      include: {
+        flow: true,
+      },
+    });
+
+    if (!execution?.flow?.userId) {
+      throw new Error('UserId not found in flow');
+    }
+
+    const userId = String(execution.flow.userId);
+
+    // Buscar dados de todos os nodes anteriores
+    const nodeExecutions =
+      (execution.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+
+    // Criar objeto $nodes com saídas de todos os nodes anteriores
+    const $nodes: Record<string, { output: unknown }> = {};
+    Object.keys(nodeExecutions).forEach((nodeId) => {
+      const nodeExec = nodeExecutions[nodeId];
+      if (nodeExec?.result) {
+        $nodes[nodeId] = {
+          output: nodeExec.result,
+        };
+      }
+    });
+
+    // Buscar todas as memórias do usuário para o contexto
+    const $memory = await listarMemorias(userId);
+
+    // Preparar contexto de execução
+    const executionContext = {
+      userId,
+      flowId: execution.flowId,
+      executionId: execution.id,
+      variables: {
+        input: webhookData.body,
+        nodes: $nodes,
+        memory: $memory,
+      },
+    };
+
+    // Executar database node
+    const result = await executeDatabaseNode(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      node as any,
+      webhookData.body,
+      executionContext,
+    );
+
+    console.log(
+      `✅ Database node completed: ${result.operation} - ${result.message}`,
+    );
+
+    return result;
+  } catch (error) {
+    console.error(`❌ Error processing database node:`, error);
     throw error;
   }
 }
@@ -892,6 +1131,11 @@ async function processTransformationNode(
       // SEMPRE usar o input configurado no step (resolvendo variáveis dinâmicas)
       const inputValue = replaceVariables(step.input || '', variableContext);
       console.log(`  📥 Input for step ${index + 1}: "${inputValue}"`);
+      console.log(`  📥 Input type: ${typeof inputValue}`);
+      console.log(`  📥 Input is array: ${Array.isArray(inputValue)}`);
+      if (typeof inputValue === 'object' && inputValue !== null) {
+        console.log(`  📥 Input object keys: ${Object.keys(inputValue)}`);
+      }
 
       // Executar transformação baseada no tipo e operação
       try {
@@ -927,6 +1171,313 @@ async function processTransformationNode(
   } catch (error) {
     console.error(`❌ Error processing transformation node:`, error);
     throw error;
+  }
+}
+
+// Condition Node Types
+interface ConditionRule {
+  id: string;
+  variable: string;
+  operator: string;
+  value: string;
+  logicOperator?: 'AND' | 'OR';
+}
+
+interface SwitchCase {
+  id: string;
+  variable: string;
+  operator: string;
+  value: string;
+  label: string;
+}
+
+interface ConditionConfig {
+  conditionType: 'if' | 'switch';
+  rules?: ConditionRule[];
+  variable?: string;
+  cases?: SwitchCase[];
+  useDefaultCase?: boolean;
+}
+
+// Processador do Condition Node
+async function processConditionNode(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  console.log('🔀 Processing condition node');
+
+  const conditionConfig = node.data?.conditionConfig as
+    | ConditionConfig
+    | undefined;
+
+  console.log('🔍 Condition config:', JSON.stringify(conditionConfig, null, 2));
+
+  if (!conditionConfig || !conditionConfig.conditionType) {
+    throw new Error(
+      'Condition node is not configured. Please double-click the node and configure it.',
+    );
+  }
+
+  try {
+    // Buscar execução para obter contexto de variáveis
+    const execution = await prisma.flow_executions.findUnique({
+      where: { id: executionId },
+      include: {
+        flow: true,
+      },
+    });
+
+    if (!execution) {
+      throw new Error('Execution not found');
+    }
+
+    // Preparar contexto de variáveis
+    const nodeExecutions =
+      (execution.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+
+    const $nodes: Record<string, { output: unknown }> = {};
+    Object.keys(nodeExecutions).forEach((nodeId) => {
+      const nodeExec = nodeExecutions[nodeId];
+      if (nodeExec?.result) {
+        $nodes[nodeId] = {
+          output: nodeExec.result,
+        };
+      }
+    });
+
+    // Buscar memórias do usuário
+    const userId = execution?.flow?.userId
+      ? String(execution.flow.userId)
+      : null;
+    const $memory = userId ? await listarMemorias(userId) : {};
+
+    const variableContext = {
+      $node: {
+        input: webhookData.body,
+        webhook: {
+          body: webhookData.body,
+          headers: webhookData.headers,
+          queryParams: webhookData.queryParams,
+        },
+      },
+      $nodes,
+      $memory,
+    };
+
+    // Processar baseado no tipo de condição
+    if (conditionConfig.conditionType === 'if') {
+      // Processar IF
+      const rules = conditionConfig.rules || [];
+      if (rules.length === 0) {
+        throw new Error('No rules defined for IF condition');
+      }
+
+      console.log(`🔀 Evaluating ${rules.length} IF rule(s)`);
+
+      // Avaliar cada regra
+      const evaluationResults: boolean[] = [];
+      for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i];
+        const resolvedVariable = replaceVariables(
+          rule.variable,
+          variableContext,
+        );
+        const resolvedValue = replaceVariables(
+          rule.value || '',
+          variableContext,
+        );
+
+        const result = evaluateCondition(
+          resolvedVariable,
+          rule.operator,
+          resolvedValue,
+        );
+        evaluationResults.push(result);
+
+        console.log(
+          `  Rule ${i + 1}: "${resolvedVariable}" ${rule.operator} "${resolvedValue}" = ${result}`,
+        );
+      }
+
+      // Combinar resultados baseado em operadores lógicos
+      let finalResult = evaluationResults[0];
+      for (let i = 1; i < evaluationResults.length; i++) {
+        const logicOperator = rules[i].logicOperator || 'AND';
+        if (logicOperator === 'AND') {
+          finalResult = finalResult && evaluationResults[i];
+        } else {
+          // OR
+          finalResult = finalResult || evaluationResults[i];
+        }
+      }
+
+      console.log(`🔀 Final IF result: ${finalResult}`);
+
+      return {
+        type: 'condition',
+        conditionType: 'if',
+        result: finalResult,
+        selectedHandle: finalResult ? 'true' : 'false',
+        evaluations: evaluationResults,
+      };
+    } else if (conditionConfig.conditionType === 'switch') {
+      // Processar SWITCH
+      const cases = conditionConfig.cases || [];
+      if (cases.length === 0) {
+        throw new Error('No cases defined for SWITCH condition');
+      }
+
+      console.log(`🔀 Evaluating SWITCH with ${cases.length} case(s)`);
+
+      // Avaliar cada caso com sua própria variável e operador
+      let matchedCase: SwitchCase | undefined;
+      const evaluationResults: Array<{
+        caseId: string;
+        label: string;
+        variable: string;
+        operator: string;
+        value: string;
+        result: boolean;
+      }> = [];
+
+      for (const caseItem of cases) {
+        const resolvedVariable = replaceVariables(
+          caseItem.variable,
+          variableContext,
+        );
+        const resolvedValue = replaceVariables(
+          caseItem.value || '',
+          variableContext,
+        );
+
+        const result = evaluateCondition(
+          resolvedVariable,
+          caseItem.operator,
+          resolvedValue,
+        );
+
+        evaluationResults.push({
+          caseId: caseItem.id,
+          label: caseItem.label,
+          variable: resolvedVariable,
+          operator: caseItem.operator,
+          value: resolvedValue,
+          result,
+        });
+
+        console.log(
+          `  Case "${caseItem.label}": "${resolvedVariable}" ${caseItem.operator} "${resolvedValue}" = ${result}`,
+        );
+
+        // Primeiro caso que der match é selecionado
+        if (!matchedCase && result) {
+          matchedCase = caseItem;
+        }
+      }
+
+      let selectedHandle: string;
+      if (matchedCase) {
+        selectedHandle = `case_${matchedCase.id}`;
+        console.log(
+          `🔀 Matched case: "${matchedCase.label}" (ID: ${matchedCase.id})`,
+        );
+      } else if (conditionConfig.useDefaultCase !== false) {
+        selectedHandle = 'default';
+        console.log(`🔀 No match found, using DEFAULT case`);
+      } else {
+        throw new Error(`No matching case found and no default case defined`);
+      }
+
+      return {
+        type: 'condition',
+        conditionType: 'switch',
+        matchedCase: matchedCase?.label,
+        selectedHandle,
+        totalCases: cases.length,
+        evaluations: evaluationResults,
+      };
+    } else {
+      throw new Error(
+        `Unknown condition type: ${conditionConfig.conditionType}`,
+      );
+    }
+  } catch (error) {
+    console.error(`❌ Error processing condition node:`, error);
+    throw error;
+  }
+}
+
+// Função auxiliar para avaliar uma condição individual
+function evaluateCondition(
+  variable: string,
+  operator: string,
+  value: string,
+): boolean {
+  const varStr = String(variable || '').trim();
+  const valStr = String(value || '').trim();
+
+  switch (operator) {
+    case 'equals':
+      return varStr === valStr;
+
+    case 'not_equals':
+      return varStr !== valStr;
+
+    case 'contains':
+      return varStr.includes(valStr);
+
+    case 'not_contains':
+      return !varStr.includes(valStr);
+
+    case 'starts_with':
+      return varStr.startsWith(valStr);
+
+    case 'ends_with':
+      return varStr.endsWith(valStr);
+
+    case 'greater_than': {
+      const varNum = parseFloat(varStr);
+      const valNum = parseFloat(valStr);
+      return !isNaN(varNum) && !isNaN(valNum) && varNum > valNum;
+    }
+
+    case 'less_than': {
+      const varNum = parseFloat(varStr);
+      const valNum = parseFloat(valStr);
+      return !isNaN(varNum) && !isNaN(valNum) && varNum < valNum;
+    }
+
+    case 'greater_or_equal': {
+      const varNum = parseFloat(varStr);
+      const valNum = parseFloat(valStr);
+      return !isNaN(varNum) && !isNaN(valNum) && varNum >= valNum;
+    }
+
+    case 'less_or_equal': {
+      const varNum = parseFloat(varStr);
+      const valNum = parseFloat(valStr);
+      return !isNaN(varNum) && !isNaN(valNum) && varNum <= valNum;
+    }
+
+    case 'is_empty':
+      return varStr === '';
+
+    case 'is_not_empty':
+      return varStr !== '';
+
+    case 'regex_match':
+      try {
+        const regex = new RegExp(valStr);
+        return regex.test(varStr);
+      } catch (error) {
+        console.error(`❌ Invalid regex pattern: ${valStr}`, error);
+        return false;
+      }
+
+    default:
+      console.warn(`⚠️ Unknown operator: ${operator}`);
+      return false;
   }
 }
 
@@ -1150,12 +1701,6 @@ function executeValidationTransformation(
     default:
       throw new Error(`Unknown validation operation: ${operation}`);
   }
-}
-
-async function processConditionNode(): Promise<unknown> {
-  console.log(`🔀 Processing condition node`);
-  // Implementar lógica de condição
-  return { type: 'condition', result: true };
 }
 
 async function processApiNode(): Promise<unknown> {

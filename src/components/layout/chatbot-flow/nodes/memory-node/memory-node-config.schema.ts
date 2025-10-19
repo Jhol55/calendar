@@ -20,6 +20,7 @@ export const memoryConfigSchema = z
     ttlPreset: z.string().optional(),
     customTtl: z.string().optional(),
     defaultValue: z.string().optional(),
+    saveMode: z.enum(['overwrite', 'append']).optional(),
   })
   .superRefine((data, ctx) => {
     // Validar items apenas se a ação for "save"

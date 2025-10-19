@@ -1,0 +1,356 @@
+// ============================================
+// DATABASE NODE EXECUTOR
+// Executa operações do database-node
+// ============================================
+
+import { databaseNodeService } from '@/services/database-node.service';
+import type { DatabaseNodeConfig } from '@/types/database-node.types';
+
+/**
+ * Interface do contexto de execução
+ */
+export interface ExecutionContext {
+  userId: string;
+  flowId: string;
+  executionId: string;
+  variables: Record<string, any>;
+}
+
+/**
+ * Interface do node
+ */
+export interface Node {
+  id: string;
+  type: string;
+  data?: {
+    label?: string;
+    config?: DatabaseNodeConfig;
+    [key: string]: any;
+  };
+}
+
+/**
+ * Executa um database-node
+ */
+export async function executeDatabaseNode(
+  node: Node,
+  input: any,
+  context: ExecutionContext,
+): Promise<any> {
+  const config = node.data?.databaseConfig as DatabaseNodeConfig;
+
+  if (!config) {
+    throw new Error('Database node config não encontrado');
+  }
+
+  const { operation, tableName } = config;
+  const userId = context.userId;
+
+  console.log(
+    `🗄️  Executando database-node [${operation}] na tabela "${tableName}"`,
+  );
+
+  try {
+    switch (operation) {
+      case 'addColumns':
+        return await handleAddColumns(userId, config);
+
+      case 'removeColumns':
+        return await handleRemoveColumns(userId, config);
+
+      case 'insert':
+        return await handleInsert(userId, config, input, context);
+
+      case 'update':
+        return await handleUpdate(userId, config, input, context);
+
+      case 'delete':
+        return await handleDelete(userId, config, input, context);
+
+      case 'get':
+        return await handleGet(userId, config, input, context);
+
+      default:
+        throw new Error(`Operação "${operation}" não suportada`);
+    }
+  } catch (error: any) {
+    console.error(`❌ Erro no database-node [${operation}]:`, error);
+    throw error;
+  }
+}
+
+// ============================================
+// HANDLERS DE CADA OPERAÇÃO
+// ============================================
+
+/**
+ * Handler: addColumns
+ */
+async function handleAddColumns(
+  userId: string,
+  config: DatabaseNodeConfig,
+): Promise<any> {
+  if (!config.columns || config.columns.length === 0) {
+    throw new Error('Nenhuma coluna especificada para adicionar');
+  }
+
+  const schema = await databaseNodeService.addColumns(
+    userId,
+    config.tableName,
+    config.columns,
+  );
+
+  return {
+    success: true,
+    operation: 'addColumns',
+    tableName: config.tableName,
+    schema,
+    message: `${config.columns.length} coluna(s) adicionada(s) com sucesso`,
+  };
+}
+
+/**
+ * Handler: removeColumns
+ */
+async function handleRemoveColumns(
+  userId: string,
+  config: DatabaseNodeConfig,
+): Promise<any> {
+  if (!config.columnsToRemove || config.columnsToRemove.length === 0) {
+    throw new Error('Nenhuma coluna especificada para remover');
+  }
+
+  const schema = await databaseNodeService.removeColumns(
+    userId,
+    config.tableName,
+    config.columnsToRemove,
+  );
+
+  return {
+    success: true,
+    operation: 'removeColumns',
+    tableName: config.tableName,
+    schema,
+    message: `${config.columnsToRemove.length} coluna(s) removida(s) com sucesso`,
+  };
+}
+
+/**
+ * Handler: insert
+ */
+async function handleInsert(
+  userId: string,
+  config: DatabaseNodeConfig,
+  input: any,
+  context: ExecutionContext,
+): Promise<any> {
+  if (!config.record) {
+    throw new Error('Nenhum registro especificado para inserir');
+  }
+
+  // Resolve variáveis no registro
+  const resolvedRecord = resolveVariables(config.record, input, context);
+
+  const newRecord = await databaseNodeService.insertRecord(
+    userId,
+    config.tableName,
+    resolvedRecord,
+  );
+
+  return {
+    success: true,
+    operation: 'insert',
+    tableName: config.tableName,
+    record: newRecord,
+    message: 'Registro inserido com sucesso',
+  };
+}
+
+/**
+ * Handler: update
+ */
+async function handleUpdate(
+  userId: string,
+  config: DatabaseNodeConfig,
+  input: any,
+  context: ExecutionContext,
+): Promise<any> {
+  if (!config.filters) {
+    throw new Error('Nenhum filtro especificado para atualização');
+  }
+
+  if (!config.updates) {
+    throw new Error('Nenhuma atualização especificada');
+  }
+
+  // Resolve variáveis nos filtros e updates
+  const resolvedFilters = resolveVariables(config.filters, input, context);
+  const resolvedUpdates = resolveVariables(config.updates, input, context);
+
+  const result = await databaseNodeService.updateRecords(
+    userId,
+    config.tableName,
+    resolvedFilters,
+    resolvedUpdates,
+  );
+
+  return {
+    success: true,
+    operation: 'update',
+    tableName: config.tableName,
+    affected: result.affected,
+    records: result.records,
+    message: `${result.affected} registro(s) atualizado(s)`,
+  };
+}
+
+/**
+ * Handler: delete
+ */
+async function handleDelete(
+  userId: string,
+  config: DatabaseNodeConfig,
+  input: any,
+  context: ExecutionContext,
+): Promise<any> {
+  if (!config.filters) {
+    throw new Error('Nenhum filtro especificado para exclusão');
+  }
+
+  // Resolve variáveis nos filtros
+  const resolvedFilters = resolveVariables(config.filters, input, context);
+
+  const result = await databaseNodeService.deleteRecords(
+    userId,
+    config.tableName,
+    resolvedFilters,
+  );
+
+  return {
+    success: true,
+    operation: 'delete',
+    tableName: config.tableName,
+    affected: result.affected,
+    message: `${result.affected} registro(s) deletado(s)`,
+  };
+}
+
+/**
+ * Handler: get
+ */
+async function handleGet(
+  userId: string,
+  config: DatabaseNodeConfig,
+  input: any,
+  context: ExecutionContext,
+): Promise<any> {
+  // Resolve variáveis nas opções de query
+  const options = {
+    filters: config.filters
+      ? resolveVariables(config.filters, input, context)
+      : undefined,
+    sort: config.sort,
+    pagination: config.pagination,
+  };
+
+  const records = await databaseNodeService.getRecords(
+    userId,
+    config.tableName,
+    options,
+  );
+
+  return {
+    success: true,
+    operation: 'get',
+    tableName: config.tableName,
+    count: records.length,
+    records,
+    message: `${records.length} registro(s) encontrado(s)`,
+  };
+}
+
+// ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Resolve variáveis no formato {{variavel}} em um objeto
+ */
+function resolveVariables(
+  obj: any,
+  input: any,
+  context: ExecutionContext,
+): any {
+  if (typeof obj === 'string') {
+    return resolveString(obj, input, context);
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => resolveVariables(item, input, context));
+  }
+
+  if (obj && typeof obj === 'object') {
+    const resolved: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      resolved[key] = resolveVariables(value, input, context);
+    }
+    return resolved;
+  }
+
+  return obj;
+}
+
+/**
+ * Resolve variáveis em uma string
+ */
+function resolveString(
+  str: string,
+  input: any,
+  context: ExecutionContext,
+): any {
+  if (typeof str !== 'string') return str;
+
+  // Padrão: {{variavel}} ou {{objeto.propriedade}}
+  const regex = /\{\{([^}]+)\}\}/g;
+  let hasVariables = false;
+
+  const resolved = str.replace(regex, (match, path) => {
+    hasVariables = true;
+    const trimmedPath = path.trim();
+
+    // Tenta resolver de múltiplas fontes
+    const value = resolveValue(trimmedPath, { input, ...context.variables });
+
+    return value !== undefined ? String(value) : match;
+  });
+
+  // Se a string inteira era uma variável, retorna o valor original (não string)
+  if (hasVariables && str.match(/^\{\{[^}]+\}\}$/)) {
+    const path = str.slice(2, -2).trim();
+    return resolveValue(path, { input, ...context.variables });
+  }
+
+  return resolved;
+}
+
+/**
+ * Resolve um caminho de propriedade (ex: "input.body.name")
+ */
+function resolveValue(path: string, data: any): any {
+  const parts = path.split('.');
+  let current = data;
+
+  for (const part of parts) {
+    if (current === null || current === undefined) {
+      return undefined;
+    }
+    current = current[part];
+  }
+
+  return current;
+}
+
+/**
+ * Exporta função para uso no webhook-worker
+ */
+export default executeDatabaseNode;

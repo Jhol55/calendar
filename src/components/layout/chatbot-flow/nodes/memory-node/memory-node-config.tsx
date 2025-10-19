@@ -51,6 +51,7 @@ function MemoryFormFields({
   const { form, setValue, errors } = useForm();
   const action = (form.action as 'save' | 'fetch' | 'delete') || 'save';
   const ttlPreset = (form.ttlPreset as string) || 'never';
+  const saveMode = (form.saveMode as 'overwrite' | 'append') || 'overwrite';
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -58,6 +59,7 @@ function MemoryFormFields({
         setValue('action', config.action || 'save');
         setValue('memoryName', config.memoryName || '');
         setValue('defaultValue', config.defaultValue || '');
+        setValue('saveMode', config.saveMode || 'overwrite');
 
         // Sincronizar items com o formulário APENAS quando config mudar
         if (config.items && config.items.length > 0) {
@@ -127,6 +129,33 @@ function MemoryFormFields({
           placeholder="Ex: dadosCliente, informacoesPedido"
         />
       </div>
+
+      {/* Modo de Salvamento - Apenas para SALVAR */}
+      {action === 'save' && (
+        <div className="p-1">
+          <FormControl variant="label">Modo de Salvamento *</FormControl>
+          <FormSelect
+            fieldName="saveMode"
+            placeholder="Selecione o modo"
+            options={[
+              {
+                value: 'overwrite',
+                label: 'Sobrescrever - Substitui o valor existente',
+              },
+              {
+                value: 'append',
+                label: 'Adicionar à Lista - Adiciona à lista existente',
+              },
+            ]}
+            className="w-full"
+          />
+          <Typography variant="span" className="text-xs text-gray-500 mt-1">
+            {saveMode === 'overwrite'
+              ? 'O valor será substituído completamente'
+              : 'O valor será adicionado como um novo item na lista'}
+          </Typography>
+        </div>
+      )}
 
       {/* Items (Chave/Valor) - Apenas para SALVAR */}
       {action === 'save' && (
@@ -285,6 +314,10 @@ export function MemoryNodeConfig({
       items: data.action === 'save' ? (data.items as MemoryItem[]) : undefined,
       ttl: ttl,
       defaultValue: data.defaultValue,
+      saveMode:
+        data.action === 'save'
+          ? (data.saveMode as 'overwrite' | 'append')
+          : undefined,
     };
 
     onSave(memoryConfig);

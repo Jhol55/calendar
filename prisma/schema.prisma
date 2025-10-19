@@ -158,3 +158,23 @@ model chatbot_memories {
   @@index([userId])
   @@index([expiresAt])
 }
+
+model DataTable {
+  id          String   @id @default(uuid())
+  userId      String   @db.VarChar(255) // Email do usuário logado
+  tableName   String   @db.VarChar(255) // Nome da tabela virtual (ex: "leads", "customers")
+  partition   Int      @default(0)      // Número da partição (0, 1, 2, 3...)
+  
+  schema      Json     @db.JsonB        // Definição das colunas
+  data        Json     @db.JsonB        // Array de registros (max 1000 por partição)
+  
+  recordCount Int      @default(0)      // Quantidade de registros nesta partição
+  isFull      Boolean  @default(false)  // true quando atingir MAX_PARTITION_SIZE
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, tableName, partition])
+  @@index([userId, tableName])
+  @@index([userId, tableName, isFull])
+}

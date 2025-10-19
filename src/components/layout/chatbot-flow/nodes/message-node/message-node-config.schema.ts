@@ -69,14 +69,28 @@ export const messageConfigSchema = baseSchema.refine(
         const choices = data.interactiveMenuChoices
           ? JSON.parse(data.interactiveMenuChoices)
           : [];
-        if (!Array.isArray(choices) || choices.length <= 1) return false;
+        if (!Array.isArray(choices) || choices.length === 0) return false;
 
         // Validações específicas por tipo
-        if (
-          data.interactiveMenuType === 'list' &&
-          !data.interactiveMenuListButton
-        ) {
-          return false;
+        if (data.interactiveMenuType === 'button') {
+          // Botões: mínimo 1, máximo 3
+          if (choices.length < 1 || choices.length > 3) return false;
+        }
+
+        if (data.interactiveMenuType === 'list') {
+          // Lista: mínimo 1 item + ListButton obrigatório
+          if (choices.length < 1) return false;
+          if (!data.interactiveMenuListButton) return false;
+        }
+
+        if (data.interactiveMenuType === 'poll') {
+          // Enquete: mínimo 2 opções
+          if (choices.length < 2) return false;
+        }
+
+        if (data.interactiveMenuType === 'carousel') {
+          // Carrossel: mínimo 1 card
+          if (choices.length < 1) return false;
         }
       } catch {
         return false;
@@ -105,6 +119,80 @@ export const messageConfigSchema = baseSchema.refine(
       };
     }
     if (data.messageType === 'interactive_menu') {
+      // Mensagens de erro específicas por tipo
+      if (!data.interactiveMenuType) {
+        return {
+          message: 'Selecione o tipo de menu interativo',
+          path: ['interactiveMenuType'],
+        };
+      }
+
+      if (!data.interactiveMenuText || data.interactiveMenuText.length === 0) {
+        return {
+          message: 'Digite o texto do menu',
+          path: ['interactiveMenuText'],
+        };
+      }
+
+      try {
+        const choices = data.interactiveMenuChoices
+          ? JSON.parse(data.interactiveMenuChoices)
+          : [];
+
+        if (data.interactiveMenuType === 'button') {
+          if (choices.length === 0) {
+            return {
+              message: 'Adicione pelo menos 1 botão (máximo 3)',
+              path: ['interactiveMenuChoices'],
+            };
+          }
+          if (choices.length > 3) {
+            return {
+              message: 'Máximo de 3 botões permitidos',
+              path: ['interactiveMenuChoices'],
+            };
+          }
+        }
+
+        if (data.interactiveMenuType === 'list') {
+          if (choices.length === 0) {
+            return {
+              message: 'Adicione pelo menos 1 item à lista',
+              path: ['interactiveMenuChoices'],
+            };
+          }
+          if (!data.interactiveMenuListButton) {
+            return {
+              message: 'Digite o texto do botão da lista',
+              path: ['interactiveMenuListButton'],
+            };
+          }
+        }
+
+        if (data.interactiveMenuType === 'poll') {
+          if (choices.length < 2) {
+            return {
+              message: 'Adicione pelo menos 2 opções para a enquete',
+              path: ['interactiveMenuChoices'],
+            };
+          }
+        }
+
+        if (data.interactiveMenuType === 'carousel') {
+          if (choices.length === 0) {
+            return {
+              message: 'Adicione pelo menos 1 card ao carrossel',
+              path: ['interactiveMenuChoices'],
+            };
+          }
+        }
+      } catch {
+        return {
+          message: 'Erro ao processar opções do menu',
+          path: ['interactiveMenuChoices'],
+        };
+      }
+
       return {
         message: 'Configure o menu interativo corretamente',
         path: ['interactiveMenuType'],

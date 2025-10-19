@@ -156,32 +156,80 @@ export function now(): string {
 
 // ==================== ARRAY OPERATIONS ====================
 
-export function filterArray(input: any[], condition: string): any[] {
+// Função auxiliar para parsear input que pode ser string JSON ou array
+function parseArrayInput(input: any): any[] {
+  if (Array.isArray(input)) {
+    return input;
+  }
+
+  if (typeof input === 'string') {
+    try {
+      const parsed = JSON.parse(input);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Se não conseguir fazer parse, continuar com erro
+    }
+  }
+
+  // Se for um objeto, tentar extrair valores ou chaves
+  if (typeof input === 'object' && input !== null) {
+    // Se tem propriedade 'value' que é array
+    if (input.value && Array.isArray(input.value)) {
+      return input.value;
+    }
+    // Se tem propriedade 'output' que é array
+    if (input.output && Array.isArray(input.output)) {
+      return input.output;
+    }
+    // Se tem propriedade 'data' que é array
+    if (input.data && Array.isArray(input.data)) {
+      return input.data;
+    }
+    // Se tem propriedade 'items' que é array
+    if (input.items && Array.isArray(input.items)) {
+      return input.items;
+    }
+    // Se tem propriedade 'results' que é array
+    if (input.results && Array.isArray(input.results)) {
+      return input.results;
+    }
+    // Se for um objeto com valores numéricos, converter para array
+    const values = Object.values(input);
+    if (
+      values.length > 0 &&
+      values.every((v) => typeof v === 'number' || typeof v === 'string')
+    ) {
+      return values;
+    }
+  }
+
+  throw new Error(
+    `Input deve ser um array ou string JSON válida. Recebido: ${typeof input} - ${JSON.stringify(input)}`,
+  );
+}
+
+export function filterArray(input: any, condition: string): any[] {
+  const array = parseArrayInput(input);
   // Nota: condition seria algo como "value > 10" ou "value === 'ativo'"
   // Aqui simplificamos para demonstração
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
   // Por enquanto retorna o array original
   // TODO: Implementar parser de condição
-  return input;
+  return array;
 }
 
-export function mapArray(input: any[], transformation: string): any[] {
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
+export function mapArray(input: any, transformation: string): any[] {
+  const array = parseArrayInput(input);
   // Por enquanto retorna o array original
   // TODO: Implementar transformação
-  return input;
+  return array;
 }
 
-export function sortArray(input: any[], order: 'asc' | 'desc' = 'asc'): any[] {
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
+export function sortArray(input: any, order: 'asc' | 'desc' = 'asc'): any[] {
+  const array = parseArrayInput(input);
 
-  const sorted = [...input].sort((a, b) => {
+  const sorted = [...array].sort((a, b) => {
     if (typeof a === 'string' && typeof b === 'string') {
       return order === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
     }
@@ -194,46 +242,90 @@ export function sortArray(input: any[], order: 'asc' | 'desc' = 'asc'): any[] {
   return sorted;
 }
 
-export function firstElement(input: any[]): any {
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
-  return input[0];
+export function firstElement(input: any): any {
+  const array = parseArrayInput(input);
+  return array[0];
 }
 
-export function lastElement(input: any[]): any {
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
-  return input[input.length - 1];
+export function lastElement(input: any): any {
+  const array = parseArrayInput(input);
+  return array[array.length - 1];
 }
 
-export function joinArray(input: any[], separator: string = ','): string {
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
-  return input.join(separator);
+export function joinArray(input: any, separator: string = ','): string {
+  const array = parseArrayInput(input);
+  return array.join(separator);
 }
 
-export function uniqueArray(input: any[]): any[] {
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
-  return [...new Set(input)];
+export function uniqueArray(input: any): any[] {
+  const array = parseArrayInput(input);
+  return [...new Set(array)];
 }
 
-export function arrayLength(input: any[]): number {
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
-  return input.length;
+export function arrayLength(input: any): number {
+  const array = parseArrayInput(input);
+  return array.length;
 }
 
-export function sumArray(input: any[]): number {
-  if (!Array.isArray(input)) {
-    throw new Error('Input deve ser um array');
-  }
-  return input.reduce((sum, val) => sum + Number(val), 0);
+export function sumArray(input: any): number {
+  const array = parseArrayInput(input);
+  console.log(`🔢 sumArray input:`, array);
+
+  const result = array.reduce((sum, val, index) => {
+    console.log(`  🔢 Processing item ${index}:`, val, `(type: ${typeof val})`);
+
+    // Se for objeto, tentar extrair valor numérico
+    if (typeof val === 'object' && val !== null) {
+      // Tentar propriedades comuns que podem conter números
+      const numericValue =
+        val.value ||
+        val.amount ||
+        val.price ||
+        val.quantity ||
+        val.count ||
+        val.number;
+      console.log(`    🔢 Found numeric value: ${numericValue}`);
+      if (numericValue !== undefined) {
+        const numVal = Number(numericValue);
+        console.log(`    🔢 Adding ${numVal} to sum (was ${sum})`);
+        return sum + numVal;
+      }
+      // Se não encontrar propriedade numérica, tentar somar todos os valores numéricos do objeto
+      const objectValues = Object.values(val);
+      const numericValues = objectValues.filter(
+        (v) =>
+          typeof v === 'number' || (typeof v === 'string' && !isNaN(Number(v))),
+      );
+      console.log(
+        `    🔢 Object values:`,
+        objectValues,
+        `numeric:`,
+        numericValues,
+      );
+      if (numericValues.length > 0) {
+        const objSum = numericValues.reduce(
+          (objSum, v) => objSum + Number(v),
+          0,
+        );
+        console.log(
+          `    🔢 Object sum: ${objSum}, adding to total (was ${sum})`,
+        );
+        return sum + objSum;
+      }
+      // Se não conseguir extrair número do objeto, retornar 0
+      console.log(`    🔢 No numeric value found in object, skipping`);
+      return sum;
+    }
+    // Se for valor simples, converter para número
+    const numVal = Number(val);
+    console.log(
+      `    🔢 Simple value: ${val} -> ${numVal}, adding to sum (was ${sum})`,
+    );
+    return sum + numVal;
+  }, 0);
+
+  console.log(`🔢 sumArray result: ${result}`);
+  return result;
 }
 
 // ==================== OBJECT OPERATIONS ====================

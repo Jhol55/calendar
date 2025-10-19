@@ -53,7 +53,7 @@ function MessageFormFields({
     id: string;
     text: string;
     description: string;
-    actionType?: 'copy' | 'link' | 'call'; // Tipo de ação do botão
+    actionType?: 'copy' | 'link' | 'call' | 'return_id'; // Tipo de ação do botão
   }
 
   interface ListCategory {
@@ -214,8 +214,12 @@ function MessageFormFields({
                 const rawId = parts[1] || '';
 
                 // Detectar tipo de ação
-                let actionType: 'copy' | 'link' | 'call' | undefined =
-                  undefined;
+                let actionType:
+                  | 'copy'
+                  | 'link'
+                  | 'call'
+                  | 'return_id'
+                  | undefined = undefined;
                 let cleanId = rawId;
 
                 if (rawId.startsWith('copy:')) {
@@ -224,8 +228,15 @@ function MessageFormFields({
                 } else if (rawId.startsWith('call:')) {
                   actionType = 'call';
                   cleanId = rawId.replace('call:', '');
+                } else if (rawId.startsWith('return_id:')) {
+                  actionType = 'return_id';
+                  cleanId = rawId.replace('return_id:', '');
                 } else if (rawId.startsWith('http')) {
                   actionType = 'link';
+                  cleanId = rawId;
+                } else if (rawId && rawId.trim() !== '') {
+                  // Se não tem prefixo mas tem valor, assumir que é return_id
+                  actionType = 'return_id';
                   cleanId = rawId;
                 }
 
@@ -290,8 +301,12 @@ function MessageFormFields({
                 const rawId = parts[1] || '';
 
                 // Detectar tipo de ação
-                let actionType: 'copy' | 'link' | 'call' | undefined =
-                  undefined;
+                let actionType:
+                  | 'copy'
+                  | 'link'
+                  | 'call'
+                  | 'return_id'
+                  | undefined = undefined;
                 let cleanId = rawId;
 
                 if (rawId.startsWith('copy:')) {
@@ -300,8 +315,15 @@ function MessageFormFields({
                 } else if (rawId.startsWith('call:')) {
                   actionType = 'call';
                   cleanId = rawId.replace('call:', '');
+                } else if (rawId.startsWith('return_id:')) {
+                  actionType = 'return_id';
+                  cleanId = rawId.replace('return_id:', '');
                 } else if (rawId.startsWith('http')) {
                   actionType = 'link';
+                  cleanId = rawId;
+                } else if (rawId && rawId.trim() !== '') {
+                  // Se não tem prefixo mas tem valor, assumir que é return_id
+                  actionType = 'return_id';
                   cleanId = rawId;
                 }
 
@@ -416,6 +438,8 @@ function MessageFormFields({
               finalId = `copy:${button.id}`;
             } else if (button.actionType === 'call') {
               finalId = `call:${button.id}`;
+            } else if (button.actionType === 'return_id') {
+              finalId = `${button.id}`;
             }
             // Para 'link', não adiciona prefixo (já é a URL completa)
 
@@ -438,6 +462,8 @@ function MessageFormFields({
             finalId = `copy:${choice.id}`;
           } else if (choice.actionType === 'call') {
             finalId = `call:${choice.id}`;
+          } else if (choice.actionType === 'return_id') {
+            finalId = `${choice.id}`;
           }
           // Para 'link', não adiciona prefixo (já é a URL completa)
 
@@ -1159,6 +1185,10 @@ function MessageFormFields({
                                 { value: 'copy', label: '📋 Copiar' },
                                 { value: 'link', label: '🔗 Link' },
                                 { value: 'call', label: '📞 Ligação' },
+                                {
+                                  value: 'return_id',
+                                  label: '🔄 Retornar Identificador',
+                                },
                               ]}
                               onValueChange={(value) =>
                                 updateCardButton(
@@ -1181,6 +1211,8 @@ function MessageFormFields({
                                   'URL do Link *'}
                                 {button.actionType === 'call' &&
                                   'Número para Ligar *'}
+                                {button.actionType === 'return_id' &&
+                                  'Identificador *'}
                                 {!button.actionType && 'Valor *'}
                               </Typography>
                             </FormControl>
@@ -1203,7 +1235,9 @@ function MessageFormFields({
                                     ? 'Ex: https://exemplo.com'
                                     : button.actionType === 'call'
                                       ? 'Ex: +5511999999999'
-                                      : 'Selecione o tipo de ação primeiro'
+                                      : button.actionType === 'return_id'
+                                        ? 'Ex: etapa_1'
+                                        : 'Selecione o tipo de ação primeiro'
                               }
                             />
                           </div>
@@ -1287,6 +1321,10 @@ function MessageFormFields({
                               { value: 'copy', label: '📋 Copiar' },
                               { value: 'link', label: '🔗 Link' },
                               { value: 'call', label: '📞 Ligação' },
+                              {
+                                value: 'return_id',
+                                label: '🔄 Retornar Identificador',
+                              },
                             ]}
                             onValueChange={(value) =>
                               updateChoice(index, 'actionType', value)
@@ -1303,6 +1341,8 @@ function MessageFormFields({
                               {choice.actionType === 'link' && 'URL do Link *'}
                               {choice.actionType === 'call' &&
                                 'Número para Ligar *'}
+                              {choice.actionType === 'return_id' &&
+                                'Identificador *'}
                               {!choice.actionType && 'Valor *'}
                             </Typography>
                           </FormControl>
@@ -1320,7 +1360,9 @@ function MessageFormFields({
                                   ? 'Ex: https://exemplo.com'
                                   : choice.actionType === 'call'
                                     ? 'Ex: +5511999999999'
-                                    : 'Selecione o tipo de ação primeiro'
+                                    : choice.actionType === 'return_id'
+                                      ? 'Ex: etapa_1'
+                                      : 'Selecione o tipo de ação primeiro'
                             }
                           />
                         </div>

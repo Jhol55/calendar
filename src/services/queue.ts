@@ -19,11 +19,17 @@ const queueConfig = {
   defaultJobOptions: {
     removeOnComplete: 100, // Manter apenas 100 jobs completos
     removeOnFail: 50, // Manter apenas 50 jobs falhados
-    attempts: 3, // Tentar 3 vezes em caso de falha
+    attempts: 1, // ✅ SEM RETRY - executar apenas 1 vez
     backoff: {
       type: 'exponential' as const,
       delay: 2000, // Delay inicial de 2 segundos
     },
+  },
+  settings: {
+    lockDuration: 30000, // 30 segundos de lock
+    lockRenewTime: 15000, // Renovar lock a cada 15 segundos
+    stalledInterval: 0, // ✅ DESABILITAR verificação de jobs stalled
+    maxStalledCount: 0, // ✅ Não recuperar jobs stalled
   },
 };
 

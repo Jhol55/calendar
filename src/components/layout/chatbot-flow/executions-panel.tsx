@@ -11,8 +11,13 @@ import {
   XCircle,
   AlertCircle,
   RefreshCw,
+  StopCircle,
 } from 'lucide-react';
-import { listExecutions, type Execution } from '@/actions/executions';
+import {
+  listExecutions,
+  stopExecution,
+  type Execution,
+} from '@/actions/executions';
 
 interface ExecutionsPanelProps {
   flowId: string;
@@ -52,6 +57,35 @@ export function ExecutionsPanel({
       setExecutions([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStopExecution = async (
+    executionId: string,
+    event: React.MouseEvent,
+  ) => {
+    event.stopPropagation(); // Evitar selecionar a execução ao clicar no botão
+
+    if (!confirm('Tem certeza que deseja parar esta execução?')) {
+      return;
+    }
+
+    try {
+      const result = await stopExecution(executionId);
+      if (result.success) {
+        console.log('✅ Execution stopped successfully');
+        // Atualizar lista de execuções
+        await fetchExecutions();
+        // Se a execução parada estava selecionada, atualizar
+        if (selectedExecution?.id === executionId) {
+          setSelectedExecution(result.execution as Execution);
+        }
+      } else {
+        alert(`Erro ao parar execução: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error stopping execution:', error);
+      alert('Erro ao parar execução');
     }
   };
 
@@ -173,14 +207,28 @@ export function ExecutionsPanel({
                             {execution.id.substring(0, 8)}...
                           </Typography>
                         </div>
-                        <span
-                          className={cn(
-                            'px-2 py-1 rounded-full text-xs font-semibold',
-                            getStatusColor(execution.status),
+                        <div className="flex items-center gap-2">
+                          {execution.status === 'running' && (
+                            <Button
+                              variant="ghost"
+                              onClick={(e) =>
+                                handleStopExecution(execution.id, e)
+                              }
+                              className="h-6 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Parar execução"
+                            >
+                              <StopCircle className="w-4 h-4" />
+                            </Button>
                           )}
-                        >
-                          {execution.status}
-                        </span>
+                          <span
+                            className={cn(
+                              'px-2 py-1 rounded-full text-xs font-semibold',
+                              getStatusColor(execution.status),
+                            )}
+                          >
+                            {execution.status}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="text-sm text-gray-600 space-y-1">

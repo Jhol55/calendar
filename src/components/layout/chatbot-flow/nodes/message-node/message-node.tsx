@@ -65,11 +65,6 @@ export function MessageNode({ data, selected }: NodeProps<NodeData>) {
             <span className="px-2 py-1 bg-neutral-100 text-blue-600 rounded">
               {getMessageTypeLabel()}
             </span>
-            {messageConfig.phoneNumber && (
-              <span className="text-gray-500">
-                → {messageConfig.phoneNumber}
-              </span>
-            )}
           </div>
         )}
 

@@ -30,6 +30,7 @@ import {
   WebhookNode,
   MemoryNode,
   TransformationNode,
+  DatabaseNode,
 } from './nodes';
 import {
   NodeType,
@@ -38,6 +39,8 @@ import {
   WebhookConfig,
   MemoryConfig,
   TransformationConfig,
+  ConditionConfig,
+  DatabaseConfig,
 } from '../../layout/chatbot-flow/types';
 import { Save, Download, Upload, Plus, Play } from 'lucide-react';
 import {
@@ -52,6 +55,8 @@ import { CreateWorkflowDialog } from '@/components/features/dialogs/create-workf
 import { WebhookNodeConfig } from './nodes/webhook-node/webhook-node-config';
 import { MemoryNodeConfig } from './nodes/memory-node/memory-node-config';
 import { TransformationNodeConfig } from './nodes/transformation-node/transformation-node-config';
+import { ConditionNodeConfig } from './nodes/condition-node/condition-node-config';
+import { DatabaseNodeConfig } from './nodes/database-node/database-node-config';
 import { ExecutionsPanel } from './executions-panel';
 
 const nodeTypes = {
@@ -63,6 +68,7 @@ const nodeTypes = {
   webhook: WebhookNode,
   memory: MemoryNode,
   transformation: TransformationNode,
+  database: DatabaseNode,
 };
 
 // Função para gerar IDs únicos
@@ -81,12 +87,84 @@ function FlowEditorContent() {
   const [memoryConfigDialogOpen, setMemoryConfigDialogOpen] = useState(false);
   const [transformationConfigDialogOpen, setTransformationConfigDialogOpen] =
     useState(false);
+  const [conditionConfigDialogOpen, setConditionConfigDialogOpen] =
+    useState(false);
+  const [databaseConfigDialogOpen, setDatabaseConfigDialogOpen] =
+    useState(false);
   const [nodeToConfig, setNodeToConfig] = useState<Node<NodeData> | null>(null);
   const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isExecutionsPanelOpen, setIsExecutionsPanelOpen] = useState(false);
+  const [copiedNode, setCopiedNode] = useState<Node<NodeData> | null>(null);
   const { user, workflows, setWorkflows } = useUser();
+
+  // Handler para deletar nodes selecionados
+  const onNodesDelete = useCallback(
+    (nodesToDelete: Node[]) => {
+      console.log(
+        '🗑️ Deleting nodes:',
+        nodesToDelete.map((n) => n.id),
+      );
+      setNodes((nds) =>
+        nds.filter((node) => !nodesToDelete.some((n) => n.id === node.id)),
+      );
+      // Deletar edges conectadas aos nodes deletados
+      setEdges((eds) =>
+        eds.filter(
+          (edge) =>
+            !nodesToDelete.some(
+              (n) => n.id === edge.source || n.id === edge.target,
+            ),
+        ),
+      );
+    },
+    [setNodes, setEdges],
+  );
+
+  // Event listener para tecla Delete/Backspace
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Verificar se não está digitando em um input/textarea
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Delete ou Backspace
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+
+        // Deletar nodes selecionados
+        const selectedNodes = nodes.filter((node) => node.selected);
+        if (selectedNodes.length > 0) {
+          onNodesDelete(selectedNodes);
+          return;
+        }
+
+        // Deletar edges selecionadas (se nenhum node estiver selecionado)
+        const selectedEdges = edges.filter((edge) => edge.selected);
+        if (selectedEdges.length > 0) {
+          console.log(
+            '🗑️ Deleting edges:',
+            selectedEdges.map((e) => e.id),
+          );
+          setEdges((eds) =>
+            eds.filter((edge) => !selectedEdges.some((e) => e.id === edge.id)),
+          );
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [nodes, edges, onNodesDelete, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
@@ -141,16 +219,13 @@ function FlowEditorContent() {
   };
 
   const handleSave = useCallback(async () => {
-    if (!reactFlowInstance) return;
-
     setIsSaving(true);
 
     try {
-      const flow = reactFlowInstance.toObject();
       const flowData = {
         name: flowName,
-        nodes: flow.nodes,
-        edges: flow.edges,
+        nodes: nodes,
+        edges: edges,
         userId: user?.id,
       };
 
@@ -168,7 +243,6 @@ function FlowEditorContent() {
       }
 
       if (result.success) {
-        alert('Fluxo salvo com sucesso!');
       } else {
         alert(`Erro ao salvar fluxo: ${result.error}`);
       }
@@ -178,7 +252,7 @@ function FlowEditorContent() {
     } finally {
       setIsSaving(false);
     }
-  }, [reactFlowInstance, flowName, currentFlowId, user]);
+  }, [nodes, edges, flowName, currentFlowId, user]);
 
   const handleExport = useCallback(() => {
     if (reactFlowInstance) {
@@ -330,6 +404,12 @@ function FlowEditorContent() {
       } else if (node.type === 'transformation') {
         setNodeToConfig(node);
         setTransformationConfigDialogOpen(true);
+      } else if (node.type === 'condition') {
+        setNodeToConfig(node);
+        setConditionConfigDialogOpen(true);
+      } else if (node.type === 'database') {
+        setNodeToConfig(node);
+        setDatabaseConfigDialogOpen(true);
       } else if (node.type === 'start' || node.type === 'end') {
         // Start e End nodes não têm configuração
         return;
@@ -376,6 +456,97 @@ function FlowEditorContent() {
     },
     [nodeToConfig, handleNodeUpdate],
   );
+
+  const handleSaveConditionConfig = useCallback(
+    (config: ConditionConfig) => {
+      if (nodeToConfig) {
+        handleNodeUpdate(nodeToConfig.id, { conditionConfig: config });
+      }
+    },
+    [nodeToConfig, handleNodeUpdate],
+  );
+
+  const handleSaveDatabaseConfig = useCallback(
+    (config: DatabaseConfig) => {
+      if (nodeToConfig) {
+        handleNodeUpdate(nodeToConfig.id, { databaseConfig: config });
+      }
+    },
+    [nodeToConfig, handleNodeUpdate],
+  );
+
+  // Copiar node selecionado (Ctrl+C)
+  const handleCopyNode = useCallback(() => {
+    const selectedNode = nodes.find((node) => node.selected);
+    if (selectedNode) {
+      setCopiedNode(selectedNode);
+      const nodeLabel = selectedNode.data.label || selectedNode.type;
+      console.log(`📋 Node "${nodeLabel}" copiado (ID: ${selectedNode.id})`);
+    }
+  }, [nodes]);
+
+  // Colar node copiado (Ctrl+V)
+  const handlePasteNode = useCallback(() => {
+    if (!copiedNode) return;
+
+    // Gerar novo ID único
+    const newId = generateNodeId();
+
+    // Criar novo node com offset na posição
+    const newNode: Node<NodeData> = {
+      ...copiedNode,
+      id: newId,
+      position: {
+        x: copiedNode.position.x + 50,
+        y: copiedNode.position.y + 50,
+      },
+      selected: true,
+      data: {
+        ...copiedNode.data,
+      },
+    };
+
+    // Desselecionar outros nodes e adicionar o novo
+    setNodes((nds) => {
+      const updatedNodes = nds.map((node) => ({
+        ...node,
+        selected: false,
+      }));
+      return [...updatedNodes, newNode];
+    });
+
+    console.log('📌 Node colado:', newId, 'copiado de:', copiedNode.id);
+  }, [copiedNode, setNodes]);
+
+  // Listener de teclado para Ctrl+C e Ctrl+V
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignorar se estiver em um input, textarea ou elemento editável
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Ctrl+C ou Cmd+C (Mac)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+        event.preventDefault();
+        handleCopyNode();
+      }
+
+      // Ctrl+V ou Cmd+V (Mac)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+        event.preventDefault();
+        handlePasteNode();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCopyNode, handlePasteNode]);
 
   const nodeColor = (node: Node) => {
     switch (node.type) {
@@ -565,6 +736,30 @@ function FlowEditorContent() {
         }}
         config={nodeToConfig?.data.transformationConfig}
         onSave={handleSaveTransformationConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
+      />
+
+      <ConditionNodeConfig
+        isOpen={conditionConfigDialogOpen}
+        onClose={() => {
+          setConditionConfigDialogOpen(false);
+          setNodeToConfig(null);
+        }}
+        config={nodeToConfig?.data.conditionConfig}
+        onSave={handleSaveConditionConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
+      />
+
+      <DatabaseNodeConfig
+        isOpen={databaseConfigDialogOpen}
+        onClose={() => {
+          setDatabaseConfigDialogOpen(false);
+          setNodeToConfig(null);
+        }}
+        config={nodeToConfig?.data.databaseConfig}
+        onSave={handleSaveDatabaseConfig}
         nodeId={nodeToConfig?.id}
         flowId={currentFlowId || undefined}
       />

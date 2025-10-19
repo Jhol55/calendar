@@ -5,6 +5,7 @@ import { Typography } from '@/components/ui/typography';
 import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 import { listExecutions } from '@/actions/executions';
 import { getFlow } from '@/actions/chatbot-flows/flows';
+import { cn } from '@/lib/utils';
 
 interface ExecutionData {
   input?: any;
@@ -115,24 +116,29 @@ function JsonTreeItem({
           </button>
         )}
         <span className="text-sm font-medium text-gray-700">{itemKey}:</span>
-        {!isObject && (
-          <>
+        <div
+          className={cn(
+            'flex items-center gap-2 w-full justify-between',
+            isObject && 'justify-end',
+          )}
+        >
+          {!isObject && (
             <span className="text-sm text-blue-600 font-mono">
               {JSON.stringify(value)}
             </span>
-            <button
-              onClick={() => onCopyPath(currentPath)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 rounded ml-auto"
-              title="Copiar variável"
-            >
-              {copiedPath === currentPath ? (
-                <Check className="w-3 h-3 text-green-600" />
-              ) : (
-                <Copy className="w-3 h-3 text-gray-400" />
-              )}
-            </button>
-          </>
-        )}
+          )}
+          <button
+            onClick={() => onCopyPath(currentPath)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 rounded"
+            title="Copiar variável"
+          >
+            {copiedPath === currentPath ? (
+              <Check className="w-3 h-3 text-green-600" />
+            ) : (
+              <Copy className="w-3 h-3 text-gray-400" />
+            )}
+          </button>
+        </div>
       </div>
       {isObject && isExpanded && renderJsonTree(value, currentPath, level + 1)}
     </div>

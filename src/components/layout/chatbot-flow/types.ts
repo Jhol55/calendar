@@ -7,6 +7,7 @@ export type NodeType =
   | 'webhook'
   | 'memory'
   | 'transformation'
+  | 'database'
   | 'end';
 
 export type MessageType =
@@ -73,6 +74,7 @@ export interface MemoryConfig {
   items?: MemoryItem[];
   ttl?: number;
   defaultValue?: string;
+  saveMode?: 'overwrite' | 'append'; // Novo: modo de salvamento
 }
 
 export type TransformationType =
@@ -157,6 +159,137 @@ export interface TransformationConfig {
   outputAs?: string; // Nome da variável de saída (opcional)
 }
 
+// Condition Node Types
+export type ConditionType = 'if' | 'switch';
+
+export type ComparisonOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'not_contains'
+  | 'starts_with'
+  | 'ends_with'
+  | 'greater_than'
+  | 'less_than'
+  | 'greater_or_equal'
+  | 'less_or_equal'
+  | 'is_empty'
+  | 'is_not_empty'
+  | 'regex_match';
+
+export type LogicOperator = 'AND' | 'OR';
+
+export interface ConditionRule {
+  id: string;
+  variable: string; // Suporta {{variáveis}}
+  operator: ComparisonOperator;
+  value: string;
+  logicOperator?: LogicOperator; // Para conectar com próxima condição
+}
+
+export interface SwitchCase {
+  id: string;
+  variable: string; // Variável específica deste caso
+  operator: ComparisonOperator; // Operador de comparação
+  value: string; // Valor para comparar
+  label: string; // Label para exibir no handle
+}
+
+export interface ConditionConfig {
+  conditionType: ConditionType;
+
+  // Para IF
+  rules?: ConditionRule[];
+
+  // Para SWITCH
+  variable?: string; // Deprecated - mantido para compatibilidade
+  cases?: SwitchCase[];
+  useDefaultCase?: boolean;
+}
+
+// Database Node Types
+export type DatabaseOperation =
+  | 'addColumns'
+  | 'removeColumns'
+  | 'insert'
+  | 'update'
+  | 'delete'
+  | 'get';
+
+export type ColumnType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'array'
+  | 'object';
+
+export type FilterOperator =
+  | 'equals'
+  | 'notEquals'
+  | 'greaterThan'
+  | 'greaterThanOrEqual'
+  | 'lessThan'
+  | 'lessThanOrEqual'
+  | 'contains'
+  | 'notContains'
+  | 'startsWith'
+  | 'endsWith'
+  | 'in'
+  | 'notIn'
+  | 'isEmpty'
+  | 'isNotEmpty'
+  | 'isTrue'
+  | 'isFalse';
+
+export interface ColumnDefinition {
+  name: string;
+  type: ColumnType;
+  required?: boolean;
+  default?: any;
+}
+
+export interface FilterRule {
+  field: string;
+  operator: FilterOperator;
+  value: any;
+}
+
+export interface FilterConfig {
+  condition: 'AND' | 'OR';
+  rules: FilterRule[];
+}
+
+export interface DatabaseConfig {
+  operation: DatabaseOperation;
+  tableName: string;
+
+  // Para addColumns
+  columns?: ColumnDefinition[];
+
+  // Para removeColumns
+  columnsToRemove?: string[];
+
+  // Para insert
+  record?: Record<string, any>;
+
+  // Para update
+  updates?: Record<string, any>;
+
+  // Para update, delete, get
+  filters?: FilterConfig;
+
+  // Para get
+  sort?: {
+    field: string;
+    order: 'asc' | 'desc';
+  };
+  pagination?: {
+    limit?: number;
+    offset?: number;
+  };
+}
+
 export interface NodeData {
   label: string;
   type: NodeType;
@@ -165,6 +298,8 @@ export interface NodeData {
   webhookConfig?: WebhookConfig;
   memoryConfig?: MemoryConfig;
   transformationConfig?: TransformationConfig;
+  conditionConfig?: ConditionConfig;
+  databaseConfig?: DatabaseConfig;
   conditions?: Array<{
     field: string;
     operator: string;
