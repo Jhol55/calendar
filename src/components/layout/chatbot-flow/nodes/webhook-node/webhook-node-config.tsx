@@ -263,9 +263,14 @@ export function WebhookNodeConfig({
       try {
         const result = await getInstanceWebhook(data.instanceToken);
 
-        if (result.success && result.data && (result.data as any).webhook) {
+        if (
+          result.success &&
+          result.data &&
+          typeof result.data === 'object' &&
+          'webhook' in result.data
+        ) {
           // Usar o webhook real da instância
-          finalWebhookId = (result.data as any).webhook;
+          finalWebhookId = (result.data as { webhook: string }).webhook;
           console.log('✅ Using instance webhook:', finalWebhookId);
         } else {
           // Fallback: usar o token da instância
@@ -299,6 +304,7 @@ export function WebhookNodeConfig({
             }
           : undefined,
     };
+
     onSave(webhookConfig);
     onClose();
   };

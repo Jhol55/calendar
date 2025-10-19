@@ -16,8 +16,13 @@ import {
   OPERATIONS_BY_TYPE,
   OPERATION_PARAMS,
 } from './transformation-node-config.schema';
-import { TransformationConfig, TransformationStep } from '../../types';
+import {
+  TransformationConfig,
+  TransformationStep,
+  MemoryItem,
+} from '../../types';
 import { Plus, Trash2, MoveUp, MoveDown } from 'lucide-react';
+import { MemoryConfigSection } from '../memory-config-section';
 
 interface TransformationNodeConfigProps {
   isOpen: boolean;
@@ -52,12 +57,16 @@ function TransformationFormFields({
   config,
   steps,
   setSteps,
+  memoryItems,
+  setMemoryItems,
 }: {
   config?: TransformationConfig;
   steps: TransformationStep[];
   setSteps: React.Dispatch<React.SetStateAction<TransformationStep[]>>;
+  memoryItems: MemoryItem[];
+  setMemoryItems: React.Dispatch<React.SetStateAction<MemoryItem[]>>;
 }) {
-  const { setValue } = useForm();
+  const { form, setValue } = useForm();
   const [selectedTypes, setSelectedTypes] = useState<Record<string, string>>(
     {},
   );
@@ -86,6 +95,47 @@ function TransformationFormFields({
           types[step.id] = step.type;
         });
         setSelectedTypes(types);
+
+        // Carregar configuração de memória
+        if (config.memoryConfig) {
+          setValue('memoryAction', config.memoryConfig.action);
+          setValue('memoryName', config.memoryConfig.memoryName);
+          setValue(
+            'memorySaveMode',
+            config.memoryConfig.saveMode || 'overwrite',
+          );
+          setValue(
+            'memoryDefaultValue',
+            config.memoryConfig.defaultValue || '',
+          );
+
+          if (
+            config.memoryConfig.items &&
+            config.memoryConfig.items.length > 0
+          ) {
+            setMemoryItems(config.memoryConfig.items);
+          }
+
+          // TTL
+          if (config.memoryConfig.ttl) {
+            const ttlValue = config.memoryConfig.ttl;
+            const presetMatch = [
+              { value: '3600', label: '1 hora' },
+              { value: '86400', label: '1 dia' },
+              { value: '604800', label: '7 dias' },
+              { value: '2592000', label: '30 dias' },
+            ].find((p) => p.value === String(ttlValue));
+
+            if (presetMatch) {
+              setValue('memoryTtlPreset', presetMatch.value);
+            } else {
+              setValue('memoryTtlPreset', 'custom');
+              setValue('memoryCustomTtl', String(ttlValue));
+            }
+          } else {
+            setValue('memoryTtlPreset', 'never');
+          }
+        }
       } else {
         // Se não tem config, setar steps inicial
         setValue('steps', steps);
@@ -375,6 +425,14 @@ function TransformationFormFields({
         </Typography>
       </div>
 
+      {/* Configuração de Memória */}
+      <MemoryConfigSection
+        memoryItems={memoryItems}
+        setMemoryItems={setMemoryItems}
+        form={form}
+        setValue={setValue}
+      />
+
       <SubmitButton variant="gradient" className="mt-4">
         Salvar Configuração
       </SubmitButton>
@@ -390,6 +448,10 @@ export function TransformationNodeConfig({
   nodeId,
   flowId,
 }: TransformationNodeConfigProps) {
+  const [memoryItems, setMemoryItems] = useState<MemoryItem[]>([
+    { key: '', value: '' },
+  ]);
+
   const [steps, setSteps] = useState<TransformationStep[]>([
     {
       id: crypto.randomUUID(),
@@ -423,6 +485,27 @@ export function TransformationNodeConfig({
       outputAs: data.outputAs || undefined,
     };
 
+    // Adicionar configuração de memória se preenchida
+    if (data.memoryName && data.memoryAction && data.memoryAction !== '') {
+      let ttl: number | undefined;
+      if (data.memoryTtlPreset && data.memoryTtlPreset !== 'never') {
+        if (data.memoryTtlPreset === 'custom') {
+          ttl = data.memoryCustomTtl ? Number(data.memoryCustomTtl) : undefined;
+        } else {
+          ttl = Number(data.memoryTtlPreset);
+        }
+      }
+
+      transformationConfig.memoryConfig = {
+        action: data.memoryAction || 'save',
+        memoryName: data.memoryName,
+        items: data.memoryAction === 'save' ? memoryItems : undefined,
+        ttl,
+        defaultValue: data.memoryDefaultValue,
+        saveMode: data.memorySaveMode || 'overwrite',
+      };
+    }
+
     onSave(transformationConfig);
     onClose();
   };
@@ -445,6 +528,8 @@ export function TransformationNodeConfig({
           config={config}
           steps={steps}
           setSteps={setSteps}
+          memoryItems={memoryItems}
+          setMemoryItems={setMemoryItems}
         />
       </Form>
     </NodeConfigLayout>

@@ -27,9 +27,12 @@ export const conditionRuleSchema = z.object({
 
 export const switchCaseSchema = z.object({
   id: z.string().min(1, 'ID do caso é obrigatório'),
-  variable: z.string().min(1, 'Variável é obrigatória'),
-  operator: z.enum(
-    [
+  label: z.string().min(1, 'Label do caso é obrigatório'),
+  rules: z.array(conditionRuleSchema).min(1, 'Adicione pelo menos uma regra'),
+  // Campos antigos mantidos para compatibilidade (opcionais)
+  variable: z.string().optional(),
+  operator: z
+    .enum([
       'equals',
       'not_equals',
       'contains',
@@ -43,11 +46,9 @@ export const switchCaseSchema = z.object({
       'is_empty',
       'is_not_empty',
       'regex_match',
-    ],
-    { required_error: 'Operador é obrigatório' },
-  ),
+    ])
+    .optional(),
   value: z.string().optional(),
-  label: z.string().min(1, 'Label do caso é obrigatório'),
 });
 
 export const conditionConfigSchema = z
@@ -98,17 +99,35 @@ export const conditionConfigSchema = z
         });
       }
 
-      // Validar que casos que precisam de valor têm valor
-      data.cases?.forEach((caseItem, index) => {
-        if (
-          !['is_empty', 'is_not_empty'].includes(caseItem.operator) &&
-          (!caseItem.value || caseItem.value.trim() === '')
-        ) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Valor é obrigatório para este operador',
-            path: ['cases', index, 'value'],
+      // Validar regras dentro de cada caso
+      data.cases?.forEach((caseItem, caseIndex) => {
+        // Verificar se tem rules (novo formato)
+        if (caseItem.rules && caseItem.rules.length > 0) {
+          // Validar cada regra do caso
+          caseItem.rules.forEach((rule, ruleIndex) => {
+            if (
+              !['is_empty', 'is_not_empty'].includes(rule.operator) &&
+              (!rule.value || rule.value.trim() === '')
+            ) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Valor é obrigatório para este operador',
+                path: ['cases', caseIndex, 'rules', ruleIndex, 'value'],
+              });
+            }
           });
+        } else if (caseItem.operator) {
+          // Formato antigo (compatibilidade)
+          if (
+            !['is_empty', 'is_not_empty'].includes(caseItem.operator) &&
+            (!caseItem.value || caseItem.value.trim() === '')
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Valor é obrigatório para este operador',
+              path: ['cases', caseIndex, 'value'],
+            });
+          }
         }
       });
     }

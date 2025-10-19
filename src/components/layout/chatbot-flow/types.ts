@@ -54,6 +54,8 @@ export interface MessageConfig {
   forward?: boolean;
   trackSource?: string;
   trackId?: string;
+  // Configuração de memória (opcional)
+  memoryConfig?: MemoryConfig;
 }
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -169,6 +171,8 @@ export interface TransformationStep {
 export interface TransformationConfig {
   steps: TransformationStep[]; // Pipeline de transformações
   outputAs?: string; // Nome da variável de saída (opcional)
+  // Configuração de memória (opcional)
+  memoryConfig?: MemoryConfig;
 }
 
 // Condition Node Types
@@ -201,10 +205,12 @@ export interface ConditionRule {
 
 export interface SwitchCase {
   id: string;
-  variable: string; // Variável específica deste caso
-  operator: ComparisonOperator; // Operador de comparação
-  value: string; // Valor para comparar
   label: string; // Label para exibir no handle
+  rules: ConditionRule[]; // Múltiplas regras para este caso (com operadores lógicos)
+  // Campos antigos mantidos para compatibilidade
+  variable?: string;
+  operator?: ComparisonOperator;
+  value?: string;
 }
 
 export interface ConditionConfig {
@@ -217,6 +223,9 @@ export interface ConditionConfig {
   variable?: string; // Deprecated - mantido para compatibilidade
   cases?: SwitchCase[];
   useDefaultCase?: boolean;
+
+  // Configuração de memória (opcional)
+  memoryConfig?: MemoryConfig;
 }
 
 // Database Node Types

@@ -787,6 +787,35 @@ async function processMessageNode(
       `✅ Message sent successfully to ${resolvedPhoneNumber} from node ${node.id}`,
     );
 
+    // Processar memória se configurada
+    // Adicionar a resposta da API ao contexto para poder usar em variáveis de memória
+    let memoryResult = undefined;
+    if (messageConfig.memoryConfig) {
+      const memoryVariableContext = {
+        ...variableContext,
+        $node: {
+          ...variableContext.$node,
+          output: {
+            apiResponse: result,
+            phoneNumber: resolvedPhoneNumber,
+            text: resolvedText || text,
+            messageType: messageType || 'text',
+          },
+        },
+      };
+
+      console.log('🔍 Memory Variable Context:', {
+        apiResponse: result,
+        availableKeys: Object.keys(result || {}),
+      });
+
+      memoryResult = await processNodeMemory(
+        messageConfig.memoryConfig,
+        executionId,
+        memoryVariableContext,
+      );
+    }
+
     return {
       type: 'message',
       status: 'sent',
@@ -802,6 +831,7 @@ async function processMessageNode(
         text: resolvedText || text,
       },
       apiResponse: result,
+      memoryResult, // Adicionar resultado da memória
     };
   } catch (error) {
     console.error(`❌ Error sending message:`, error);
@@ -821,6 +851,191 @@ interface MemoryConfig {
   items?: MemoryItem[];
   ttl?: number;
   defaultValue?: string;
+  saveMode?: 'overwrite' | 'append';
+}
+
+/**
+ * Função reutilizável para processar memória em qualquer node
+ *
+ * @param memoryConfig - Configuração de memória do node
+ * @param executionId - ID da execução atual
+ * @param variableContext - Contexto de variáveis para substituição
+ * @returns Resultado da operação de memória
+ *
+ * @example
+ * // Em qualquer processador de node:
+ * const memoryResult = nodeConfig.memoryConfig
+ *   ? await processNodeMemory(
+ *       nodeConfig.memoryConfig,
+ *       executionId,
+ *       variableContext,
+ *     )
+ *   : undefined;
+ *
+ * // Adicionar ao retorno do node:
+ * return {
+ *   ...otherResults,
+ *   memoryResult,
+ * };
+ */
+async function processNodeMemory(
+  memoryConfig: MemoryConfig,
+  executionId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  variableContext: any,
+): Promise<unknown> {
+  console.log('🧠 Processing memory configuration');
+  console.log('📦 Variable Context received:', {
+    hasNode: !!variableContext.$node,
+    hasOutput: !!variableContext.$node?.output,
+    outputKeys: variableContext.$node?.output
+      ? Object.keys(variableContext.$node.output)
+      : [],
+    apiResponseKeys: variableContext.$node?.output?.apiResponse
+      ? Object.keys(variableContext.$node.output.apiResponse)
+      : [],
+  });
+
+  try {
+    // Buscar execução para obter userId
+    const execution = await prisma.flow_executions.findUnique({
+      where: { id: executionId },
+      include: {
+        flow: true,
+      },
+    });
+
+    const userId = execution?.flow?.userId
+      ? String(execution.flow.userId)
+      : null;
+
+    if (!userId) {
+      console.warn('⚠️ UserId not found, skipping memory processing');
+      return {
+        error: true,
+        message: 'UserId not found',
+      };
+    }
+
+    const { action, memoryName, items, ttl, defaultValue, saveMode } =
+      memoryConfig;
+
+    // Resolver variáveis no memoryName
+    const resolvedMemoryName = replaceVariables(memoryName, variableContext);
+
+    switch (action) {
+      case 'save': {
+        if (!items || items.length === 0) {
+          console.warn('⚠️ No items to save in memory');
+          return {
+            error: true,
+            message: 'No items to save',
+          };
+        }
+
+        // Resolver variáveis em cada item
+        const resolvedItems: Record<string, string> = {};
+        items.forEach((item) => {
+          console.log('🔍 Resolving memory item:', {
+            originalKey: item.key,
+            originalValue: item.value,
+            contextKeys: Object.keys(variableContext),
+            hasNodeOutput: !!variableContext.$node?.output,
+            nodeOutputKeys: variableContext.$node?.output
+              ? Object.keys(variableContext.$node.output)
+              : [],
+          });
+
+          const resolvedKey = replaceVariables(item.key, variableContext);
+          const resolvedValue = replaceVariables(item.value, variableContext);
+
+          console.log('✅ Resolved memory item:', {
+            resolvedKey,
+            resolvedValue,
+          });
+
+          resolvedItems[resolvedKey] = resolvedValue;
+        });
+
+        // Implementar lógica de saveMode
+        let finalValue: unknown = resolvedItems;
+        if (saveMode === 'append') {
+          // Buscar valor existente e adicionar à lista
+          const existingMemory = await buscarMemoria(
+            userId,
+            resolvedMemoryName,
+          );
+          if (existingMemory.found && existingMemory.value) {
+            // Se já existe, adicionar o novo valor à lista
+            const existingArray = Array.isArray(existingMemory.value)
+              ? existingMemory.value
+              : [existingMemory.value];
+            finalValue = [...existingArray, resolvedItems];
+          } else {
+            // Se não existe, criar nova lista
+            finalValue = [resolvedItems];
+          }
+        }
+
+        // Salvar na memória
+        const saveResult = await salvarMemoria(
+          userId,
+          resolvedMemoryName,
+          finalValue,
+          ttl,
+        );
+
+        return {
+          action: 'save',
+          name: resolvedMemoryName,
+          items: resolvedItems,
+          saveMode: saveMode || 'overwrite',
+          success: saveResult.success,
+          expiresAt: saveResult.expiresAt,
+        };
+      }
+
+      case 'fetch': {
+        // Buscar memória
+        const searchResult = await buscarMemoria(userId, resolvedMemoryName);
+
+        let parsedValue = searchResult.value;
+        if (!searchResult.found && defaultValue) {
+          parsedValue = replaceVariables(defaultValue, variableContext);
+        }
+
+        return {
+          action: 'fetch',
+          name: resolvedMemoryName,
+          value: parsedValue,
+          found: searchResult.found,
+          expired: searchResult.expired,
+          usedDefault: !searchResult.found,
+        };
+      }
+
+      case 'delete': {
+        // Deletar memória
+        const deleteResult = await deletarMemoria(userId, resolvedMemoryName);
+
+        return {
+          action: 'delete',
+          name: resolvedMemoryName,
+          success: deleteResult.success,
+          found: deleteResult.found,
+        };
+      }
+
+      default:
+        throw new Error(`Unknown memory action: ${action}`);
+    }
+  } catch (error) {
+    console.error('❌ Error processing memory:', error);
+    return {
+      error: true,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }
 
 // Processador do Memory Node
@@ -1109,6 +1324,7 @@ interface TransformationStep {
 interface TransformationConfig {
   steps: TransformationStep[];
   outputAs?: string;
+  memoryConfig?: MemoryConfig;
 }
 
 // Processador do Transformation Node
@@ -1225,11 +1441,35 @@ async function processTransformationNode(
       }
     }
 
+    // Processar memória se configurada
+    let memoryResult = undefined;
+    if (transformationConfig.memoryConfig) {
+      // Adicionar o resultado da transformação ao contexto
+      const transformationVariableContext = {
+        ...variableContext,
+        $node: {
+          ...variableContext.$node,
+          output: {
+            finalValue: currentValue,
+            steps: results,
+            outputAs: outputAs || 'transformation_result',
+          },
+        },
+      };
+
+      memoryResult = await processNodeMemory(
+        transformationConfig.memoryConfig,
+        executionId,
+        transformationVariableContext,
+      );
+    }
+
     // Retornar resultado final
     return {
       finalValue: currentValue,
       steps: results,
       outputAs: outputAs || 'transformation_result',
+      memoryResult,
     };
   } catch (error) {
     console.error(`❌ Error processing transformation node:`, error);
@@ -1248,10 +1488,12 @@ interface ConditionRule {
 
 interface SwitchCase {
   id: string;
-  variable: string;
-  operator: string;
-  value: string;
   label: string;
+  rules: ConditionRule[]; // Múltiplas regras para este caso
+  // Campos antigos mantidos para compatibilidade
+  variable?: string;
+  operator?: string;
+  value?: string;
 }
 
 interface ConditionConfig {
@@ -1260,6 +1502,7 @@ interface ConditionConfig {
   variable?: string;
   cases?: SwitchCase[];
   useDefaultCase?: boolean;
+  memoryConfig?: MemoryConfig;
 }
 
 // Processador do Condition Node
@@ -1377,12 +1620,23 @@ async function processConditionNode(
 
       console.log(`🔀 Final IF result: ${finalResult}`);
 
+      // Processar memória se configurada
+      let memoryResult = undefined;
+      if (conditionConfig.memoryConfig) {
+        memoryResult = await processNodeMemory(
+          conditionConfig.memoryConfig,
+          executionId,
+          variableContext,
+        );
+      }
+
       return {
         type: 'condition',
         conditionType: 'if',
         result: finalResult,
         selectedHandle: finalResult ? 'true' : 'false',
         evaluations: evaluationResults,
+        memoryResult,
       };
     } else if (conditionConfig.conditionType === 'switch') {
       // Processar SWITCH
@@ -1393,49 +1647,124 @@ async function processConditionNode(
 
       console.log(`🔀 Evaluating SWITCH with ${cases.length} case(s)`);
 
-      // Avaliar cada caso com sua própria variável e operador
+      // Avaliar cada caso com suas múltiplas regras
       let matchedCase: SwitchCase | undefined;
       const evaluationResults: Array<{
         caseId: string;
         label: string;
-        variable: string;
-        operator: string;
-        value: string;
-        result: boolean;
+        rules: Array<{
+          variable: string;
+          operator: string;
+          value: string;
+          result: boolean;
+        }>;
+        finalResult: boolean;
       }> = [];
 
       for (const caseItem of cases) {
-        const resolvedVariable = replaceVariables(
-          caseItem.variable,
-          variableContext,
-        );
-        const resolvedValue = replaceVariables(
-          caseItem.value || '',
-          variableContext,
-        );
+        // Se o caso tem rules (novo formato), avaliar múltiplas regras
+        if (caseItem.rules && caseItem.rules.length > 0) {
+          const ruleResults: boolean[] = [];
+          const ruleDetails: Array<{
+            variable: string;
+            operator: string;
+            value: string;
+            result: boolean;
+          }> = [];
 
-        const result = evaluateCondition(
-          resolvedVariable,
-          caseItem.operator,
-          resolvedValue,
-        );
+          // Avaliar cada regra do caso
+          for (const rule of caseItem.rules) {
+            const resolvedVariable = replaceVariables(
+              rule.variable,
+              variableContext,
+            );
+            const resolvedValue = replaceVariables(
+              rule.value || '',
+              variableContext,
+            );
 
-        evaluationResults.push({
-          caseId: caseItem.id,
-          label: caseItem.label,
-          variable: resolvedVariable,
-          operator: caseItem.operator,
-          value: resolvedValue,
-          result,
-        });
+            const result = evaluateCondition(
+              resolvedVariable,
+              rule.operator,
+              resolvedValue,
+            );
 
-        console.log(
-          `  Case "${caseItem.label}": "${resolvedVariable}" ${caseItem.operator} "${resolvedValue}" = ${result}`,
-        );
+            ruleResults.push(result);
+            ruleDetails.push({
+              variable: resolvedVariable,
+              operator: rule.operator,
+              value: resolvedValue,
+              result,
+            });
 
-        // Primeiro caso que der match é selecionado
-        if (!matchedCase && result) {
-          matchedCase = caseItem;
+            console.log(
+              `    Rule: "${resolvedVariable}" ${rule.operator} "${resolvedValue}" = ${result}`,
+            );
+          }
+
+          // Aplicar operadores lógicos entre as regras
+          let finalResult = ruleResults[0];
+          for (let i = 0; i < caseItem.rules.length - 1; i++) {
+            const rule = caseItem.rules[i];
+            if (rule.logicOperator === 'AND') {
+              finalResult = finalResult && ruleResults[i + 1];
+            } else if (rule.logicOperator === 'OR') {
+              finalResult = finalResult || ruleResults[i + 1];
+            }
+          }
+
+          evaluationResults.push({
+            caseId: caseItem.id,
+            label: caseItem.label,
+            rules: ruleDetails,
+            finalResult,
+          });
+
+          console.log(`  Case "${caseItem.label}": ${finalResult}`);
+
+          // Primeiro caso que der match é selecionado
+          if (!matchedCase && finalResult) {
+            matchedCase = caseItem;
+          }
+        } else {
+          // Formato antigo (compatibilidade): avaliar com variable, operator, value
+          const resolvedVariable = replaceVariables(
+            caseItem.variable || '',
+            variableContext,
+          );
+          const resolvedValue = replaceVariables(
+            caseItem.value || '',
+            variableContext,
+          );
+
+          const result = evaluateCondition(
+            resolvedVariable,
+            caseItem.operator || 'equals',
+            resolvedValue,
+          );
+
+          evaluationResults.push({
+            caseId: caseItem.id,
+            label: caseItem.label,
+            rules: [
+              {
+                variable: resolvedVariable,
+                operator: caseItem.operator || 'equals',
+                value: resolvedValue,
+                result,
+              },
+            ],
+            finalResult: result,
+          });
+
+          console.log(
+            `  Case "${caseItem.label}": "${resolvedVariable}" ${caseItem.operator} "${resolvedValue}" = ${result}`,
+          );
+
+          // Primeiro caso que der match é selecionado
+          if (!matchedCase && result) {
+            matchedCase = caseItem;
+          }
         }
       }
 
@@ -1452,6 +1781,16 @@ async function processConditionNode(
         throw new Error(`No matching case found and no default case defined`);
       }
 
+      // Processar memória se configurada
+      let memoryResult = undefined;
+      if (conditionConfig.memoryConfig) {
+        memoryResult = await processNodeMemory(
+          conditionConfig.memoryConfig,
+          executionId,
+          variableContext,
+        );
+      }
+
       return {
         type: 'condition',
         conditionType: 'switch',
@@ -1459,6 +1798,7 @@ async function processConditionNode(
         selectedHandle,
         totalCases: cases.length,
         evaluations: evaluationResults,
+        memoryResult,
       };
     } else {
       throw new Error(

@@ -1,7 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MessageConfig, MessageType, InteractiveMenuType } from '../../types';
+import {
+  MessageConfig,
+  MessageType,
+  InteractiveMenuType,
+  MemoryItem,
+} from '../../types';
 import { Typography } from '@/components/ui/typography';
 import { useUser } from '@/hooks/use-user';
 import { Form } from '@/components/ui/form';
@@ -18,6 +23,7 @@ import { FormSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { NodeConfigLayout } from '../node-config-layout';
 import { Plus, Trash2 } from 'lucide-react';
+import { MemoryConfigSection } from '../memory-config-section';
 
 interface MessageNodeConfigProps {
   isOpen: boolean;
@@ -39,9 +45,13 @@ const messageTypes: { value: MessageType; label: string }[] = [
 function MessageFormFields({
   instances,
   config,
+  memoryItems,
+  setMemoryItems,
 }: {
   instances: InstanceProps[];
   config?: MessageConfig;
+  memoryItems: MemoryItem[];
+  setMemoryItems: React.Dispatch<React.SetStateAction<MemoryItem[]>>;
 }) {
   const { form, setValue } = useForm();
   const messageType = (form.messageType as MessageType) || 'text';
@@ -375,6 +385,43 @@ function MessageFormFields({
             'interactiveMenuChoices',
             JSON.stringify(config.interactiveMenu.choices || []),
           );
+        }
+
+        // Carregar configuração de memória
+        if (config.memoryConfig) {
+          setValue('memoryAction', config.memoryConfig.action || 'save');
+          setValue('memoryName', config.memoryConfig.memoryName || '');
+          setValue(
+            'memorySaveMode',
+            config.memoryConfig.saveMode || 'overwrite',
+          );
+          setValue(
+            'memoryDefaultValue',
+            config.memoryConfig.defaultValue || '',
+          );
+
+          // Carregar items de memória
+          if (
+            config.memoryConfig.items &&
+            config.memoryConfig.items.length > 0
+          ) {
+            setMemoryItems(config.memoryConfig.items);
+            setValue('memoryItems', config.memoryConfig.items);
+          }
+
+          // Carregar TTL
+          if (config.memoryConfig.ttl) {
+            const ttlString = String(config.memoryConfig.ttl);
+            const ttlPresets = ['3600', '86400', '604800', '2592000'];
+            if (ttlPresets.includes(ttlString)) {
+              setValue('memoryTtlPreset', ttlString);
+            } else {
+              setValue('memoryTtlPreset', 'custom');
+              setValue('memoryCustomTtl', ttlString);
+            }
+          } else {
+            setValue('memoryTtlPreset', 'never');
+          }
         }
       }
     }, 0);
@@ -756,7 +803,7 @@ function MessageFormFields({
                   Ativar preview de links
                 </FormControl>
               </div>
-              <Typography variant="span" className="text-xs text-gray-600">
+              <Typography variant="span" className="text-xs text-neutral-600">
                 Gera preview automático do primeiro link encontrado no texto
               </Typography>
 
@@ -830,7 +877,10 @@ function MessageFormFields({
                 fieldName="replyId"
                 placeholder="3EB0538DA65A59F6D8A251"
               />
-              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              <Typography
+                variant="span"
+                className="text-xs text-neutral-600 mt-1"
+              >
                 ID da mensagem que será respondida
               </Typography>
             </div>
@@ -847,7 +897,10 @@ function MessageFormFields({
                 fieldName="mentions"
                 placeholder="5511999999999,5511888888888"
               />
-              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              <Typography
+                variant="span"
+                className="text-xs text-neutral-600 mt-1"
+              >
                 Números para mencionar, separados por vírgula
               </Typography>
             </div>
@@ -897,14 +950,17 @@ function MessageFormFields({
                 </Typography>
               </FormControl>
               <Input type="number" fieldName="delay" placeholder="1000" />
-              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              <Typography
+                variant="span"
+                className="text-xs text-neutral-600 mt-1"
+              >
                 Tempo em milissegundos. Durante o atraso aparecerá
                 &quot;Digitando...&quot;
               </Typography>
             </div>
 
             {/* Rastreamento */}
-            <div className="space-y-3 p-3 bg-neutral-50 rounded-lg">
+            <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
               <Typography variant="span" className="text-sm font-medium">
                 Rastreamento
               </Typography>
@@ -933,7 +989,7 @@ function MessageFormFields({
                 />
                 <Typography
                   variant="span"
-                  className="text-xs text-gray-600 mt-1"
+                  className="text-xs text-neutral-600 mt-1"
                 >
                   Aceita valores duplicados
                 </Typography>
@@ -1089,7 +1145,7 @@ function MessageFormFields({
                               {catIndex + 1 === 1 && (
                                 <Typography
                                   variant="span"
-                                  className="text-sm text-gray-600 mt-1 whitespace-nowrap"
+                                  className="text-sm text-neutral-600 mt-1 whitespace-nowrap"
                                 >
                                   (Deixe vazio para não criar seção)
                                 </Typography>
@@ -1130,7 +1186,7 @@ function MessageFormFields({
                           <div className="flex items-center justify-between mb-2">
                             <Typography
                               variant="span"
-                              className="text-sm font-semibold text-gray-600"
+                              className="text-sm font-semibold text-neutral-600"
                             >
                               Opção {itemIndex + 1}
                             </Typography>
@@ -1352,7 +1408,7 @@ function MessageFormFields({
                           <div className="flex items-center justify-between mb-2">
                             <Typography
                               variant="span"
-                              className="text-sm font-semibold text-gray-600"
+                              className="text-sm font-semibold text-neutral-600"
                             >
                               Botão {buttonIndex + 1}
                             </Typography>
@@ -1703,7 +1759,10 @@ function MessageFormFields({
                 fieldName="replyId"
                 placeholder="3EB0538DA65A59F6D8A251"
               />
-              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              <Typography
+                variant="span"
+                className="text-xs text-neutral-600 mt-1"
+              >
                 ID da mensagem que será respondida
               </Typography>
             </div>
@@ -1720,13 +1779,16 @@ function MessageFormFields({
                 fieldName="mentions"
                 placeholder="5511999999999,5511888888888"
               />
-              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              <Typography
+                variant="span"
+                className="text-xs text-neutral-600 mt-1"
+              >
                 Números para mencionar, separados por vírgula
               </Typography>
             </div>
 
             {/* Checkboxes de leitura */}
-            <div className="space-y-2 p-3 bg-neutral-50 rounded-lg">
+            <div className="space-y-2 p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Input
                   type="checkbox"
@@ -1759,7 +1821,10 @@ function MessageFormFields({
                 </Typography>
               </FormControl>
               <Input type="number" fieldName="delay" placeholder="1000" />
-              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              <Typography
+                variant="span"
+                className="text-xs text-neutral-600 mt-1"
+              >
                 Tempo em milissegundos. Durante o atraso aparecerá
                 &quot;Digitando...&quot;
               </Typography>
@@ -1795,7 +1860,7 @@ function MessageFormFields({
                 />
                 <Typography
                   variant="span"
-                  className="text-xs text-gray-600 mt-1"
+                  className="text-xs text-neutral-600 mt-1"
                 >
                   Aceita valores duplicados
                 </Typography>
@@ -1824,7 +1889,10 @@ function MessageFormFields({
               fieldName="replyId"
               placeholder="3EB0538DA65A59F6D8A251"
             />
-            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+            <Typography
+              variant="span"
+              className="text-xs text-neutral-600 mt-1"
+            >
               ID da mensagem que será respondida
             </Typography>
           </div>
@@ -1841,7 +1909,10 @@ function MessageFormFields({
               fieldName="mentions"
               placeholder="5511999999999,5511888888888"
             />
-            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+            <Typography
+              variant="span"
+              className="text-xs text-neutral-600 mt-1"
+            >
               Números para mencionar, separados por vírgula
             </Typography>
           </div>
@@ -1880,7 +1951,10 @@ function MessageFormFields({
               </Typography>
             </FormControl>
             <Input type="number" fieldName="delay" placeholder="1000" />
-            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+            <Typography
+              variant="span"
+              className="text-xs text-neutral-600 mt-1"
+            >
               Tempo em milissegundos. Durante o atraso aparecerá
               &quot;Digitando...&quot;
             </Typography>
@@ -1914,7 +1988,10 @@ function MessageFormFields({
                 fieldName="trackId"
                 placeholder="msg_123456789"
               />
-              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              <Typography
+                variant="span"
+                className="text-xs text-neutral-600 mt-1"
+              >
                 Aceita valores duplicados
               </Typography>
             </div>
@@ -1941,7 +2018,10 @@ function MessageFormFields({
               fieldName="replyId"
               placeholder="3EB0538DA65A59F6D8A251"
             />
-            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+            <Typography
+              variant="span"
+              className="text-xs text-neutral-600 mt-1"
+            >
               ID da mensagem que será respondida
             </Typography>
           </div>
@@ -1958,7 +2038,10 @@ function MessageFormFields({
               fieldName="mentions"
               placeholder="5511999999999,5511888888888"
             />
-            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+            <Typography
+              variant="span"
+              className="text-xs text-neutral-600 mt-1"
+            >
               Números para mencionar, separados por vírgula
             </Typography>
           </div>
@@ -1997,7 +2080,10 @@ function MessageFormFields({
               </Typography>
             </FormControl>
             <Input type="number" fieldName="delay" placeholder="1000" />
-            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+            <Typography
+              variant="span"
+              className="text-xs text-neutral-600 mt-1"
+            >
               Tempo em milissegundos. Durante o atraso aparecerá
               &quot;Digitando...&quot;
             </Typography>
@@ -2031,13 +2117,24 @@ function MessageFormFields({
                 fieldName="trackId"
                 placeholder="msg_123456789"
               />
-              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              <Typography
+                variant="span"
+                className="text-xs text-neutral-600 mt-1"
+              >
                 Aceita valores duplicados
               </Typography>
             </div>
           </div>
         </div>
       )}
+
+      {/* Seção de Configuração de Memória */}
+      <MemoryConfigSection
+        memoryItems={memoryItems}
+        setMemoryItems={setMemoryItems}
+        form={form}
+        setValue={setValue}
+      />
 
       <SubmitButton variant="gradient" className="mt-4">
         Salvar Configuração
@@ -2055,6 +2152,20 @@ export function MessageNodeConfig({
   flowId,
 }: MessageNodeConfigProps) {
   const { instances } = useUser();
+
+  // Estados para configuração de memória
+  const [memoryItems, setMemoryItems] = useState<MemoryItem[]>([
+    { key: '', value: '' },
+  ]);
+
+  // Carregar configuração de memória quando config mudar
+  useEffect(() => {
+    if (config?.memoryConfig?.items && config.memoryConfig.items.length > 0) {
+      setMemoryItems(config.memoryConfig.items);
+    } else {
+      setMemoryItems([{ key: '', value: '' }]);
+    }
+  }, [config]);
 
   const handleSubmit = async (data: FieldValues) => {
     const messageConfig: MessageConfig = {
@@ -2103,6 +2214,34 @@ export function MessageNodeConfig({
       };
     }
 
+    // Se configuração de memória estiver preenchida, adicionar ao messageConfig
+    if (data.memoryName && data.memoryAction && data.memoryAction !== '') {
+      // Processar TTL baseado no preset selecionado
+      let ttl: number | undefined = undefined;
+      if (data.memoryTtlPreset && data.memoryTtlPreset !== 'never') {
+        if (data.memoryTtlPreset === 'custom') {
+          ttl = data.memoryCustomTtl ? Number(data.memoryCustomTtl) : undefined;
+        } else {
+          ttl = Number(data.memoryTtlPreset);
+        }
+      }
+
+      messageConfig.memoryConfig = {
+        action: data.memoryAction as 'save' | 'fetch' | 'delete',
+        memoryName: data.memoryName,
+        items:
+          data.memoryAction === 'save'
+            ? (data.memoryItems as MemoryItem[])
+            : undefined,
+        ttl: ttl,
+        defaultValue: data.memoryDefaultValue,
+        saveMode:
+          data.memoryAction === 'save'
+            ? (data.memorySaveMode as 'overwrite' | 'append')
+            : undefined,
+      };
+    }
+
     onSave(messageConfig);
     onClose();
   };
@@ -2120,7 +2259,12 @@ export function MessageNodeConfig({
         zodSchema={messageConfigSchema}
         onSubmit={handleSubmit}
       >
-        <MessageFormFields instances={instances} config={config} />
+        <MessageFormFields
+          instances={instances}
+          config={config}
+          memoryItems={memoryItems}
+          setMemoryItems={setMemoryItems}
+        />
       </Form>
     </NodeConfigLayout>
   );
