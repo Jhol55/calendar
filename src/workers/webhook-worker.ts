@@ -7,7 +7,7 @@ import {
   listarMemorias,
 } from './memory-helper';
 import * as transformations from './transformation-helper';
-import executeDatabaseNode from './database-node-executor';
+import executeDatabaseNode from './database-helper';
 import type { MessageConfig } from '../components/layout/chatbot-flow/types';
 
 // Função para substituir variáveis no texto
@@ -209,7 +209,6 @@ async function executeFlow(
   }
 
   console.log(`📊 Flow has ${nodes.length} nodes and ${edges.length} edges`);
-  console.log(`🔗 ALL EDGES IN FLOW:`, JSON.stringify(edges, null, 2));
 
   // Encontrar o nó webhook
   const webhookNode = nodes.find((node) => node.id === webhookData.nodeId);
@@ -221,8 +220,6 @@ async function executeFlow(
   const connectedEdges = edges.filter(
     (edge) => edge.source === webhookData.nodeId,
   );
-
-  console.log(`📊 Found ${connectedEdges.length} connected nodes from webhook`);
 
   // Processar cada cadeia de nós conectados
   for (const edge of connectedEdges) {
@@ -318,8 +315,8 @@ async function processNodeChain(
   if (currentNode.type === 'condition' && selectedHandle) {
     console.log(`🔀 Condition node selected handle: ${selectedHandle}`);
     // Filtrar edges baseado no sourceHandle (ReactFlow usa sourceHandle para identificar handles)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     nextEdges = nextEdges.filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (edge: any) => edge.sourceHandle === selectedHandle,
     );
     console.log(
@@ -521,6 +518,20 @@ async function processMessageNode(
     latitude,
     longitude,
     interactiveMenu,
+    // Opções avançadas
+    linkPreview,
+    linkPreviewTitle,
+    linkPreviewDescription,
+    linkPreviewImage,
+    linkPreviewLarge,
+    replyId,
+    mentions,
+    readChat,
+    readMessages,
+    delay,
+    forward,
+    trackSource,
+    trackId,
   } = messageConfig;
 
   if (!token || !phoneNumber) {
@@ -689,6 +700,56 @@ async function processMessageNode(
         formData.text = resolvedText;
     }
 
+    // Adicionar opções avançadas ao formData (se fornecidas)
+    if (linkPreview !== undefined) {
+      formData.linkPreview = linkPreview;
+    }
+    if (linkPreviewTitle) {
+      formData.linkPreviewTitle = replaceVariables(
+        linkPreviewTitle,
+        variableContext,
+      );
+    }
+    if (linkPreviewDescription) {
+      formData.linkPreviewDescription = replaceVariables(
+        linkPreviewDescription,
+        variableContext,
+      );
+    }
+    if (linkPreviewImage) {
+      formData.linkPreviewImage = replaceVariables(
+        linkPreviewImage,
+        variableContext,
+      );
+    }
+    if (linkPreviewLarge !== undefined) {
+      formData.linkPreviewLarge = linkPreviewLarge;
+    }
+    if (replyId) {
+      formData.replyid = replaceVariables(replyId, variableContext);
+    }
+    if (mentions) {
+      formData.mentions = replaceVariables(mentions, variableContext);
+    }
+    if (readChat !== undefined) {
+      formData.readchat = readChat;
+    }
+    if (readMessages !== undefined) {
+      formData.readmessages = readMessages;
+    }
+    if (delay !== undefined) {
+      formData.delay = delay;
+    }
+    if (forward !== undefined) {
+      formData.forward = forward;
+    }
+    if (trackSource) {
+      formData.track_source = replaceVariables(trackSource, variableContext);
+    }
+    if (trackId) {
+      formData.track_id = replaceVariables(trackId, variableContext);
+    }
+
     console.log('📦 FormData:', formData);
 
     // Determinar endpoint baseado no tipo de mensagem
@@ -722,7 +783,9 @@ async function processMessageNode(
 
     const result = await response.json();
     console.log('📋 API Response:', result);
-    console.log(`✅ Message sent successfully to ${resolvedPhoneNumber}`);
+    console.log(
+      `✅ Message sent successfully to ${resolvedPhoneNumber} from node ${node.id}`,
+    );
 
     return {
       type: 'message',

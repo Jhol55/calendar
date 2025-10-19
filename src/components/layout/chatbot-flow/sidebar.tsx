@@ -1,9 +1,7 @@
 import React from 'react';
 import {
   MessageSquare,
-  HelpCircle,
   GitBranch,
-  Zap,
   Webhook,
   Brain,
   Settings,
@@ -28,25 +26,11 @@ const nodeTemplates: NodeTemplate[] = [
     color: 'bg-blue-500',
   },
   {
-    type: 'question',
-    label: 'Pergunta',
-    icon: <HelpCircle className="w-5 h-5" />,
-    description: 'Fazer pergunta ao usuário',
-    color: 'bg-purple-500',
-  },
-  {
     type: 'condition',
     label: 'Condição',
     icon: <GitBranch className="w-5 h-5" />,
     description: 'IF/SWITCH - Decisões e ramificações',
     color: 'bg-purple-500',
-  },
-  {
-    type: 'action',
-    label: 'Ação',
-    icon: <Zap className="w-5 h-5" />,
-    description: 'Executar ação específica',
-    color: 'bg-orange-500',
   },
   {
     type: 'webhook',

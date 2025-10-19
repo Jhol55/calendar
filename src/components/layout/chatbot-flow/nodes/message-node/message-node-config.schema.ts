@@ -27,6 +27,20 @@ const baseSchema = z.object({
   interactiveMenuImageButton: z.string().optional(),
   interactiveMenuSelectableCount: z.union([z.string(), z.number()]).optional(),
   interactiveMenuChoices: z.string().optional(), // JSON stringified array
+  // Opções avançadas para mensagens de texto
+  linkPreview: z.boolean().optional(),
+  linkPreviewTitle: z.string().optional(),
+  linkPreviewDescription: z.string().optional(),
+  linkPreviewImage: z.string().optional(),
+  linkPreviewLarge: z.boolean().optional(),
+  replyId: z.string().optional(),
+  mentions: z.string().optional(),
+  readChat: z.boolean().optional(),
+  readMessages: z.boolean().optional(),
+  delay: z.union([z.string(), z.number()]).optional(),
+  forward: z.boolean().optional(),
+  trackSource: z.string().optional(),
+  trackId: z.string().optional(),
 });
 
 export const messageConfigSchema = baseSchema.refine(

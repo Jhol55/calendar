@@ -1,9 +1,7 @@
 export type NodeType =
   | 'start'
   | 'message'
-  | 'question'
   | 'condition'
-  | 'action'
   | 'webhook'
   | 'memory'
   | 'transformation'
@@ -42,6 +40,20 @@ export interface MessageConfig {
   longitude?: number;
   // Configuração de menu interativo
   interactiveMenu?: InteractiveMenuConfig;
+  // Opções avançadas para mensagens de texto
+  linkPreview?: boolean;
+  linkPreviewTitle?: string;
+  linkPreviewDescription?: string;
+  linkPreviewImage?: string;
+  linkPreviewLarge?: boolean;
+  replyId?: string;
+  mentions?: string;
+  readChat?: boolean;
+  readMessages?: boolean;
+  delay?: number;
+  forward?: boolean;
+  trackSource?: string;
+  trackId?: string;
 }
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

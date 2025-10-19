@@ -3,6 +3,8 @@
 // Executa operações do database-node
 // ============================================
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { databaseNodeService } from '@/services/database-node.service';
 import type { DatabaseNodeConfig } from '@/types/database-node.types';
 
@@ -148,14 +150,34 @@ async function handleInsert(
     throw new Error('Nenhum registro especificado para inserir');
   }
 
+  console.log(
+    '📝 [INSERT] Config record:',
+    JSON.stringify(config.record, null, 2),
+  );
+  console.log('📝 [INSERT] Context variables:', {
+    hasInput: !!input,
+    hasNodes: !!context.variables?.nodes,
+    nodeKeys: context.variables?.nodes
+      ? Object.keys(context.variables.nodes)
+      : [],
+    hasMemory: !!context.variables?.memory,
+  });
+
   // Resolve variáveis no registro
   const resolvedRecord = resolveVariables(config.record, input, context);
+
+  console.log(
+    '✅ [INSERT] Resolved record:',
+    JSON.stringify(resolvedRecord, null, 2),
+  );
 
   const newRecord = await databaseNodeService.insertRecord(
     userId,
     config.tableName,
     resolvedRecord,
   );
+
+  console.log('✅ [INSERT] New record created with ID:', newRecord._id);
 
   return {
     success: true,
@@ -321,6 +343,10 @@ function resolveString(
     // Tenta resolver de múltiplas fontes
     const value = resolveValue(trimmedPath, { input, ...context.variables });
 
+    if (value === undefined) {
+      console.warn(`⚠️  Variável não encontrada: {{${trimmedPath}}}`);
+    }
+
     return value !== undefined ? String(value) : match;
   });
 
@@ -334,10 +360,13 @@ function resolveString(
 }
 
 /**
- * Resolve um caminho de propriedade (ex: "input.body.name")
+ * Resolve um caminho de propriedade (ex: "input.body.name" ou "$nodes.xxx.output")
  */
 function resolveValue(path: string, data: any): any {
-  const parts = path.split('.');
+  // Remove o $ inicial se existir (ex: $nodes -> nodes, $memory -> memory)
+  const cleanPath = path.startsWith('$') ? path.substring(1) : path;
+
+  const parts = cleanPath.split('.');
   let current = data;
 
   for (const part of parts) {

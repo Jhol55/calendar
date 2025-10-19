@@ -12,7 +12,7 @@ import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
 import { NodeConfigLayout } from '../node-config-layout';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, MoveUp, MoveDown } from 'lucide-react';
 import type {
   ConditionConfig,
   ConditionRule,
@@ -170,6 +170,24 @@ function ConditionFormFields({ config }: { config?: ConditionConfig }) {
     );
   };
 
+  const moveRule = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === rules.length - 1)
+    ) {
+      return;
+    }
+
+    const newRules = [...rules];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [newRules[index], newRules[targetIndex]] = [
+      newRules[targetIndex],
+      newRules[index],
+    ];
+
+    setRules(newRules);
+  };
+
   // Funções para gerenciar cases (SWITCH)
   const addCase = () => {
     setCases([
@@ -198,6 +216,24 @@ function ConditionFormFields({ config }: { config?: ConditionConfig }) {
     setCases(
       cases.map((c) => (c.id === caseId ? { ...c, [field]: value } : c)),
     );
+  };
+
+  const moveCase = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === cases.length - 1)
+    ) {
+      return;
+    }
+
+    const newCases = [...cases];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [newCases[index], newCases[targetIndex]] = [
+      newCases[targetIndex],
+      newCases[index],
+    ];
+
+    setCases(newCases);
   };
 
   // Operadores disponíveis
@@ -274,16 +310,36 @@ function ConditionFormFields({ config }: { config?: ConditionConfig }) {
                   >
                     Regra {index + 1}
                   </Typography>
-                  {rules.length > 1 && (
+                  <div className="flex items-center gap-1">
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() => removeRule(rule.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                      onClick={() => moveRule(index, 'up')}
+                      disabled={index === 0}
+                      className="hover:bg-neutral-200 h-fit w-fit p-1"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <MoveUp className="w-4 h-4 text-neutral-600" />
                     </Button>
-                  )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => moveRule(index, 'down')}
+                      disabled={index === rules.length - 1}
+                      className="hover:bg-neutral-200 h-fit w-fit p-1"
+                    >
+                      <MoveDown className="w-4 h-4 text-neutral-600" />
+                    </Button>
+                    {rules.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => removeRule(rule.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Lógica (AND/OR) - Apenas para regras após a primeira */}
@@ -415,16 +471,36 @@ function ConditionFormFields({ config }: { config?: ConditionConfig }) {
                     >
                       Caso {index + 1}
                     </Typography>
-                    {cases.length > 1 && (
+                    <div className="flex items-center gap-1">
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => removeCase(caseItem.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                        onClick={() => moveCase(index, 'up')}
+                        disabled={index === 0}
+                        className="hover:bg-neutral-200 h-fit w-fit p-1"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <MoveUp className="w-4 h-4 text-neutral-600" />
                       </Button>
-                    )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => moveCase(index, 'down')}
+                        disabled={index === cases.length - 1}
+                        className="hover:bg-neutral-200 h-fit w-fit p-1"
+                      >
+                        <MoveDown className="w-4 h-4 text-neutral-600" />
+                      </Button>
+                      {cases.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => removeCase(caseItem.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Variável */}

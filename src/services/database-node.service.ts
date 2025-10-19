@@ -154,6 +154,14 @@ export class DatabaseNodeService {
     tableName: string,
     record: Record<string, any>,
   ): Promise<DatabaseRecord> {
+    console.log(
+      `🗄️  [DB-SERVICE] Inserting record into "${tableName}" for user "${userId}"`,
+    );
+    console.log(
+      `📝 [DB-SERVICE] Record data:`,
+      JSON.stringify(record, null, 2),
+    );
+
     this.validateTableName(tableName);
 
     // 1. Busca partição ativa (não cheia)
@@ -165,6 +173,13 @@ export class DatabaseNodeService {
       },
       orderBy: { partition: 'desc' },
     });
+
+    console.log(
+      `📊 [DB-SERVICE] Active partition found:`,
+      activePartition
+        ? `ID ${activePartition.id}, partition ${activePartition.partition}`
+        : 'NONE',
+    );
 
     // 2. Se não existe nenhuma partição, erro (precisa criar schema primeiro)
     if (!activePartition) {
@@ -231,6 +246,10 @@ export class DatabaseNodeService {
         isFull: newCount >= this.MAX_PARTITION_SIZE,
       },
     });
+
+    console.log(
+      `✅ [DB-SERVICE] Record inserted successfully! ID: ${newRecord._id}, Total records in partition: ${newCount}`,
+    );
 
     return newRecord;
   }

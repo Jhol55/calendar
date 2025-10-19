@@ -23,7 +23,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     };
 
     const defaultStyle =
-      'w-full rounded-md border border-gray-300 bg-neutral-100 p-2.5 text-black outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] text-sm resize-none';
+      'w-full rounded-md border border-gray-300 bg-neutral-100 p-2.5 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] text-sm resize-none';
 
     return (
       <textarea

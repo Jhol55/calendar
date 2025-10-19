@@ -106,6 +106,21 @@ function MessageFormFields({
         setValue('latitude', config.latitude?.toString() || '');
         setValue('longitude', config.longitude?.toString() || '');
 
+        // Carregar opções avançadas
+        setValue('linkPreview', config.linkPreview || false);
+        setValue('linkPreviewTitle', config.linkPreviewTitle || '');
+        setValue('linkPreviewDescription', config.linkPreviewDescription || '');
+        setValue('linkPreviewImage', config.linkPreviewImage || '');
+        setValue('linkPreviewLarge', config.linkPreviewLarge || false);
+        setValue('replyId', config.replyId || '');
+        setValue('mentions', config.mentions || '');
+        setValue('readChat', config.readChat || false);
+        setValue('readMessages', config.readMessages || false);
+        setValue('delay', config.delay?.toString() || '');
+        setValue('forward', config.forward || false);
+        setValue('trackSource', config.trackSource || '');
+        setValue('trackId', config.trackId || '');
+
         // Carregar configuração de menu interativo
         if (config.interactiveMenu) {
           setValue('interactiveMenuType', config.interactiveMenu.type);
@@ -709,17 +724,223 @@ function MessageFormFields({
 
       {/* Campos específicos por tipo */}
       {messageType === 'text' && (
-        <div className="p-1">
-          <FormControl variant="label">Mensagem</FormControl>
-          <Textarea
-            fieldName="text"
-            placeholder="Digite a mensagem que será enviada..."
-            rows={6}
-          />
-          <Typography variant="p" className="mt-1 text-xs text-gray-500">
-            Você pode usar variáveis como {'{nome}'}, {'{email}'}, etc.
-          </Typography>
-        </div>
+        <>
+          <div className="p-1">
+            <FormControl variant="label">Mensagem</FormControl>
+            <Textarea
+              fieldName="text"
+              placeholder="Digite a mensagem que será enviada..."
+              rows={6}
+            />
+          </div>
+
+          {/* Opções Avançadas */}
+          <div className="border-t pt-4 mt-4">
+            <Typography variant="h5" className="font-semibold mb-3">
+              ⚙️ Opções Avançadas
+            </Typography>
+
+            {/* Link Preview */}
+            <div className="space-y-3 p-3 bg-neutral-50 rounded-lg mb-3">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="checkbox"
+                  fieldName="linkPreview"
+                  onChange={(e) => setValue('linkPreview', e.target.checked)}
+                  className="bg-neutral-200"
+                />
+                <FormControl
+                  variant="label"
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Ativar preview de links
+                </FormControl>
+              </div>
+              <Typography variant="span" className="text-xs text-gray-600">
+                Gera preview automático do primeiro link encontrado no texto
+              </Typography>
+
+              {form.linkPreview && (
+                <div className="space-y-2 pl-6 border-l-2 border-gray-300">
+                  <div className="p-1">
+                    <FormControl variant="label">
+                      <Typography variant="span" className="text-sm">
+                        Título do Preview (opcional)
+                      </Typography>
+                    </FormControl>
+                    <Input
+                      type="text"
+                      fieldName="linkPreviewTitle"
+                      placeholder="Título Personalizado"
+                    />
+                  </div>
+                  <div className="p-1">
+                    <FormControl variant="label">
+                      <Typography variant="span" className="text-sm">
+                        Descrição do Preview (opcional)
+                      </Typography>
+                    </FormControl>
+                    <Input
+                      type="text"
+                      fieldName="linkPreviewDescription"
+                      placeholder="Descrição personalizada do link"
+                    />
+                  </div>
+                  <div className="p-1">
+                    <FormControl variant="label">
+                      <Typography variant="span" className="text-sm">
+                        Imagem do Preview (opcional)
+                      </Typography>
+                    </FormControl>
+                    <Input
+                      type="text"
+                      fieldName="linkPreviewImage"
+                      placeholder="https://exemplo.com/imagem.jpg ou Base64"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="checkbox"
+                      fieldName="linkPreviewLarge"
+                      onChange={(e) =>
+                        setValue('linkPreviewLarge', e.target.checked)
+                      }
+                      className="bg-neutral-200"
+                    />
+                    <FormControl
+                      variant="label"
+                      className="text-sm cursor-pointer"
+                    >
+                      Preview grande (com upload da imagem)
+                    </FormControl>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Responder Mensagem */}
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  ID da mensagem para responder (opcional)
+                </Typography>
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="replyId"
+                placeholder="3EB0538DA65A59F6D8A251"
+              />
+              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+                ID da mensagem que será respondida
+              </Typography>
+            </div>
+
+            {/* Menções */}
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  Menções (opcional)
+                </Typography>
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="mentions"
+                placeholder="5511999999999,5511888888888"
+              />
+              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+                Números para mencionar, separados por vírgula
+              </Typography>
+            </div>
+
+            {/* Checkboxes de leitura e encaminhamento */}
+            <div className="space-y-2 p-3 bg-neutral-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="checkbox"
+                  fieldName="readChat"
+                  onChange={(e) => setValue('readChat', e.target.checked)}
+                  className="bg-neutral-200"
+                />
+                <FormControl variant="label" className="text-sm cursor-pointer">
+                  Marcar conversa como lida após envio
+                </FormControl>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="checkbox"
+                  fieldName="readMessages"
+                  onChange={(e) => setValue('readMessages', e.target.checked)}
+                  className="bg-neutral-200"
+                />
+                <FormControl variant="label" className="text-sm cursor-pointer">
+                  Marcar últimas mensagens recebidas como lidas
+                </FormControl>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="checkbox"
+                  fieldName="forward"
+                  onChange={(e) => setValue('forward', e.target.checked)}
+                  className="bg-neutral-200"
+                />
+                <FormControl variant="label" className="text-sm cursor-pointer">
+                  Marcar mensagem como encaminhada
+                </FormControl>
+              </div>
+            </div>
+
+            {/* Delay */}
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  Atraso antes do envio (opcional)
+                </Typography>
+              </FormControl>
+              <Input type="number" fieldName="delay" placeholder="1000" />
+              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+                Tempo em milissegundos. Durante o atraso aparecerá
+                &quot;Digitando...&quot;
+              </Typography>
+            </div>
+
+            {/* Rastreamento */}
+            <div className="space-y-3 p-3 bg-neutral-50 rounded-lg">
+              <Typography variant="span" className="text-sm font-medium">
+                Rastreamento
+              </Typography>
+              <div className="p-1">
+                <FormControl variant="label">
+                  <Typography variant="span" className="text-sm">
+                    Origem (opcional)
+                  </Typography>
+                </FormControl>
+                <Input
+                  type="text"
+                  fieldName="trackSource"
+                  placeholder="chatwoot"
+                />
+              </div>
+              <div className="p-1">
+                <FormControl variant="label">
+                  <Typography variant="span" className="text-sm">
+                    ID de rastreamento (opcional)
+                  </Typography>
+                </FormControl>
+                <Input
+                  type="text"
+                  fieldName="trackId"
+                  placeholder="msg_123456789"
+                />
+                <Typography
+                  variant="span"
+                  className="text-xs text-gray-600 mt-1"
+                >
+                  Aceita valores duplicados
+                </Typography>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {messageType === 'media' && (
@@ -1263,7 +1484,7 @@ function MessageFormFields({
                 {choices.map((choice, index) => (
                   <div
                     key={index}
-                    className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2"
+                    className="p-3 border border-gray-200 rounded-lg bg-neutral-50 space-y-2"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <Typography
@@ -1463,6 +1684,358 @@ function MessageFormFields({
               </Typography>
             </div>
           )}
+
+          {/* Opções Avançadas para Menu Interativo */}
+          <div className="border-t pt-4 mt-4">
+            <Typography variant="h5" className="font-semibold mb-3">
+              ⚙️ Opções Avançadas
+            </Typography>
+
+            {/* Responder Mensagem */}
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  ID da mensagem para responder (opcional)
+                </Typography>
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="replyId"
+                placeholder="3EB0538DA65A59F6D8A251"
+              />
+              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+                ID da mensagem que será respondida
+              </Typography>
+            </div>
+
+            {/* Menções */}
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  Menções (opcional)
+                </Typography>
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="mentions"
+                placeholder="5511999999999,5511888888888"
+              />
+              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+                Números para mencionar, separados por vírgula
+              </Typography>
+            </div>
+
+            {/* Checkboxes de leitura */}
+            <div className="space-y-2 p-3 bg-neutral-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="checkbox"
+                  fieldName="readChat"
+                  onChange={(e) => setValue('readChat', e.target.checked)}
+                  className="bg-neutral-200"
+                />
+                <FormControl variant="label" className="text-sm cursor-pointer">
+                  Marcar conversa como lida após envio
+                </FormControl>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="checkbox"
+                  fieldName="readMessages"
+                  onChange={(e) => setValue('readMessages', e.target.checked)}
+                  className="bg-neutral-200"
+                />
+                <FormControl variant="label" className="text-sm cursor-pointer">
+                  Marcar últimas mensagens recebidas como lidas
+                </FormControl>
+              </div>
+            </div>
+
+            {/* Delay */}
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  Atraso antes do envio (opcional)
+                </Typography>
+              </FormControl>
+              <Input type="number" fieldName="delay" placeholder="1000" />
+              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+                Tempo em milissegundos. Durante o atraso aparecerá
+                &quot;Digitando...&quot;
+              </Typography>
+            </div>
+
+            {/* Rastreamento */}
+            <div className="space-y-3 p-3 bg-neutral-50 rounded-lg">
+              <Typography variant="span" className="text-sm font-medium">
+                Rastreamento
+              </Typography>
+              <div className="p-1">
+                <FormControl variant="label">
+                  <Typography variant="span" className="text-sm">
+                    Origem (opcional)
+                  </Typography>
+                </FormControl>
+                <Input
+                  type="text"
+                  fieldName="trackSource"
+                  placeholder="chatwoot"
+                />
+              </div>
+              <div className="p-1">
+                <FormControl variant="label">
+                  <Typography variant="span" className="text-sm">
+                    ID de rastreamento (opcional)
+                  </Typography>
+                </FormControl>
+                <Input
+                  type="text"
+                  fieldName="trackId"
+                  placeholder="msg_123456789"
+                />
+                <Typography
+                  variant="span"
+                  className="text-xs text-gray-600 mt-1"
+                >
+                  Aceita valores duplicados
+                </Typography>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Opções Avançadas para Mídia */}
+      {messageType === 'media' && (
+        <div className="border-t pt-4 mt-4">
+          <Typography variant="h5" className="font-semibold mb-3">
+            ⚙️ Opções Avançadas
+          </Typography>
+
+          {/* Responder Mensagem */}
+          <div className="p-1">
+            <FormControl variant="label">
+              <Typography variant="span" className="text-sm">
+                ID da mensagem para responder (opcional)
+              </Typography>
+            </FormControl>
+            <Input
+              type="text"
+              fieldName="replyId"
+              placeholder="3EB0538DA65A59F6D8A251"
+            />
+            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              ID da mensagem que será respondida
+            </Typography>
+          </div>
+
+          {/* Menções */}
+          <div className="p-1">
+            <FormControl variant="label">
+              <Typography variant="span" className="text-sm">
+                Menções (opcional)
+              </Typography>
+            </FormControl>
+            <Input
+              type="text"
+              fieldName="mentions"
+              placeholder="5511999999999,5511888888888"
+            />
+            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              Números para mencionar, separados por vírgula
+            </Typography>
+          </div>
+
+          {/* Checkboxes de leitura */}
+          <div className="space-y-2 p-3 bg-neutral-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Input
+                type="checkbox"
+                fieldName="readChat"
+                onChange={(e) => setValue('readChat', e.target.checked)}
+                className="bg-neutral-200"
+              />
+              <FormControl variant="label" className="text-sm cursor-pointer">
+                Marcar conversa como lida após envio
+              </FormControl>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="checkbox"
+                fieldName="readMessages"
+                onChange={(e) => setValue('readMessages', e.target.checked)}
+                className="bg-neutral-200"
+              />
+              <FormControl variant="label" className="text-sm cursor-pointer">
+                Marcar últimas mensagens recebidas como lidas
+              </FormControl>
+            </div>
+          </div>
+
+          {/* Delay */}
+          <div className="p-1">
+            <FormControl variant="label">
+              <Typography variant="span" className="text-sm">
+                Atraso antes do envio (opcional)
+              </Typography>
+            </FormControl>
+            <Input type="number" fieldName="delay" placeholder="1000" />
+            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              Tempo em milissegundos. Durante o atraso aparecerá
+              &quot;Digitando...&quot;
+            </Typography>
+          </div>
+
+          {/* Rastreamento */}
+          <div className="space-y-3 p-3 bg-neutral-50 rounded-lg">
+            <Typography variant="span" className="text-sm font-medium">
+              Rastreamento
+            </Typography>
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  Origem (opcional)
+                </Typography>
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="trackSource"
+                placeholder="chatwoot"
+              />
+            </div>
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  ID de rastreamento (opcional)
+                </Typography>
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="trackId"
+                placeholder="msg_123456789"
+              />
+              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+                Aceita valores duplicados
+              </Typography>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Opções Avançadas para Contato e Localização */}
+      {(messageType === 'contact' || messageType === 'location') && (
+        <div className="border-t pt-4 mt-4">
+          <Typography variant="h5" className="font-semibold mb-3">
+            ⚙️ Opções Avançadas
+          </Typography>
+
+          {/* Responder Mensagem */}
+          <div className="p-1">
+            <FormControl variant="label">
+              <Typography variant="span" className="text-sm">
+                ID da mensagem para responder (opcional)
+              </Typography>
+            </FormControl>
+            <Input
+              type="text"
+              fieldName="replyId"
+              placeholder="3EB0538DA65A59F6D8A251"
+            />
+            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              ID da mensagem que será respondida
+            </Typography>
+          </div>
+
+          {/* Menções */}
+          <div className="p-1">
+            <FormControl variant="label">
+              <Typography variant="span" className="text-sm">
+                Menções (opcional)
+              </Typography>
+            </FormControl>
+            <Input
+              type="text"
+              fieldName="mentions"
+              placeholder="5511999999999,5511888888888"
+            />
+            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              Números para mencionar, separados por vírgula
+            </Typography>
+          </div>
+
+          {/* Checkboxes de leitura */}
+          <div className="space-y-2 p-3 bg-neutral-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Input
+                type="checkbox"
+                fieldName="readChat"
+                onChange={(e) => setValue('readChat', e.target.checked)}
+                className="bg-neutral-200"
+              />
+              <FormControl variant="label" className="text-sm cursor-pointer">
+                Marcar conversa como lida após envio
+              </FormControl>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="checkbox"
+                fieldName="readMessages"
+                onChange={(e) => setValue('readMessages', e.target.checked)}
+                className="bg-neutral-200"
+              />
+              <FormControl variant="label" className="text-sm cursor-pointer">
+                Marcar últimas mensagens recebidas como lidas
+              </FormControl>
+            </div>
+          </div>
+
+          {/* Delay */}
+          <div className="p-1">
+            <FormControl variant="label">
+              <Typography variant="span" className="text-sm">
+                Atraso antes do envio (opcional)
+              </Typography>
+            </FormControl>
+            <Input type="number" fieldName="delay" placeholder="1000" />
+            <Typography variant="span" className="text-xs text-gray-600 mt-1">
+              Tempo em milissegundos. Durante o atraso aparecerá
+              &quot;Digitando...&quot;
+            </Typography>
+          </div>
+
+          {/* Rastreamento */}
+          <div className="space-y-3 p-3 bg-neutral-50 rounded-lg">
+            <Typography variant="span" className="text-sm font-medium">
+              Rastreamento
+            </Typography>
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  Origem (opcional)
+                </Typography>
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="trackSource"
+                placeholder="chatwoot"
+              />
+            </div>
+            <div className="p-1">
+              <FormControl variant="label">
+                <Typography variant="span" className="text-sm">
+                  ID de rastreamento (opcional)
+                </Typography>
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="trackId"
+                placeholder="msg_123456789"
+              />
+              <Typography variant="span" className="text-xs text-gray-600 mt-1">
+                Aceita valores duplicados
+              </Typography>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1495,6 +2068,20 @@ export function MessageNodeConfig({
       contactPhone: data.contactPhone,
       latitude: data.latitude ? parseFloat(data.latitude) : undefined,
       longitude: data.longitude ? parseFloat(data.longitude) : undefined,
+      // Opções avançadas
+      linkPreview: data.linkPreview || undefined,
+      linkPreviewTitle: data.linkPreviewTitle || undefined,
+      linkPreviewDescription: data.linkPreviewDescription || undefined,
+      linkPreviewImage: data.linkPreviewImage || undefined,
+      linkPreviewLarge: data.linkPreviewLarge || undefined,
+      replyId: data.replyId || undefined,
+      mentions: data.mentions || undefined,
+      readChat: data.readChat || undefined,
+      readMessages: data.readMessages || undefined,
+      delay: data.delay ? parseInt(data.delay) : undefined,
+      forward: data.forward || undefined,
+      trackSource: data.trackSource || undefined,
+      trackId: data.trackId || undefined,
     };
 
     // Se for menu interativo, adicionar configuração

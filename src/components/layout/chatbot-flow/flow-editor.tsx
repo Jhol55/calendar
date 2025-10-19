@@ -24,9 +24,7 @@ import { FlowsListSidebar } from './flows-list-sidebar';
 import {
   EndNode,
   MessageNode,
-  QuestionNode,
   ConditionNode,
-  ActionNode,
   WebhookNode,
   MemoryNode,
   TransformationNode,
@@ -62,9 +60,7 @@ import { ExecutionsPanel } from './executions-panel';
 const nodeTypes = {
   end: EndNode,
   message: MessageNode,
-  question: QuestionNode,
   condition: ConditionNode,
-  action: ActionNode,
   webhook: WebhookNode,
   memory: MemoryNode,
   transformation: TransformationNode,
@@ -201,10 +197,7 @@ function FlowEditorContent() {
         data: {
           label: type.charAt(0).toUpperCase() + type.slice(1),
           type,
-          content:
-            type === 'message' || type === 'question'
-              ? 'Digite aqui...'
-              : undefined,
+          content: type === 'message' ? 'Digite aqui...' : undefined,
         },
       };
 
@@ -232,10 +225,8 @@ function FlowEditorContent() {
       let result;
 
       if (currentFlowId) {
-        // Atualizar fluxo existente
         result = await updateFlow(currentFlowId, flowData);
       } else {
-        // Criar novo fluxo
         result = await createFlow(flowData);
         if (result.success && result.flow) {
           setCurrentFlowId(result.flow.id);
@@ -243,6 +234,7 @@ function FlowEditorContent() {
       }
 
       if (result.success) {
+        console.log('✅ Flow salvo com sucesso!');
       } else {
         alert(`Erro ao salvar fluxo: ${result.error}`);
       }
@@ -556,12 +548,8 @@ function FlowEditorContent() {
         return '#ef4444';
       case 'message':
         return '#3b82f6';
-      case 'question':
-        return '#a855f7';
       case 'condition':
         return '#eab308';
-      case 'action':
-        return '#f97316';
       case 'webhook':
         return '#10b981';
       case 'memory':

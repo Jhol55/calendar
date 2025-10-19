@@ -67,7 +67,7 @@ export const FormSelect = forwardRef<HTMLButtonElement, FormSelectProps>(
             >
               <Typography
                 variant="span"
-                className={cn(currentValue === option.value && 'text-black')}
+                className={cn(currentValue === option.value && 'text-black/80')}
               >
                 {option.label}
               </Typography>
