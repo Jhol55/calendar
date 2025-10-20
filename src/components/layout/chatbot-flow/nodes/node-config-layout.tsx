@@ -102,8 +102,8 @@ export function NodeConfigLayout({
             !showLeftPanel && showRightPanel && '!w-3/4',
           )}
         >
-          <div className="p-6 flex flex-col h-full relative">
-            <div className="flex items-center justify-between mb-6 gap-3 ml-4">
+          <div className="pl-4 pr-2 py-6 flex flex-col h-full relative">
+            <div className="flex items-center justify-between mb-6 gap-3 ml-6">
               {/* Título com nome editável */}
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <Typography variant="h2" className="whitespace-nowrap hidden">
