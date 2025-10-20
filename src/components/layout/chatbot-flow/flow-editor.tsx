@@ -40,7 +40,7 @@ import {
   ConditionConfig,
   DatabaseConfig,
 } from '../../layout/chatbot-flow/types';
-import { Save, Download, Upload, Plus, Play, Database } from 'lucide-react';
+import { Save, Download, Upload, Plus, Play, Database, X } from 'lucide-react';
 import {
   createFlow,
   updateFlow,
@@ -95,6 +95,7 @@ function FlowEditorContent() {
   const [isExecutionsPanelOpen, setIsExecutionsPanelOpen] = useState(false);
   const [isSpreadsheetOpen, setIsSpreadsheetOpen] = useState(false);
   const [copiedNode, setCopiedNode] = useState<Node<NodeData> | null>(null);
+  const [hasExecutionHighlight, setHasExecutionHighlight] = useState(false);
   const { user, workflows, setWorkflows } = useUser();
 
   // Handler para deletar nodes selecionados
@@ -247,6 +248,39 @@ function FlowEditorContent() {
       setIsSaving(false);
     }
   }, [nodes, edges, flowName, currentFlowId, user]);
+
+  const clearExecutionHighlight = useCallback(() => {
+    // Limpar highlight dos nodes
+    const clearedNodes = nodes.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        executionStatus: undefined,
+      },
+      style: {
+        ...node.style,
+        boxShadow: undefined,
+        borderRadius: undefined,
+      },
+    }));
+    setNodes(clearedNodes);
+
+    // Limpar highlight das edges
+    const clearedEdges = edges.map((edge) => ({
+      ...edge,
+      animated: false,
+      style: {
+        ...edge.style,
+        stroke: undefined,
+        strokeWidth: undefined,
+      },
+    }));
+    setEdges(clearedEdges);
+
+    // Limpar sessionStorage
+    sessionStorage.removeItem('selectedExecution');
+    setHasExecutionHighlight(false);
+  }, [nodes, edges, setNodes, setEdges]);
 
   const handleExport = useCallback(() => {
     if (reactFlowInstance) {
@@ -678,6 +712,22 @@ function FlowEditorContent() {
                   Banco de dados
                 </Typography>
               </Button>
+              {hasExecutionHighlight && (
+                <Button
+                  variant="gradient"
+                  className="w-full flex items-center justify-center gap-2"
+                  bgHexColor="#ef4444"
+                  onClick={clearExecutionHighlight}
+                >
+                  <X className="w-4 h-4" />
+                  <Typography
+                    variant="span"
+                    className="text-xs text-white whitespace-nowrap"
+                  >
+                    Limpar Visualização
+                  </Typography>
+                </Button>
+              )}
               <Button
                 variant="gradient"
                 className="w-full flex items-center justify-center gap-2"
@@ -786,6 +836,8 @@ function FlowEditorContent() {
 
           // Destacar nós executados
           if (execution.nodeExecutions) {
+            const executedNodeIds = Object.keys(execution.nodeExecutions);
+
             const updatedNodes = nodes.map((node) => {
               const nodeExecution = execution.nodeExecutions[node.id];
               if (nodeExecution) {
@@ -799,16 +851,74 @@ function FlowEditorContent() {
                     ...node.style,
                     boxShadow:
                       nodeExecution.status === 'completed'
-                        ? '0 0 0 3px rgba(34, 197, 94, 0.5)'
+                        ? '0 0 0 5px rgba(34, 197, 94, 0.4)'
                         : nodeExecution.status === 'error'
-                          ? '0 0 0 3px rgba(239, 68, 68, 0.5)'
-                          : '0 0 0 3px rgba(59, 130, 246, 0.5)',
+                          ? '0 0 0 5px rgba(239, 68, 68, 0.4)'
+                          : '0 0 0 5px rgba(59, 130, 246, 0.4)',
+                    borderRadius: '12px',
                   },
                 };
               }
-              return node;
+              // Limpar highlight de nodes não executados
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  executionStatus: undefined,
+                },
+                style: {
+                  ...node.style,
+                  boxShadow: undefined,
+                  borderRadius: undefined,
+                },
+              };
             });
             setNodes(updatedNodes);
+
+            // Destacar edges entre nós executados
+            const updatedEdges = edges.map((edge) => {
+              const sourceExecuted = executedNodeIds.includes(edge.source);
+              const targetExecuted = executedNodeIds.includes(edge.target);
+
+              if (sourceExecuted && targetExecuted) {
+                const sourceExecution = execution.nodeExecutions[edge.source];
+                const targetExecution = execution.nodeExecutions[edge.target];
+
+                // Determinar a cor baseada no status
+                const hasError =
+                  sourceExecution?.status === 'error' ||
+                  targetExecution?.status === 'error';
+                const isRunning =
+                  sourceExecution?.status === 'running' ||
+                  targetExecution?.status === 'running';
+
+                return {
+                  ...edge,
+                  animated: true,
+                  style: {
+                    ...edge.style,
+                    stroke: hasError
+                      ? '#ef4444'
+                      : isRunning
+                        ? '#3b82f6'
+                        : '#22c55e',
+                    strokeWidth: 3,
+                  },
+                };
+              }
+              // Limpar highlight de edges não executadas
+              return {
+                ...edge,
+                animated: false,
+                style: {
+                  ...edge.style,
+                  stroke: undefined,
+                  strokeWidth: undefined,
+                },
+              };
+            });
+            setEdges(updatedEdges);
+            setHasExecutionHighlight(true);
           }
         }}
       />

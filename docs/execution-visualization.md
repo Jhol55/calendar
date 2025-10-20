@@ -34,6 +34,12 @@ O sistema permite visualizar o caminho percorrido por uma execução específica
    - **Esquerda**: Dados de entrada do nó
    - **Direita**: Dados de saída do nó
 
+### 5. Limpar Visualização
+
+1. Após visualizar uma execução, um botão **"🔴 Limpar Visualização"** aparecerá no painel superior
+2. Clique nesse botão para remover todos os destaques de nós e linhas
+3. O fluxo voltará ao estado normal
+
 ## Recursos
 
 ### ✅ Destaques Visuais
@@ -41,6 +47,8 @@ O sistema permite visualizar o caminho percorrido por uma execução específica
 - **Box-shadow colorido** ao redor dos nós executados
 - **Indicadores de status** visuais
 - **Caminho percorrido** destacado no fluxo
+- **Linhas animadas** conectando os nós executados (edges)
+- **Cores das linhas** de acordo com o status da execução
 
 ### 📊 Informações Disponíveis
 
@@ -115,10 +123,31 @@ Os nós são atualizados com:
     executionStatus: 'completed' | 'error' | 'running'
   },
   style: {
-    boxShadow: '0 0 0 3px rgba(34, 197, 94, 0.5)' // Verde para sucesso
+    boxShadow: '0 0 0 5px rgba(34, 197, 94, 0.4)', // Verde para sucesso
+    borderRadius: '12px' // Bordas arredondadas
   }
 }
 ```
+
+### Destaque de Edges (Linhas)
+
+As edges que conectam nós executados são atualizadas com:
+
+```typescript
+{
+  animated: true,
+  style: {
+    stroke: '#22c55e',     // Verde para sucesso
+    strokeWidth: 3,        // Linha mais espessa
+  }
+}
+```
+
+Cores das edges por status:
+
+- **Verde (#22c55e)**: Ambos os nós completados com sucesso
+- **Vermelho (#ef4444)**: Algum dos nós com erro
+- **Azul (#3b82f6)**: Algum dos nós em execução
 
 ### Dados de Execução
 
@@ -202,19 +231,23 @@ Cada nó executado tem:
 
 | Status    | Box Shadow                                    |
 | --------- | --------------------------------------------- |
-| completed | `0 0 0 3px rgba(34, 197, 94, 0.5)` (verde)    |
-| error     | `0 0 0 3px rgba(239, 68, 68, 0.5)` (vermelho) |
-| running   | `0 0 0 3px rgba(59, 130, 246, 0.5)` (azul)    |
+| completed | `0 0 0 5px rgba(34, 197, 94, 0.4)` (verde)    |
+| error     | `0 0 0 5px rgba(239, 68, 68, 0.4)` (vermelho) |
+| running   | `0 0 0 5px rgba(59, 130, 246, 0.4)` (azul)    |
+
+**Nota**: Bordas arredondadas com `borderRadius: 12px`
 
 ## Limitações Atuais
 
 - ⚠️ Apenas uma execução pode ser visualizada por vez
-- ⚠️ O destaque é limpo ao recarregar a página
-- ⚠️ Não mostra animação do caminho percorrido (futuro)
+- ⚠️ O destaque é limpo ao recarregar a página ou trocar de fluxo
+- ✅ Use o botão "Limpar Visualização" para remover os destaques manualmente
 
 ## Próximas Funcionalidades
 
-- [ ] Animação mostrando o caminho passo a passo
+- [x] ~~Destaque das linhas (edges) entre nós executados~~ ✅ **Implementado!**
+- [x] ~~Animação das linhas do caminho percorrido~~ ✅ **Implementado!**
+- [x] ~~Botão para limpar visualização~~ ✅ **Implementado!**
 - [ ] Timeline de execução dos nós
 - [ ] Comparar duas execuções
 - [ ] Exportar dados de execução

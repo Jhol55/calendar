@@ -1142,14 +1142,14 @@ function MessageFormFields({
                               className="font-semibold"
                             >
                               Categoria {catIndex + 1}{' '}
-                              {catIndex + 1 === 1 && (
+                              {/* {catIndex + 1 === 1 && (
                                 <Typography
                                   variant="span"
                                   className="text-sm text-neutral-600 mt-1 whitespace-nowrap"
                                 >
                                   (Deixe vazio para não criar seção)
                                 </Typography>
-                              )}
+                              )} */}
                             </Typography>
                           </FormControl>
                           {listCategories?.length > 1 && (
