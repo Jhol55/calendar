@@ -14,6 +14,7 @@ const Button = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
       darkenFactor = 0.22,
       animated = true,
       className,
+      textClassName,
       children,
       icon = { src: '', width: 16, height: 16, alt: '' },
       ...props
@@ -71,7 +72,12 @@ const Button = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
         }}
         {...props}
       >
-        <span className="relative flex items-center justify-center gap-2">
+        <span
+          className={cn(
+            'relative flex items-center gap-2 w-full',
+            textClassName,
+          )}
+        >
           {icon.src && (
             <Image
               {...{

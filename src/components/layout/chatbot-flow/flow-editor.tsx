@@ -40,7 +40,7 @@ import {
   ConditionConfig,
   DatabaseConfig,
 } from '../../layout/chatbot-flow/types';
-import { Save, Download, Upload, Plus, Play, Table2 } from 'lucide-react';
+import { Save, Download, Upload, Plus, Play, Database } from 'lucide-react';
 import {
   createFlow,
   updateFlow,
@@ -670,9 +670,12 @@ function FlowEditorContent() {
                 bgHexColor="#10b981"
                 onClick={() => setIsSpreadsheetOpen(true)}
               >
-                <Table2 className="w-4 h-4" />
-                <Typography variant="span" className="text-xs text-white">
-                  Planilha
+                <Database className="w-4 h-4" />
+                <Typography
+                  variant="span"
+                  className="text-xs text-white whitespace-nowrap"
+                >
+                  Banco de dados
                 </Typography>
               </Button>
               <Button

@@ -83,7 +83,8 @@ export const Dialog: React.FC<DialogProps> = ({
         {closeButton && (
           <Button
             variant="ghost"
-            className="absolute top-4 right-4 z-10 h-8 w-8 p-0 text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+            className="absolute top-4 right-4 z-10 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-500 !shadow-none !text-center"
+            textClassName="!justify-center"
             onClick={onClose}
           >
             <X size={16} />

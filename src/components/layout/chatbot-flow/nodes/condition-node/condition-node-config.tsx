@@ -638,7 +638,7 @@ function ConditionFormFields({
                 return (
                   <div
                     key={caseItem.id}
-                    className="border-2 border-neutral-200 rounded-lg bg-white"
+                    className="border border-neutral-200 rounded-lg bg-white"
                   >
                     {/* Header do Caso - Sempre visível */}
                     <div className="p-4 flex items-center justify-between">
@@ -650,15 +650,15 @@ function ConditionFormFields({
                           className="h-fit w-fit p-1 hover:bg-neutral-100"
                         >
                           {isExpanded ? (
-                            <ChevronDown className="w-5 h-5 text-neutral-600" />
+                            <ChevronDown className="w-5 h-5 text-neutral-400" />
                           ) : (
-                            <ChevronRight className="w-5 h-5 text-neutral-600" />
+                            <ChevronRight className="w-5 h-5 text-neutral-400" />
                           )}
                         </Button>
                         <div className="flex flex-col flex-1">
                           <Typography
                             variant="span"
-                            className="text-sm font-semibold text-neutral-800"
+                            className="text-sm text-neutral-700"
                           >
                             Caso {index + 1}
                           </Typography>

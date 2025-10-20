@@ -103,7 +103,7 @@ export const LoginForm = ({
         <Link
           href="/forget-password"
           target="_blank"
-          className="text-sm font-medium underline text-slate-600"
+          className="text-sm font-medium underline text-neutral-600"
         >
           Esqueceu a senha?
         </Link>

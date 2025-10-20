@@ -5,6 +5,7 @@ interface BaseButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   darkBgHexColor?: string;
   darkenFactor?: number;
   className?: string;
+  textClassName?: string;
   children?: React.ReactNode;
   icon?: { src: string; width: number; height: number; alt: string };
 }

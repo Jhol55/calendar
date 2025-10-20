@@ -159,7 +159,7 @@ export function FlowsListSidebar({
                 onClick={() => onSelectFlow(flow)}
                 className={`w-full text-left px-6 py-3 rounded-lg transition-all group hover:shadow-md ${
                   currentFlowId === flow.id
-                    ? 'bg-white border border-neutral-200 shadow-lg ring-1 ring-[#5c5e5d]'
+                    ? 'bg-white border border-neutral-200 shadow-lg ring-1 ring-[#47e897]'
                     : 'border bg-neutral-50 border-neutral-200'
                 }`}
               >
