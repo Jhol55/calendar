@@ -40,7 +40,7 @@ import {
   ConditionConfig,
   DatabaseConfig,
 } from '../../layout/chatbot-flow/types';
-import { Save, Download, Upload, Plus, Play } from 'lucide-react';
+import { Save, Download, Upload, Plus, Play, Table2 } from 'lucide-react';
 import {
   createFlow,
   updateFlow,
@@ -56,6 +56,7 @@ import { TransformationNodeConfig } from './nodes/transformation-node/transforma
 import { ConditionNodeConfig } from './nodes/condition-node/condition-node-config';
 import { DatabaseNodeConfig } from './nodes/database-node/database-node-config';
 import { ExecutionsPanel } from './executions-panel';
+import { DatabaseSpreadsheet } from '@/components/database-spreadsheet/database-spreadsheet';
 
 const nodeTypes = {
   end: EndNode,
@@ -92,6 +93,7 @@ function FlowEditorContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isExecutionsPanelOpen, setIsExecutionsPanelOpen] = useState(false);
+  const [isSpreadsheetOpen, setIsSpreadsheetOpen] = useState(false);
   const [copiedNode, setCopiedNode] = useState<Node<NodeData> | null>(null);
   const { user, workflows, setWorkflows } = useUser();
 
@@ -665,6 +667,17 @@ function FlowEditorContent() {
               <Button
                 variant="gradient"
                 className="w-full flex items-center justify-center gap-2"
+                bgHexColor="#10b981"
+                onClick={() => setIsSpreadsheetOpen(true)}
+              >
+                <Table2 className="w-4 h-4" />
+                <Typography variant="span" className="text-xs text-white">
+                  Planilha
+                </Typography>
+              </Button>
+              <Button
+                variant="gradient"
+                className="w-full flex items-center justify-center gap-2"
                 bgHexColor="#f047ee"
                 onClick={handleImport}
               >
@@ -679,6 +692,11 @@ function FlowEditorContent() {
       </div>
 
       <Sidebar onDragStart={onDragStart} />
+
+      <DatabaseSpreadsheet
+        isOpen={isSpreadsheetOpen}
+        onClose={() => setIsSpreadsheetOpen(false)}
+      />
 
       <MessageNodeConfig
         isOpen={configDialogOpen}
