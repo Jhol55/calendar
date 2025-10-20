@@ -584,7 +584,7 @@ export function DatabaseSpreadsheet({
               variant="h2"
               className="text-neutral-600 flex items-center gap-2"
             >
-              🗄️ Banco de Dados
+              📦 Banco de Dados
             </Typography>
             {hasUnsavedChanges && (
               <Badge className="bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-100">
@@ -595,7 +595,7 @@ export function DatabaseSpreadsheet({
 
           <div className="flex gap-4 flex-1 overflow-hidden">
             {/* Sidebar de tabelas */}
-            <div className="w-64 border rounded-lg border-neutral-200 flex flex-col gap-2 overflow-y-auto bg-neutral-100 p-4">
+            <div className="w-64 border rounded-lg border-neutral-200 flex flex-col gap-2 overflow-y-auto bg-neutral-50 p-4">
               <div className="flex items-center justify-between mb-2">
                 <Typography
                   variant="h4"
