@@ -1130,7 +1130,7 @@ function MessageFormFields({
                 {listCategories.map((category, catIndex) => (
                   <div
                     key={category.id}
-                    className="p-4 border-2 border-neutral-200 rounded-lg bg-white"
+                    className="p-4 border border-neutral-200 rounded-lg bg-white"
                   >
                     {/* Header da Categoria */}
                     <div className="flex items-center gap-2 mb-3">

@@ -474,7 +474,7 @@ function ConditionFormFields({
             {rules.map((rule, index) => (
               <div
                 key={rule.id}
-                className="p-4 border-2 border-neutral-200 rounded-lg bg-white space-y-3"
+                className="p-4 border border-neutral-200 rounded-lg bg-white space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <Typography

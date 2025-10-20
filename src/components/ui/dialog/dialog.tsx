@@ -75,7 +75,7 @@ export const Dialog: React.FC<DialogProps> = ({
       {/* Dialog Content */}
       <div
         className={cn(
-          'relative bg-neutral-50 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] h-screen overflow-hidden',
+          'relative bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] h-screen overflow-hidden',
           'animate-in fade-in-0 zoom-in-95 duration-300',
           contentClassName,
         )}

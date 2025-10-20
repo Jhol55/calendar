@@ -307,6 +307,103 @@ export async function addRow(
   }
 }
 
+export async function createTable(
+  tableName: string,
+  columns: Array<{
+    name: string;
+    type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+    default: unknown;
+    required: boolean;
+  }>,
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    // Validar nome da tabela
+    if (!tableName || !/^[a-zA-Z0-9_-]+$/.test(tableName)) {
+      return {
+        success: false,
+        message: 'Invalid table name. Use only letters, numbers, _ and -',
+        code: 400,
+      };
+    }
+
+    // Verificar se tabela já existe
+    const existingTable = await prisma.dataTable.findFirst({
+      where: {
+        userId,
+        tableName,
+      },
+    });
+
+    if (existingTable) {
+      return {
+        success: false,
+        message: 'Table already exists',
+        code: 400,
+      };
+    }
+
+    // Verificar limite de tabelas
+    const tableCount = await prisma.dataTable.count({
+      where: { userId },
+    });
+
+    if (tableCount >= DATABASE_NODE_CONFIG.MAX_TABLES_PER_USER) {
+      return {
+        success: false,
+        message: `Maximum number of tables reached (${DATABASE_NODE_CONFIG.MAX_TABLES_PER_USER})`,
+        code: 400,
+      };
+    }
+
+    // Criar schema da tabela
+    const schema = {
+      columns: columns.map((col) => ({
+        name: col.name,
+        type: col.type,
+        default: col.default,
+        required: col.required,
+      })),
+    };
+
+    // Criar tabela com partição inicial
+    await prisma.dataTable.create({
+      data: {
+        userId,
+        tableName,
+        partition: 0,
+        recordCount: 0,
+        isFull: false,
+        schema: schema as Prisma.InputJsonValue,
+        data: [] as Prisma.InputJsonValue,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Table created successfully',
+      data: { tableName, schema },
+    };
+  } catch (error) {
+    console.error('Error creating table:', error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : 'Failed to create table',
+      code: 500,
+    };
+  }
+}
+
 export async function deleteRow(
   tableName: string,
   rowId: string,

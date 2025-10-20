@@ -48,7 +48,7 @@ export const MemoryNode = memo(({ data }: NodeProps<NodeData>) => {
 
   return (
     <div
-      className={`px-4 py-3 shadow-lg rounded-lg border-2 ${style.borderColor} bg-white min-w-[200px] max-w-[300px]`}
+      className={`px-4 py-3 shadow-lg rounded-lg border ${style.borderColor} bg-white min-w-[200px] max-w-[300px]`}
     >
       <Handle type="target" position={Position.Left} />
 

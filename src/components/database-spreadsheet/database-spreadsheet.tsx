@@ -15,7 +15,9 @@ import {
   updateCell,
   addRow,
   deleteRow,
+  createTable,
 } from '@/actions/database/operations';
+import { CreateTableDialog } from './create-table-dialog';
 
 interface DatabaseSpreadsheetProps {
   isOpen: boolean;
@@ -83,6 +85,7 @@ export function DatabaseSpreadsheet({
     column: string;
     direction: 'asc' | 'desc';
   } | null>(null);
+  const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
 
   // Carregar tabelas disponíveis
   useEffect(() => {
@@ -396,6 +399,35 @@ export function DatabaseSpreadsheet({
     }));
   };
 
+  const handleCreateTable = async (
+    tableName: string,
+    columns: Array<{
+      name: string;
+      type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+      required: boolean;
+      default: string;
+    }>,
+  ) => {
+    try {
+      setLoading(true);
+      const response = await createTable(tableName, columns);
+      if (response.success) {
+        // Recarregar lista de tabelas
+        await loadAvailableTables();
+        // Selecionar a tabela recém-criada
+        setSelectedTable(tableName);
+      } else {
+        console.error('Erro ao criar tabela:', response.message);
+        alert(response.message || 'Erro ao criar tabela');
+      }
+    } catch (error) {
+      console.error('Erro ao criar tabela:', error);
+      alert('Erro ao criar tabela');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Dados filtrados e ordenados
   const filteredAndSortedData = React.useMemo(() => {
     let data = [...tableData];
@@ -564,13 +596,25 @@ export function DatabaseSpreadsheet({
           <div className="flex gap-4 flex-1 overflow-hidden">
             {/* Sidebar de tabelas */}
             <div className="w-64 border rounded-lg border-neutral-200 flex flex-col gap-2 overflow-y-auto bg-neutral-100 p-4">
-              <Typography
-                variant="h4"
-                className="text-sm font-semibold text-neutral-700"
-              >
-                Tabelas
-              </Typography>
-              <Typography variant="p" className="text-sm text-neutral-700">
+              <div className="flex items-center justify-between mb-2">
+                <Typography
+                  variant="h4"
+                  className="text-sm font-semibold text-neutral-700"
+                >
+                  Tabelas
+                </Typography>
+                <Button
+                  type="button"
+                  variant="gradient"
+                  onClick={() => setShowCreateTableDialog(true)}
+                  className="!p-1.5 !h-auto !w-auto"
+                  title="Criar nova tabela"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar
+                </Button>
+              </div>
+              <Typography variant="p" className="text-sm text-neutral-700 mb-2">
                 Selecione uma tabela para editar
               </Typography>
               {loading && availableTables.length === 0 ? (
@@ -634,7 +678,7 @@ export function DatabaseSpreadsheet({
                   className="gap-2 w-fit whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4" />
-                  Adicionar
+                  Adicionar Linha
                 </Button>
                 {selectedRows.length > 0 && (
                   <Button
@@ -945,6 +989,13 @@ export function DatabaseSpreadsheet({
           </div>
         </div>
       </Dialog>
+
+      {/* Modal de criação de tabela */}
+      <CreateTableDialog
+        isOpen={showCreateTableDialog}
+        onClose={() => setShowCreateTableDialog(false)}
+        onSubmit={handleCreateTable}
+      />
     </>
   );
 }
