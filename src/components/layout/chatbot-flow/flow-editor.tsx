@@ -761,6 +761,12 @@ function FlowEditorContent() {
         onSave={handleSaveMessageConfig}
         nodeId={nodeToConfig?.id}
         flowId={currentFlowId || undefined}
+        nodeLabel={nodeToConfig?.data.label}
+        onNodeLabelChange={(label) => {
+          if (nodeToConfig) {
+            handleNodeUpdate(nodeToConfig.id, { label });
+          }
+        }}
       />
 
       <WebhookNodeConfig

@@ -1,19 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Typography } from '@/components/ui/typography';
 import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 import { listExecutions } from '@/actions/executions';
 import { getFlow } from '@/actions/chatbot-flows/flows';
 import { cn } from '@/lib/utils';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type JsonValue = any;
+
+interface PreviousNodeOutput {
+  nodeId: string;
+  nodeLabel: string;
+  output: JsonValue;
+  customLabel?: string;
+}
+
 interface ExecutionData {
-  input?: any;
-  output?: any;
-  previousNodesOutputs?: Record<
-    string,
-    { nodeId: string; nodeLabel: string; output: any }
-  >;
+  input?: JsonValue;
+  output?: JsonValue;
+  previousNodesOutputs?: Record<string, PreviousNodeOutput>;
 }
 
 interface NodeExecutionPanelProps {
@@ -29,15 +36,17 @@ function PreviousNodeDropdown({
   nodeId,
   output,
   renderJsonTree,
+  customLabel,
 }: {
   nodeLabel: string;
   nodeId: string;
-  output: any;
+  output: JsonValue;
   renderJsonTree: (
-    obj: any,
+    obj: JsonValue,
     parentPath: string,
     level: number,
   ) => React.ReactNode;
+  customLabel?: string;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -59,8 +68,11 @@ function PreviousNodeDropdown({
         >
           {nodeLabel}
         </Typography>
-        <Typography variant="span" className="text-xs text-gray-400 font-mono">
-          ({nodeId.substring(0, 8)}...)
+        <Typography
+          variant="span"
+          className="text-xs text-gray-400 font-mono hidden"
+        >
+          ({customLabel || `${nodeId.substring(0, 8)}...`})
         </Typography>
       </button>
 
@@ -90,13 +102,13 @@ function JsonTreeItem({
   renderJsonTree,
 }: {
   itemKey: string;
-  value: any;
+  value: JsonValue;
   parentPath: string;
   level: number;
   copiedPath: string | null;
   onCopyPath: (path: string) => void;
   renderJsonTree: (
-    obj: any,
+    obj: JsonValue,
     parentPath: string,
     level: number,
   ) => React.ReactNode;
@@ -157,11 +169,7 @@ export function NodeExecutionPanel({
   const [loading, setLoading] = useState(true);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchExecutionData();
-  }, [nodeId, flowId]);
-
-  const fetchExecutionData = async () => {
+  const fetchExecutionData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -198,16 +206,20 @@ export function NodeExecutionPanel({
         const nodeData = nodeExecutions[nodeId];
 
         // Buscar o flow para obter edges e informações dos nodes
-        const previousNodesOutputs: Record<
-          string,
-          { nodeId: string; nodeLabel: string; output: any }
-        > = {};
+        const previousNodesOutputs: Record<string, PreviousNodeOutput> = {};
 
         try {
           const flowResult = await getFlow(flowId);
           if (flowResult.success && flowResult.flow) {
-            const edges = flowResult.flow.edges || [];
-            const nodes = flowResult.flow.nodes || [];
+            const edges = (flowResult.flow.edges || []) as Array<{
+              source: string;
+              target: string;
+            }>;
+            const nodes = (flowResult.flow.nodes || []) as Array<{
+              id: string;
+              type?: string;
+              data?: { label?: string };
+            }>;
 
             // Função recursiva para encontrar TODOS os nodes anteriores na cadeia
             const findAllPreviousNodes = (
@@ -221,8 +233,8 @@ export function NodeExecutionPanel({
 
               // Encontrar nodes diretamente conectados a este node
               const directPreviousNodeIds = edges
-                .filter((edge: any) => edge.target === currentNodeId)
-                .map((edge: any) => edge.source);
+                .filter((edge) => edge.target === currentNodeId)
+                .map((edge) => edge.source);
 
               // Recursivamente buscar os anteriores dos anteriores
               const allPreviousNodeIds: string[] = [];
@@ -244,7 +256,7 @@ export function NodeExecutionPanel({
             // Para cada node anterior, buscar sua saída
             allPreviousNodeIds.forEach((prevNodeId: string) => {
               const prevNodeExecution = nodeExecutions[prevNodeId];
-              const prevNode = nodes.find((n: any) => n.id === prevNodeId);
+              const prevNode = nodes.find((n) => n.id === prevNodeId);
 
               if (prevNodeExecution?.result) {
                 previousNodesOutputs[prevNodeId] = {
@@ -252,6 +264,7 @@ export function NodeExecutionPanel({
                   nodeLabel:
                     prevNode?.data?.label || prevNode?.type || prevNodeId,
                   output: prevNodeExecution.result,
+                  customLabel: prevNode?.data?.label, // Nome customizado do node
                 };
               }
             });
@@ -271,7 +284,11 @@ export function NodeExecutionPanel({
     } finally {
       setLoading(false);
     }
-  };
+  }, [nodeId, flowId]);
+
+  useEffect(() => {
+    fetchExecutionData();
+  }, [fetchExecutionData]);
 
   const handleCopyPath = (path: string) => {
     navigator.clipboard.writeText(`{{${path}}}`);
@@ -284,10 +301,10 @@ export function NodeExecutionPanel({
   };
 
   const renderJsonTree = (
-    obj: any,
+    obj: JsonValue,
     parentPath: string = '$node.input',
     level: number = 0,
-  ) => {
+  ): React.ReactNode => {
     if (obj === null || obj === undefined) {
       return <div className="ml-4 text-gray-500 text-sm">null</div>;
     }
@@ -381,6 +398,7 @@ export function NodeExecutionPanel({
                     nodeId={prevNode.nodeId}
                     output={prevNode.output}
                     renderJsonTree={renderJsonTree}
+                    customLabel={prevNode.customLabel}
                   />
                 ),
               )}

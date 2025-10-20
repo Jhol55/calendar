@@ -32,6 +32,8 @@ interface MessageNodeConfigProps {
   onSave: (config: MessageConfig) => void;
   nodeId?: string;
   flowId?: string;
+  nodeLabel?: string;
+  onNodeLabelChange?: (label: string) => void;
 }
 
 const messageTypes: { value: MessageType; label: string }[] = [
@@ -2220,6 +2222,8 @@ export function MessageNodeConfig({
   onSave,
   nodeId,
   flowId,
+  nodeLabel,
+  onNodeLabelChange,
 }: MessageNodeConfigProps) {
   const { instances } = useUser();
 
@@ -2323,6 +2327,8 @@ export function MessageNodeConfig({
       title="⚙️ Configurar Mensagem"
       nodeId={nodeId}
       flowId={flowId}
+      nodeLabel={nodeLabel}
+      onNodeLabelChange={onNodeLabelChange}
     >
       <Form
         className="flex flex-col gap-4"
