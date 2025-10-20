@@ -669,24 +669,26 @@ export function DatabaseSpreadsheet({
             {/* Conteúdo principal */}
             <div className="flex-1 flex flex-col gap-4 overflow-hidden">
               <div className="flex items-end justify-between gap-4">
-                <div className="flex items-center gap-6 border p-2 rounded-lg bg-neutral-50 shadow-md">
-                  <div>
-                    <Typography
-                      variant="span"
-                      className="text-sm text-neutral-700"
-                    >
-                      Tabela
-                    </Typography>
-                    <Typography variant="h2" className="text-neutral-600">
-                      {selectedTable}
-                    </Typography>
+                {selectedTable && (
+                  <div className="flex items-center gap-6 border p-2 rounded-lg bg-neutral-50 shadow-md">
+                    <div>
+                      <Typography
+                        variant="span"
+                        className="text-sm text-neutral-700"
+                      >
+                        Tabela
+                      </Typography>
+                      <Typography variant="h2" className="text-neutral-600">
+                        {selectedTable}
+                      </Typography>
+                    </div>
+                    {hasUnsavedChanges && (
+                      <Badge className="bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-100">
+                        Alterações não salvas
+                      </Badge>
+                    )}
                   </div>
-                  {hasUnsavedChanges && (
-                    <Badge className="bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-100">
-                      Alterações não salvas
-                    </Badge>
-                  )}
-                </div>
+                )}
                 <div className="flex gap-4 items-center justify-end">
                   {hasUnsavedChanges && (
                     <Button
@@ -701,40 +703,45 @@ export function DatabaseSpreadsheet({
                       Salvar Alterações
                     </Button>
                   )}
-                  <Button
-                    type="button"
-                    onClick={loadTableData}
-                    variant="gradient"
-                    bgHexColor="#65b8f4"
-                    disabled={!selectedTable || loading}
-                    className="gap-2 w-fit whitespace-nowrap"
-                  >
-                    <RefreshCw
-                      className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
-                    />
-                    Atualizar
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleAddRow}
-                    variant="gradient"
-                    disabled={!selectedTable || !tableSchema}
-                    className="gap-2 w-fit whitespace-nowrap"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Adicionar Linha
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setShowAddColumnDialog(true)}
-                    variant="gradient"
-                    bgHexColor="#8b5cf6"
-                    disabled={!selectedTable}
-                    className="gap-2 w-fit whitespace-nowrap"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Adicionar Coluna
-                  </Button>
+                  {selectedTable && (
+                    <Button
+                      type="button"
+                      onClick={loadTableData}
+                      variant="gradient"
+                      bgHexColor="#65b8f4"
+                      disabled={loading}
+                      className="gap-2 w-fit whitespace-nowrap"
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+                      />
+                      Atualizar
+                    </Button>
+                  )}
+                  {selectedTable && (
+                    <Button
+                      type="button"
+                      onClick={handleAddRow}
+                      variant="gradient"
+                      disabled={!tableSchema}
+                      className="gap-2 w-fit whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Adicionar Linha
+                    </Button>
+                  )}
+                  {selectedTable && (
+                    <Button
+                      type="button"
+                      onClick={() => setShowAddColumnDialog(true)}
+                      variant="gradient"
+                      bgHexColor="#8b5cf6"
+                      className="gap-2 w-fit whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Adicionar Coluna
+                    </Button>
+                  )}
                   {selectedRows.length > 0 && (
                     <Button
                       type="button"
