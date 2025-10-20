@@ -2208,7 +2208,10 @@ function MessageFormFields({
         setValue={setValue}
       />
 
-      <SubmitButton variant="gradient" className="mt-4">
+      <SubmitButton
+        variant="gradient"
+        className="absolute top-2 right-12 w-fit mt-4"
+      >
         Salvar Configuração
       </SubmitButton>
     </>

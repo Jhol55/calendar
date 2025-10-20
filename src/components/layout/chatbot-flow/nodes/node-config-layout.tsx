@@ -5,7 +5,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Typography } from '@/components/ui/typography';
 import { NodeExecutionPanel } from '../node-execution-panel';
 import { cn } from '@/lib/utils';
-import { Pencil, Check, X } from 'lucide-react';
+import { Pencil, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface NodeConfigLayoutProps {
   isOpen: boolean;
@@ -28,7 +28,8 @@ export function NodeConfigLayout({
   nodeLabel,
   onNodeLabelChange,
 }: NodeConfigLayoutProps) {
-  const [showExecutionPanel, setShowExecutionPanel] = useState(true);
+  const [showLeftPanel, setShowLeftPanel] = useState(true);
+  const [showRightPanel, setShowRightPanel] = useState(true);
   const [localLabel, setLocalLabel] = useState(nodeLabel || '');
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [tempLabel, setTempLabel] = useState(nodeLabel || '');
@@ -54,14 +55,23 @@ export function NodeConfigLayout({
       isOpen={isOpen}
       onClose={onClose}
       contentClassName={cn(
-        showExecutionPanel && '!max-w-[95vw]',
-        'overflow-hidden max-w-[40vw]',
+        showLeftPanel && showRightPanel && '!max-w-[95vw]',
+        showLeftPanel && !showRightPanel && '!max-w-[80vw]',
+        !showLeftPanel && showRightPanel && '!max-w-[80vw]',
+        'overflow-hidden max-w-[50vw]',
       )}
     >
       <div className="flex h-screen w-full" style={{ zoom: 0.9 }}>
         {/* Painel de Entrada (Esquerda) */}
-        {showExecutionPanel && nodeId && flowId && (
-          <div className="w-1/4 h-screen border-r bg-gray-50 flex flex-col">
+        {showLeftPanel && nodeId && flowId && (
+          <div
+            className={cn(
+              'h-screen border-r bg-gray-50 flex flex-col',
+              showLeftPanel && showRightPanel && '!w-1/4',
+              showLeftPanel && !showRightPanel && '!w-2/4',
+              !showLeftPanel && showRightPanel && '!w-2/4',
+            )}
+          >
             <div className="p-4 border-b bg-white">
               <Typography variant="h3" className="font-semibold">
                 📥 Entrada
@@ -87,11 +97,13 @@ export function NodeConfigLayout({
         <div
           className={cn(
             'flex flex-col bg-white w-full',
-            showExecutionPanel && '!w-2/4',
+            showLeftPanel && showRightPanel && '!w-2/4',
+            showLeftPanel && !showRightPanel && '!w-3/4',
+            !showLeftPanel && showRightPanel && '!w-3/4',
           )}
         >
-          <div className="p-6 flex flex-col h-full">
-            <div className="flex items-center justify-between mb-6 gap-3">
+          <div className="p-6 flex flex-col h-full relative">
+            <div className="flex items-center justify-between mb-6 gap-3 ml-4">
               {/* Título com nome editável */}
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <Typography variant="h2" className="whitespace-nowrap hidden">
@@ -150,12 +162,28 @@ export function NodeConfigLayout({
               </div>
 
               {nodeId && flowId && (
-                <button
-                  onClick={() => setShowExecutionPanel(!showExecutionPanel)}
-                  className="text-sm text-neutral-600 hover:text-neutral-800 font-medium whitespace-nowrap flex-shrink-0"
-                >
-                  {showExecutionPanel ? 'Ocultar Painéis' : 'Mostrar Painéis'}
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowLeftPanel(!showLeftPanel)}
+                    className="absolute shadow-md rounded-tr-md rounded-br-md z-50 bg-neutral-100 border border-neutral-300 border-l-0 p-1 top-7 left-0 text-sm text-neutral-600 hover:text-neutral-800 font-medium whitespace-nowrap flex-shrink-0"
+                  >
+                    {showLeftPanel ? (
+                      <ChevronRight className="h-4 w-4" />
+                    ) : (
+                      <ChevronLeft className="h-4 w-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setShowRightPanel(!showRightPanel)}
+                    className="absolute shadow-md rounded-tl-md rounded-bl-md z-50 bg-neutral-100 border border-neutral-300 border-r-0 p-1 top-7 right-0 text-sm text-neutral-600 hover:text-neutral-800 font-medium whitespace-nowrap flex-shrink-0"
+                  >
+                    {showRightPanel ? (
+                      <ChevronLeft className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                  </button>
+                </>
               )}
             </div>
 
@@ -167,8 +195,15 @@ export function NodeConfigLayout({
         </div>
 
         {/* Painel de Saída (Direita) */}
-        {showExecutionPanel && nodeId && flowId && (
-          <div className="w-1/4 h-screen border-l bg-gray-50 flex flex-col">
+        {showRightPanel && nodeId && flowId && (
+          <div
+            className={cn(
+              'h-screen border-l bg-gray-50 flex flex-col',
+              showLeftPanel && showRightPanel && '!w-1/4',
+              showLeftPanel && !showRightPanel && '!w-2/4',
+              !showLeftPanel && showRightPanel && '!w-2/4',
+            )}
+          >
             <div className="p-4 border-b bg-white">
               <Typography variant="h3" className="font-semibold">
                 📤 Saída

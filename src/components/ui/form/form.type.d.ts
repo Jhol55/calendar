@@ -15,4 +15,5 @@ export interface FormProps
   maskSchema?:
     | Record<string, (e: React.ChangeEvent<HTMLInputElement>) => void>
     | undefined;
+  className?: string;
 }

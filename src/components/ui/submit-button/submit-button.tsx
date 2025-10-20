@@ -24,7 +24,12 @@ const SubmitButton = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
 
     return (
       <Button ref={ref} type={type} {...props}>
-        <div className="flex justify-center items-center transition-all duration-300">
+        <div
+          className={cn(
+            'flex justify-center items-center gap-1 transition-all duration-300',
+            useLoading && 'pr-4',
+          )}
+        >
           <Loader2
             className={cn(
               useLoading && isLoading

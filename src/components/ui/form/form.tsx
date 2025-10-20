@@ -15,6 +15,7 @@ export const Form = forwardRef<HTMLFormElement, FormProps>(
       children,
       zodSchema,
       maskSchema,
+      className,
       autoComplete = 'on',
       ...props
     },
@@ -64,6 +65,7 @@ export const Form = forwardRef<HTMLFormElement, FormProps>(
             await new Promise((resolve) => setTimeout(resolve, 2000));
             onSubmit?.(form, setError);
           })}
+          className={className}
           autoComplete={autoComplete}
           {...props}
         >

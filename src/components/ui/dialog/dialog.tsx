@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
@@ -29,6 +29,25 @@ export const Dialog: React.FC<DialogProps> = ({
   closeOnOverlayClick = true,
   closeOnEscape = true,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [buttonPosition, setButtonPosition] = useState({ top: 0, right: 0 });
+  const [isPositionCalculated, setIsPositionCalculated] = useState(false);
+
+  // Calcular posição do botão
+  const updateButtonPosition = () => {
+    if (dialogRef.current) {
+      const rect = dialogRef.current.getBoundingClientRect();
+      const offset = 14; // 16px de distância da borda
+
+      // Calcular posição baseada no canto superior direito do conteúdo do dialog
+      setButtonPosition({
+        top: rect.top - offset, // 16px acima do topo do dialog
+        right: (window.innerWidth - rect.right) / 0.9 - offset, // 16px à direita do dialog
+      });
+      setIsPositionCalculated(true);
+    }
+  };
+
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && closeOnEscape) {
@@ -36,15 +55,63 @@ export const Dialog: React.FC<DialogProps> = ({
       }
     };
 
+    let resizeObserver: ResizeObserver | null = null;
+    let mutationObserver: MutationObserver | null = null;
+
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
-    }
 
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
-    };
+      // Calcular posição inicial
+      updateButtonPosition();
+
+      // ResizeObserver para mudanças de tamanho em tempo real
+      if (dialogRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          requestAnimationFrame(() => {
+            updateButtonPosition();
+          });
+        });
+        resizeObserver.observe(dialogRef.current);
+      }
+
+      // MutationObserver para mudanças de classes CSS
+      if (dialogRef.current) {
+        mutationObserver = new MutationObserver(() => {
+          requestAnimationFrame(() => {
+            updateButtonPosition();
+          });
+        });
+        mutationObserver.observe(dialogRef.current, {
+          attributes: true,
+          attributeFilter: ['class', 'style'],
+          subtree: true,
+        });
+      }
+
+      // Fallback para redimensionamento da janela
+      const handleResize = () => {
+        requestAnimationFrame(() => {
+          updateButtonPosition();
+        });
+      };
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.body.style.overflow = 'unset';
+        window.removeEventListener('resize', handleResize);
+
+        if (resizeObserver) {
+          resizeObserver.disconnect();
+        }
+        if (mutationObserver) {
+          mutationObserver.disconnect();
+        }
+      };
+    } else {
+      setIsPositionCalculated(false);
+    }
   }, [isOpen, onClose, closeOnEscape]);
 
   const handleOverlayClick = (event: React.MouseEvent) => {
@@ -73,25 +140,39 @@ export const Dialog: React.FC<DialogProps> = ({
       />
 
       {/* Dialog Content */}
-      <div
-        className={cn(
-          'relative bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] h-screen overflow-hidden',
-          'animate-in fade-in-0 zoom-in-95 duration-300',
-          contentClassName,
-        )}
-      >
-        {closeButton && (
+      <div className="flex justify-center w-full relative">
+        <div
+          ref={dialogRef}
+          className={cn(
+            'bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] h-screen overflow-hidden',
+            'animate-in fade-in-0 zoom-in-95 duration-300',
+            contentClassName,
+          )}
+        >
+          {children}
+        </div>
+
+        {/* Botão de fechar posicionado dinamicamente */}
+        {closeButton && isPositionCalculated && (
           <Button
             variant="ghost"
-            className="absolute top-4 right-4 z-10 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-500 !shadow-none !text-center"
+            className="fixed z-50 h-8 w-8 p-0 text-neutral-400 hover:text-neutral-500 bg-neutral-100 border border-neutral-300 hover:border-neutral-300 rounded-full shadow-md hover:shadow-lg"
             textClassName="!justify-center"
             onClick={onClose}
+            style={{
+              top: `${buttonPosition.top}px`,
+              right: `${buttonPosition.right}px`,
+              transition: 'none', // Remove transição para movimento instantâneo
+            }}
           >
-            <X size={16} />
+            <div className="relative flex items-center justify-center w-full h-full">
+              <X
+                size={18}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+              />
+            </div>
           </Button>
         )}
-
-        {children}
       </div>
     </div>
   );
