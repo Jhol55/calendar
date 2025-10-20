@@ -4,9 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
-import { Form } from '@/components/ui/form';
 import { Plus, Trash2, RefreshCw, Save } from 'lucide-react';
-import { z } from 'zod';
 import { Badge } from '@/components/ui/badge';
 import { ColumnFilter, type FilterCondition } from './column-filter';
 import {
@@ -16,17 +14,15 @@ import {
   addRow,
   deleteRow,
   createTable,
+  addColumnsToTable,
 } from '@/actions/database/operations';
-import { CreateTableDialog } from './create-table-dialog';
+import { CreateTableDialog } from '../../features/forms/database-spreadsheet/create-database-table/create-database-table';
+import { AddColumnDialog } from '../../features/forms/database-spreadsheet/add-table-column/add-table-column';
 
 interface DatabaseSpreadsheetProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const spreadsheetSchema = z.object({
-  selectedTable: z.string().optional(),
-});
 
 interface TableData {
   _id: string;
@@ -86,6 +82,7 @@ export function DatabaseSpreadsheet({
     direction: 'asc' | 'desc';
   } | null>(null);
   const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
+  const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
 
   // Carregar tabelas disponíveis
   useEffect(() => {
@@ -439,6 +436,33 @@ export function DatabaseSpreadsheet({
     }
   };
 
+  const handleAddColumns = async (
+    columns: Array<{
+      name: string;
+      type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+      required: boolean;
+      default: string;
+    }>,
+  ) => {
+    try {
+      setLoading(true);
+      const response = await addColumnsToTable(selectedTable, columns);
+      if (response.success) {
+        // Recarregar dados da tabela para mostrar as novas colunas
+        await loadTableData();
+        setShowAddColumnDialog(false);
+      } else {
+        console.error('Erro ao adicionar colunas:', response.message);
+        alert(response.message || 'Erro ao adicionar colunas');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar colunas:', error);
+      alert('Erro ao adicionar colunas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Dados filtrados e ordenados
   const filteredAndSortedData = React.useMemo(() => {
     let data = [...tableData];
@@ -572,10 +596,6 @@ export function DatabaseSpreadsheet({
 
   if (!isOpen) return null;
 
-  const handleFormSubmit = () => {
-    // Form não precisa submeter, apenas mantém o contexto
-  };
-
   return (
     <>
       <Dialog
@@ -584,11 +604,9 @@ export function DatabaseSpreadsheet({
         closeButton={true}
         contentClassName="max-w-[100vw] max-h-[100vh] w-[100vw] h-[100vh] overflow-hidden flex flex-col p-6"
       >
-        <Form
+        <div
           className="flex flex-col gap-4 flex-1 overflow-hidden"
           style={{ zoom: 0.9 }}
-          zodSchema={spreadsheetSchema}
-          onSubmit={handleFormSubmit}
         >
           <div className="flex items-center gap-3">
             <Typography
@@ -597,11 +615,6 @@ export function DatabaseSpreadsheet({
             >
               📦 Banco de Dados
             </Typography>
-            {hasUnsavedChanges && (
-              <Badge className="bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-100">
-                Alterações não salvas
-              </Badge>
-            )}
           </div>
 
           <div className="flex gap-4 flex-1 overflow-hidden">
@@ -610,7 +623,7 @@ export function DatabaseSpreadsheet({
               <div className="flex items-center justify-between mb-2">
                 <Typography
                   variant="h4"
-                  className="text-sm font-semibold text-neutral-700"
+                  className="text-md font-semibold text-neutral-700"
                 >
                   Tabelas
                 </Typography>
@@ -640,11 +653,12 @@ export function DatabaseSpreadsheet({
                     key={table}
                     variant="ghost"
                     onClick={() => setSelectedTable(table)}
-                    className={`!text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    className={`px-3 !py-1 rounded-md text-sm transition-colors ${
                       selectedTable === table
-                        ? 'bg-neutral-300 text-white font-medium'
-                        : 'bg-white text-neutral-700 hover:bg-neutral-200 border border-neutral-200'
+                        ? 'bg-white text-neutral-700 font-semibold border border-neutral-300 shadow-md ring-1 ring-[#47e897]'
+                        : 'bg-white text-neutral-700 hover:bg-neutral-200/50 font-medium border border-neutral-200'
                     }`}
+                    textClassName="justify-start"
                   >
                     {table}
                   </Button>
@@ -654,60 +668,91 @@ export function DatabaseSpreadsheet({
 
             {/* Conteúdo principal */}
             <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-              <div className="flex gap-4 items-center justify-end">
-                {hasUnsavedChanges && (
+              <div className="flex items-end justify-between gap-4">
+                <div className="flex items-center gap-6 border p-2 rounded-lg bg-neutral-50 shadow-md">
+                  <div>
+                    <Typography
+                      variant="span"
+                      className="text-sm text-neutral-700"
+                    >
+                      Tabela
+                    </Typography>
+                    <Typography variant="h2" className="text-neutral-600">
+                      {selectedTable}
+                    </Typography>
+                  </div>
+                  {hasUnsavedChanges && (
+                    <Badge className="bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-100">
+                      Alterações não salvas
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex gap-4 items-center justify-end">
+                  {hasUnsavedChanges && (
+                    <Button
+                      type="button"
+                      onClick={handleSaveChanges}
+                      variant="gradient"
+                      bgHexColor="#70f051"
+                      disabled={loading}
+                      className="gap-2 w-fit whitespace-nowrap"
+                    >
+                      <Save className="w-4 h-4" />
+                      Salvar Alterações
+                    </Button>
+                  )}
                   <Button
                     type="button"
-                    onClick={handleSaveChanges}
+                    onClick={loadTableData}
                     variant="gradient"
-                    bgHexColor="#70f051"
-                    disabled={loading}
+                    bgHexColor="#65b8f4"
+                    disabled={!selectedTable || loading}
                     className="gap-2 w-fit whitespace-nowrap"
                   >
-                    <Save className="w-4 h-4" />
-                    Salvar Alterações
+                    <RefreshCw
+                      className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+                    />
+                    Atualizar
                   </Button>
-                )}
-                <Button
-                  type="button"
-                  onClick={loadTableData}
-                  variant="gradient"
-                  bgHexColor="#65b8f4"
-                  disabled={!selectedTable || loading}
-                  className="gap-2 w-fit whitespace-nowrap"
-                >
-                  <RefreshCw
-                    className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
-                  />
-                  Atualizar
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleAddRow}
-                  variant="gradient"
-                  disabled={!selectedTable || !tableSchema}
-                  className="gap-2 w-fit whitespace-nowrap"
-                >
-                  <Plus className="w-4 h-4" />
-                  Adicionar Linha
-                </Button>
-                {selectedRows.length > 0 && (
                   <Button
                     type="button"
-                    onClick={handleDeleteSelectedRows}
+                    onClick={handleAddRow}
                     variant="gradient"
-                    bgHexColor="#ef4444"
-                    className="gap-2 w-fit"
+                    disabled={!selectedTable || !tableSchema}
+                    className="gap-2 w-fit whitespace-nowrap"
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Deletar {selectedRows.length}{' '}
-                    {selectedRows.length === 1 ? 'linha' : 'linhas'}
+                    <Plus className="w-4 h-4" />
+                    Adicionar Linha
                   </Button>
-                )}
+                  <Button
+                    type="button"
+                    onClick={() => setShowAddColumnDialog(true)}
+                    variant="gradient"
+                    bgHexColor="#8b5cf6"
+                    disabled={!selectedTable}
+                    className="gap-2 w-fit whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Adicionar Coluna
+                  </Button>
+                  {selectedRows.length > 0 && (
+                    <Button
+                      type="button"
+                      onClick={handleDeleteSelectedRows}
+                      variant="gradient"
+                      bgHexColor="#ef4444"
+                      className="gap-2 w-fit whitespace-nowrap"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Deletar {selectedRows.length}{' '}
+                      {selectedRows.length === 1 ? 'linha' : 'linhas'}
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {selectedTable && (
-                <div className="text-sm text-neutral-600 bg-gray-50 p-3 rounded-lg border border-neutral-200">
+                <div className="text-sm text-neutral-600 bg-neutral-50 p-3 rounded-lg border border-neutral-200">
                   <Typography variant="span" className="text-sm">
                     💡 <strong>Dica:</strong> Duplo clique para editar célula.
                     Use{' '}
@@ -957,7 +1002,7 @@ export function DatabaseSpreadsheet({
               )}
             </div>
           </div>
-        </Form>
+        </div>
       </Dialog>
 
       {/* Modal de aviso de mudanças não salvas */}
@@ -973,7 +1018,7 @@ export function DatabaseSpreadsheet({
               variant="h3"
               className="text-xl font-bold text-neutral-800"
             >
-              ⚠️ Mudanças não salvas
+              ⚠️ Alterações não salvas
             </Typography>
             <Typography variant="p" className="text-neutral-600">
               Você tem alterações não salvas na tabela. Se você fechar agora,
@@ -1008,6 +1053,14 @@ export function DatabaseSpreadsheet({
         isOpen={showCreateTableDialog}
         onClose={() => setShowCreateTableDialog(false)}
         onSubmit={handleCreateTable}
+      />
+
+      {/* Modal de adição de colunas */}
+      <AddColumnDialog
+        isOpen={showAddColumnDialog}
+        onClose={() => setShowAddColumnDialog(false)}
+        onSubmit={handleAddColumns}
+        tableName={selectedTable}
       />
     </>
   );

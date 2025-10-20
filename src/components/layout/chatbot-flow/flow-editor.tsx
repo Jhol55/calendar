@@ -56,7 +56,7 @@ import { TransformationNodeConfig } from './nodes/transformation-node/transforma
 import { ConditionNodeConfig } from './nodes/condition-node/condition-node-config';
 import { DatabaseNodeConfig } from './nodes/database-node/database-node-config';
 import { ExecutionsPanel } from './executions-panel';
-import { DatabaseSpreadsheet } from '@/components/database-spreadsheet/database-spreadsheet';
+import { DatabaseSpreadsheet } from '@/components/layout/database-spreadsheet/database-spreadsheet';
 
 const nodeTypes = {
   end: EndNode,

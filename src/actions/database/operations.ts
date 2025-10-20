@@ -477,3 +477,99 @@ export async function deleteRow(
     };
   }
 }
+
+export async function addColumnsToTable(
+  tableName: string,
+  columns: Array<{
+    name: string;
+    type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+    required: boolean;
+    default: string;
+  }>,
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    // Buscar a tabela existente
+    const existingTable = await prisma.dataTable.findFirst({
+      where: {
+        tableName: tableName,
+        userId,
+      },
+    });
+
+    if (!existingTable) {
+      return {
+        success: false,
+        message: 'Tabela não encontrada',
+        code: 404,
+      };
+    }
+
+    // Obter schema atual
+    const currentSchema = existingTable.schema as {
+      columns: Array<{
+        name: string;
+        type: string;
+        default: unknown;
+        required: boolean;
+      }>;
+    };
+
+    // Verificar se alguma coluna já existe
+    const existingColumnNames = currentSchema.columns.map((col) => col.name);
+    const duplicateColumns = columns.filter((col) =>
+      existingColumnNames.includes(col.name),
+    );
+
+    if (duplicateColumns.length > 0) {
+      return {
+        success: false,
+        message: `Colunas já existem: ${duplicateColumns.map((col) => col.name).join(', ')}`,
+        code: 409,
+      };
+    }
+
+    // Adicionar novas colunas ao schema
+    const newColumns = columns.map((col) => ({
+      name: col.name,
+      type: col.type,
+      default: col.default,
+      required: col.required,
+    }));
+
+    const updatedSchema = {
+      columns: [...currentSchema.columns, ...newColumns],
+    };
+
+    // Atualizar a tabela com o novo schema
+    const updatedTable = await prisma.dataTable.update({
+      where: {
+        id: existingTable.id,
+      },
+      data: {
+        schema: updatedSchema as Prisma.InputJsonValue,
+      },
+    });
+
+    return {
+      success: true,
+      data: updatedTable,
+    };
+  } catch (error) {
+    console.error('Error adding columns to table:', error);
+    return {
+      success: false,
+      message: 'Erro interno do servidor',
+      code: 500,
+    };
+  }
+}
