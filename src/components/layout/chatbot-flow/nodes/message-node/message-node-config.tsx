@@ -22,7 +22,7 @@ import { InstanceProps } from '@/contexts/user/user-context.type';
 import { FormSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { NodeConfigLayout } from '../node-config-layout';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { MemoryConfigSection } from '../memory-config-section';
 
 interface MessageNodeConfigProps {
@@ -101,6 +101,24 @@ function MessageFormFields({
       buttons: [{ id: '', text: '', description: '', actionType: undefined }],
     },
   ]);
+
+  // Estado para controlar quais categorias estão expandidas
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Função para alternar expansão de uma categoria
+  const toggleCategoryExpansion = (categoryId: string) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1127,163 +1145,215 @@ function MessageFormFields({
             {/* UI Hierárquica para tipo LIST */}
             {interactiveMenuType === 'list' ? (
               <div className="space-y-4 mt-2">
-                {listCategories.map((category, catIndex) => (
-                  <div
-                    key={category.id}
-                    className="p-4 border border-neutral-200 rounded-lg bg-white"
-                  >
-                    {/* Header da Categoria */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex flex-1 flex-col">
-                        <div className="flex items-center justify-between gap-2 relative">
-                          <FormControl variant="label" className="mb-2">
-                            <Typography
-                              variant="span"
-                              className="font-semibold"
-                            >
-                              Categoria {catIndex + 1}{' '}
-                              {/* {catIndex + 1 === 1 && (
-                                <Typography
-                                  variant="span"
-                                  className="text-sm text-neutral-600 mt-1 whitespace-nowrap"
-                                >
-                                  (Deixe vazio para não criar seção)
-                                </Typography>
-                              )} */}
-                            </Typography>
-                          </FormControl>
-                          {listCategories?.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              onClick={() => removeCategory(category.id)}
-                              disabled={listCategories.length === 1}
-                              className="absolute right-0 -top-3 text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-fit w-fit"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                        <Input
-                          type="text"
-                          fieldName={`category_name_${category.id}`}
-                          value={category.name}
-                          onChange={(e) =>
-                            updateCategoryName(category.id, e.target.value)
-                          }
-                          placeholder="Ex: Eletrônicos, Acessórios, etc (opcional)"
-                        />
-                      </div>
-                    </div>
+                {listCategories.map((category, catIndex) => {
+                  const isExpanded = expandedCategories.has(category.id);
 
-                    {/* Itens da Categoria */}
-                    <div className="space-y-2 ml-4 pl-4 border-l-2 border-neutral-300">
-                      {category.items.map((item, itemIndex) => (
-                        <div
-                          key={itemIndex}
-                          className="p-3 border border-gray-300 rounded-lg bg-white space-y-2"
-                        >
-                          <div className="flex items-center justify-between mb-2">
+                  return (
+                    <div
+                      key={category.id}
+                      className="border border-neutral-200 rounded-lg bg-white"
+                    >
+                      {/* Header da Categoria - Sempre visível */}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => toggleCategoryExpansion(category.id)}
+                            className="h-fit w-fit p-1 hover:bg-neutral-100"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-5 h-5 text-neutral-400" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5 text-neutral-400" />
+                            )}
+                          </Button>
+                          <div className="flex flex-col flex-1">
                             <Typography
                               variant="span"
-                              className="text-sm font-semibold text-neutral-600"
+                              className="text-sm text-neutral-700"
                             >
-                              Opção {itemIndex + 1}
+                              Categoria {catIndex + 1}
                             </Typography>
-                            {choices?.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() =>
-                                  removeItemFromCategory(category.id, itemIndex)
-                                }
-                                disabled={category.items.length === 1}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                            {category.name && (
+                              <Typography
+                                variant="span"
+                                className="text-xs text-neutral-500"
                               >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                                {category.name}
+                              </Typography>
                             )}
                           </div>
+                        </div>
+                        {listCategories?.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => removeCategory(category.id)}
+                            disabled={listCategories.length === 1}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-fit w-fit"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
 
+                      {/* Conteúdo da Categoria - Colapsável */}
+                      {isExpanded && (
+                        <div className="px-4 pb-4 space-y-3 border-t border-neutral-200 pt-4">
+                          {/* Nome da Categoria */}
                           <div>
                             <FormControl variant="label">
                               <Typography variant="span" className="text-sm">
-                                Texto *
+                                Nome da Categoria{' '}
+                                <Typography
+                                  variant="span"
+                                  className="text-xs text-gray-500 font-normal"
+                                >
+                                  (opcional)
+                                </Typography>
                               </Typography>
                             </FormControl>
                             <Input
                               type="text"
-                              fieldName={`category_${category.id}_item_text_${itemIndex}`}
-                              value={item.text}
+                              fieldName={`category_name_${category.id}`}
+                              value={category.name}
                               onChange={(e) =>
-                                updateCategoryItem(
-                                  category.id,
-                                  itemIndex,
-                                  'text',
-                                  e.target.value,
-                                )
+                                updateCategoryName(category.id, e.target.value)
                               }
-                              placeholder="Ex: Smartphones"
+                              placeholder="Ex: Eletrônicos, Acessórios, etc"
                             />
                           </div>
 
-                          <div>
-                            <FormControl variant="label">
-                              <Typography variant="span" className="text-SM">
-                                ID
-                              </Typography>
-                            </FormControl>
-                            <Input
-                              type="text"
-                              fieldName={`category_${category.id}_item_id_${itemIndex}`}
-                              value={item.id}
-                              onChange={(e) =>
-                                updateCategoryItem(
-                                  category.id,
-                                  itemIndex,
-                                  'id',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Ex: phones"
-                            />
-                          </div>
+                          {/* Itens da Categoria */}
+                          <div className="space-y-2 ml-4 pl-4 border-l-2 border-neutral-300">
+                            <Typography
+                              variant="span"
+                              className="text-sm font-medium text-gray-700"
+                            >
+                              Opções da categoria:
+                            </Typography>
+                            {category.items.map((item, itemIndex) => (
+                              <div
+                                key={itemIndex}
+                                className="p-3 border border-gray-300 rounded-lg bg-white space-y-2"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <Typography
+                                    variant="span"
+                                    className="text-sm font-semibold text-neutral-600"
+                                  >
+                                    Opção {itemIndex + 1}
+                                  </Typography>
+                                  {category.items.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        removeItemFromCategory(
+                                          category.id,
+                                          itemIndex,
+                                        )
+                                      }
+                                      disabled={category.items.length === 1}
+                                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
 
-                          <div>
-                            <FormControl variant="label">
-                              <Typography variant="span" className="text-sm">
-                                Descrição
-                              </Typography>
-                            </FormControl>
-                            <Input
-                              type="text"
-                              fieldName={`category_${category.id}_item_desc_${itemIndex}`}
-                              value={item.description}
-                              onChange={(e) =>
-                                updateCategoryItem(
-                                  category.id,
-                                  itemIndex,
-                                  'description',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Ex: Últimos lançamentos"
-                            />
+                                <div>
+                                  <FormControl variant="label">
+                                    <Typography
+                                      variant="span"
+                                      className="text-sm"
+                                    >
+                                      Texto *
+                                    </Typography>
+                                  </FormControl>
+                                  <Input
+                                    type="text"
+                                    fieldName={`category_${category.id}_item_text_${itemIndex}`}
+                                    value={item.text}
+                                    onChange={(e) =>
+                                      updateCategoryItem(
+                                        category.id,
+                                        itemIndex,
+                                        'text',
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="Ex: Smartphones"
+                                  />
+                                </div>
+
+                                <div>
+                                  <FormControl variant="label">
+                                    <Typography
+                                      variant="span"
+                                      className="text-sm"
+                                    >
+                                      ID
+                                    </Typography>
+                                  </FormControl>
+                                  <Input
+                                    type="text"
+                                    fieldName={`category_${category.id}_item_id_${itemIndex}`}
+                                    value={item.id}
+                                    onChange={(e) =>
+                                      updateCategoryItem(
+                                        category.id,
+                                        itemIndex,
+                                        'id',
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="Ex: phones"
+                                  />
+                                </div>
+
+                                <div>
+                                  <FormControl variant="label">
+                                    <Typography
+                                      variant="span"
+                                      className="text-sm"
+                                    >
+                                      Descrição
+                                    </Typography>
+                                  </FormControl>
+                                  <Input
+                                    type="text"
+                                    fieldName={`category_${category.id}_item_desc_${itemIndex}`}
+                                    value={item.description}
+                                    onChange={(e) =>
+                                      updateCategoryItem(
+                                        category.id,
+                                        itemIndex,
+                                        'description',
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="Ex: Últimos lançamentos"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="default"
+                              onClick={() => addItemToCategory(category.id)}
+                              className="w-full gap-2 text-sm"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Adicionar Item nesta Categoria
+                            </Button>
                           </div>
                         </div>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="default"
-                        onClick={() => addItemToCategory(category.id)}
-                        className="w-full gap-2 text-sm"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Adicionar Item nesta Categoria
-                      </Button>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : interactiveMenuType === 'carousel' ? (
               // UI Hierárquica para tipo CAROUSEL

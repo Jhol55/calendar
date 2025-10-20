@@ -188,7 +188,18 @@ export function DatabaseSpreadsheet({
     }
   };
 
-  const handleUpdateCell = (rowId: string, column: string, value: string) => {
+  const handleUpdateCell = (
+    rowId: string,
+    column: string,
+    value: string,
+    originalValue: string,
+  ) => {
+    // Verificar se o valor realmente mudou
+    if (value === originalValue) {
+      setEditingCell(null);
+      return;
+    }
+
     // Atualizar estado local
     setTableData((prev) =>
       prev.map((row) =>
@@ -836,6 +847,7 @@ export function DatabaseSpreadsheet({
                                         row._id,
                                         col.name,
                                         editingValue,
+                                        String(row[col.name] || ''),
                                       );
                                     }}
                                     onKeyDown={(e) => {
@@ -844,6 +856,7 @@ export function DatabaseSpreadsheet({
                                           row._id,
                                           col.name,
                                           editingValue,
+                                          String(row[col.name] || ''),
                                         );
                                       }
                                       if (e.key === 'Escape') {

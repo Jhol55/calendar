@@ -74,7 +74,7 @@ const Button = forwardRef<HTMLButtonElement, MultiVariantButtonProps>(
       >
         <span
           className={cn(
-            'relative flex items-center gap-2 w-full',
+            'relative flex items-center justify-center gap-2 w-full',
             textClassName,
           )}
         >
