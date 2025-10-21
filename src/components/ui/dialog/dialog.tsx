@@ -148,6 +148,10 @@ export const Dialog: React.FC<DialogProps> = ({
             'animate-in fade-in-0 zoom-in-95 duration-300',
             contentClassName,
           )}
+          onSubmit={(e) => {
+            // Prevenir propagação de submit para dialogs pais
+            e.stopPropagation();
+          }}
         >
           {children}
         </div>

@@ -18,6 +18,8 @@ import {
 } from '@/actions/database/operations';
 import { CreateTableDialog } from '../../features/forms/database-spreadsheet/create-database-table/create-database-table';
 import { AddColumnDialog } from '../../features/forms/database-spreadsheet/add-table-column/add-table-column';
+import { EditArrayDialog } from './edit-array';
+import { EditObjectDialog } from './edit-object';
 
 interface DatabaseSpreadsheetProps {
   isOpen: boolean;
@@ -83,6 +85,19 @@ export function DatabaseSpreadsheet({
   } | null>(null);
   const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
+  const [showEditArrayDialog, setShowEditArrayDialog] = useState(false);
+  const [editingArrayData, setEditingArrayData] = useState<{
+    rowId: string;
+    column: string;
+    array: unknown[];
+  } | null>(null);
+
+  const [showEditObjectDialog, setShowEditObjectDialog] = useState(false);
+  const [editingObjectData, setEditingObjectData] = useState<{
+    rowId: string;
+    column: string;
+    object: Record<string, unknown>;
+  } | null>(null);
 
   // Carregar tabelas disponíveis
   useEffect(() => {
@@ -461,6 +476,126 @@ export function DatabaseSpreadsheet({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditCell = (
+    rowId: string,
+    column: string,
+    currentValue: unknown,
+  ) => {
+    // Verificar se a coluna é do tipo array ou object no schema
+    const columnSchema = tableSchema?.columns.find(
+      (col) => col.name === column,
+    );
+    const isArrayColumn = columnSchema?.type === 'array';
+    const isObjectColumn = columnSchema?.type === 'object';
+
+    // Verificar se é array
+    if (Array.isArray(currentValue) || isArrayColumn) {
+      let arrayValue: unknown[] = [];
+
+      if (Array.isArray(currentValue)) {
+        arrayValue = currentValue;
+      } else if (typeof currentValue === 'string' && currentValue.trim()) {
+        // Tentar fazer parse de JSON se for string
+        try {
+          const parsed = JSON.parse(currentValue);
+          if (Array.isArray(parsed)) {
+            arrayValue = parsed;
+          }
+        } catch {
+          // Se não conseguir fazer parse, criar array com o valor atual
+          arrayValue = [currentValue];
+        }
+      }
+
+      setEditingArrayData({
+        rowId,
+        column,
+        array: arrayValue,
+      });
+      setShowEditArrayDialog(true);
+    }
+    // Verificar se é object
+    else if (
+      (typeof currentValue === 'object' &&
+        currentValue !== null &&
+        !Array.isArray(currentValue)) ||
+      isObjectColumn
+    ) {
+      let objectValue: Record<string, unknown> = {};
+
+      if (
+        typeof currentValue === 'object' &&
+        currentValue !== null &&
+        !Array.isArray(currentValue)
+      ) {
+        objectValue = currentValue as Record<string, unknown>;
+      } else if (typeof currentValue === 'string' && currentValue.trim()) {
+        // Tentar fazer parse de JSON se for string
+        try {
+          const parsed = JSON.parse(currentValue);
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            !Array.isArray(parsed)
+          ) {
+            objectValue = parsed;
+          }
+        } catch {
+          // Se não conseguir fazer parse, criar objeto vazio
+          objectValue = {};
+        }
+      }
+
+      setEditingObjectData({
+        rowId,
+        column,
+        object: objectValue,
+      });
+      setShowEditObjectDialog(true);
+    } else {
+      // Se não for array nem object, abrir edição normal
+      setEditingCell({
+        rowId,
+        column,
+      });
+      setEditingValue(String(currentValue || ''));
+    }
+  };
+
+  const handleSaveArray = (newArray: unknown[]) => {
+    if (!editingArrayData) return;
+
+    const arrayString = JSON.stringify(newArray);
+    const originalArrayString = JSON.stringify(editingArrayData.array);
+
+    handleUpdateCell(
+      editingArrayData.rowId,
+      editingArrayData.column,
+      arrayString,
+      originalArrayString,
+    );
+
+    setShowEditArrayDialog(false);
+    setEditingArrayData(null);
+  };
+
+  const handleSaveObject = (newObject: Record<string, unknown>) => {
+    if (!editingObjectData) return;
+
+    const objectString = JSON.stringify(newObject);
+    const originalObjectString = JSON.stringify(editingObjectData.object);
+
+    handleUpdateCell(
+      editingObjectData.rowId,
+      editingObjectData.column,
+      objectString,
+      originalObjectString,
+    );
+
+    setShowEditObjectDialog(false);
+    setEditingObjectData(null);
   };
 
   // Dados filtrados e ordenados
@@ -924,30 +1059,138 @@ export function DatabaseSpreadsheet({
                                     className="cursor-pointer hover:bg-transparent p-1.5 rounded min-h-[28px] transition-colors"
                                     onDoubleClick={(e) => {
                                       e.stopPropagation();
-                                      setEditingCell({
-                                        rowId: row._id,
-                                        column: col.name,
-                                      });
-                                      setEditingValue(
-                                        String(row[col.name] || ''),
+                                      handleEditCell(
+                                        row._id,
+                                        col.name,
+                                        row[col.name],
                                       );
                                     }}
                                   >
-                                    {String(row[col.name] || '') ? (
-                                      <Typography
-                                        variant="span"
-                                        className="text-sm text-neutral-800"
-                                      >
-                                        {String(row[col.name])}
-                                      </Typography>
-                                    ) : (
-                                      <Typography
-                                        variant="span"
-                                        className="text-sm text-neutral-400 italic"
-                                      >
-                                        Duplo clique para editar
-                                      </Typography>
-                                    )}
+                                    {(() => {
+                                      const value = row[col.name];
+                                      const isArrayColumn =
+                                        col.type === 'array';
+                                      const isObjectColumn =
+                                        col.type === 'object';
+
+                                      // Tentar fazer parse se for string e a coluna for do tipo array ou object
+                                      let parsedValue = value;
+                                      if (
+                                        (isArrayColumn || isObjectColumn) &&
+                                        typeof value === 'string' &&
+                                        value.trim()
+                                      ) {
+                                        try {
+                                          parsedValue = JSON.parse(value);
+                                        } catch {
+                                          // Se falhar o parse, manter o valor original
+                                          parsedValue = value;
+                                        }
+                                      }
+
+                                      if (Array.isArray(parsedValue)) {
+                                        return (
+                                          <div className="flex items-center gap-2">
+                                            <Typography
+                                              variant="span"
+                                              className="text-sm text-neutral-400 font-medium"
+                                            >
+                                              [Array com {parsedValue.length}{' '}
+                                              item
+                                              {parsedValue.length !== 1
+                                                ? 's'
+                                                : ''}
+                                              ]
+                                            </Typography>
+                                            <Typography
+                                              variant="span"
+                                              className="text-sm text-neutral-400 italic"
+                                            >
+                                              Duplo clique para editar
+                                            </Typography>
+                                          </div>
+                                        );
+                                      } else if (isArrayColumn) {
+                                        // Coluna é do tipo array mas valor não é array
+                                        return (
+                                          <div className="flex items-center gap-2">
+                                            <Typography
+                                              variant="span"
+                                              className="text-sm text-neutral-400"
+                                            >
+                                              [Array vazio]
+                                            </Typography>
+                                            <Typography
+                                              variant="span"
+                                              className="text-sm text-neutral-400 italic"
+                                            >
+                                              Duplo clique para editar
+                                            </Typography>
+                                          </div>
+                                        );
+                                      } else if (
+                                        typeof parsedValue === 'object' &&
+                                        parsedValue !== null &&
+                                        !Array.isArray(parsedValue)
+                                      ) {
+                                        const propCount =
+                                          Object.keys(parsedValue).length;
+                                        return (
+                                          <div className="flex items-center gap-2">
+                                            <Typography
+                                              variant="span"
+                                              className="text-sm text-neutral-400 font-medium"
+                                            >
+                                              [Objeto com {propCount}{' '}
+                                              propriedade
+                                              {propCount !== 1 ? 's' : ''}]
+                                            </Typography>
+                                            <Typography
+                                              variant="span"
+                                              className="text-sm text-neutral-400 italic"
+                                            >
+                                              Duplo clique para editar
+                                            </Typography>
+                                          </div>
+                                        );
+                                      } else if (isObjectColumn) {
+                                        // Coluna é do tipo object mas valor não é object
+                                        return (
+                                          <div className="flex items-center gap-2">
+                                            <Typography
+                                              variant="span"
+                                              className="text-sm text-purple-400"
+                                            >
+                                              [Objeto vazio]
+                                            </Typography>
+                                            <Typography
+                                              variant="span"
+                                              className="text-sm text-neutral-400 italic"
+                                            >
+                                              Duplo clique para editar
+                                            </Typography>
+                                          </div>
+                                        );
+                                      } else if (String(value || '')) {
+                                        return (
+                                          <Typography
+                                            variant="span"
+                                            className="text-sm text-neutral-800"
+                                          >
+                                            {String(value)}
+                                          </Typography>
+                                        );
+                                      } else {
+                                        return (
+                                          <Typography
+                                            variant="span"
+                                            className="text-sm text-neutral-400 italic"
+                                          >
+                                            Duplo clique para editar
+                                          </Typography>
+                                        );
+                                      }
+                                    })()}
                                   </div>
                                 )}
                               </td>
@@ -1069,6 +1312,33 @@ export function DatabaseSpreadsheet({
         onSubmit={handleAddColumns}
         tableName={selectedTable}
       />
+
+      {/* Modal de edição de array */}
+      {editingArrayData && (
+        <EditArrayDialog
+          isOpen={showEditArrayDialog}
+          onClose={() => {
+            setShowEditArrayDialog(false);
+            setEditingArrayData(null);
+          }}
+          onSave={handleSaveArray}
+          initialArray={editingArrayData.array}
+          columnName={editingArrayData.column}
+        />
+      )}
+
+      {editingObjectData && (
+        <EditObjectDialog
+          isOpen={showEditObjectDialog}
+          onClose={() => {
+            setShowEditObjectDialog(false);
+            setEditingObjectData(null);
+          }}
+          onSave={handleSaveObject}
+          initialObject={editingObjectData.object}
+          columnName={editingObjectData.column}
+        />
+      )}
     </>
   );
 }
