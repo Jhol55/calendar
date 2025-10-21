@@ -26,8 +26,6 @@ interface HttpRequestConfig {
   timeout?: number;
   followRedirects?: boolean;
   validateSSL?: boolean;
-  saveResponse?: boolean;
-  responseVariable?: string;
   memoryConfig?: {
     action: 'save' | 'fetch' | 'delete';
     memoryName: string;
@@ -91,8 +89,6 @@ function HttpRequestFormFields({
         setValue('timeout', config.timeout?.toString() || '');
         setValue('followRedirects', config.followRedirects || false);
         setValue('validateSSL', config.validateSSL !== false); // Padrão: true
-        setValue('saveResponse', config.saveResponse || false);
-        setValue('responseVariable', config.responseVariable || '');
 
         // Carregar headers
         if (config.headers && config.headers.length > 0) {
@@ -345,43 +341,7 @@ function HttpRequestFormFields({
               Validar certificado SSL
             </FormControl>
           </div>
-          <div className="flex items-center gap-2">
-            <Input
-              type="checkbox"
-              fieldName="saveResponse"
-              onChange={(e) => setValue('saveResponse', e.target.checked)}
-              className="bg-neutral-200"
-            />
-            <FormControl variant="label" className="text-sm cursor-pointer">
-              Salvar resposta em variável
-            </FormControl>
-          </div>
         </div>
-
-        {/* Response Variable */}
-        {form.saveResponse && (
-          <div className="p-1 mt-3">
-            <FormControl variant="label">
-              <Typography variant="span" className="text-sm">
-                Nome da Variável de Resposta *
-              </Typography>
-            </FormControl>
-            <Input
-              type="text"
-              fieldName="responseVariable"
-              placeholder="responseData"
-            />
-            <Typography
-              variant="span"
-              className="text-xs text-neutral-600 mt-1"
-            >
-              Acesse com:{' '}
-              <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">
-                {'{{$nodes.nodeId.output.responseData}}'}
-              </code>
-            </Typography>
-          </div>
-        )}
       </div>
 
       {/* Seção de Configuração de Memória */}
@@ -454,8 +414,6 @@ export function HttpRequestNodeConfig({
       timeout: data.timeout ? parseInt(data.timeout) : undefined,
       followRedirects: data.followRedirects || undefined,
       validateSSL: data.validateSSL !== false, // Padrão: true
-      saveResponse: data.saveResponse || undefined,
-      responseVariable: data.responseVariable || undefined,
     };
 
     // Se configuração de memória estiver preenchida, adicionar ao httpRequestConfig

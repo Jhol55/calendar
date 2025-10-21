@@ -11,6 +11,4 @@ export const httpRequestConfigSchema = z.object({
   timeout: z.string().optional(),
   followRedirects: z.boolean().optional(),
   validateSSL: z.boolean().optional(),
-  saveResponse: z.boolean().optional(),
-  responseVariable: z.string().optional(),
 });
