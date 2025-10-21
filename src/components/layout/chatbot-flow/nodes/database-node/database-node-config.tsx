@@ -14,6 +14,10 @@ import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
 import { NodeConfigLayout } from '../node-config-layout';
 import { Plus, Trash2 } from 'lucide-react';
+import {
+  getAvailableTables,
+  getTableData,
+} from '@/actions/database/operations';
 
 interface DatabaseNodeConfigProps {
   isOpen: boolean;
@@ -46,6 +50,13 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
   const { form, setValue } = useForm();
   const operation = form.operation || 'insert';
 
+  // Estados para tabelas e colunas disponíveis
+  const [availableTables, setAvailableTables] = useState<string[]>([]);
+  const [selectedTable, setSelectedTable] = useState<string>('');
+  const [tableColumns, setTableColumns] = useState<string[]>([]);
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [loadingColumns, setLoadingColumns] = useState(false);
+
   // Estados para gerenciar listas dinâmicas
   const [columns, setColumns] = useState<Column[]>([
     { name: '', type: 'string', required: false, default: '' },
@@ -67,6 +78,61 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
 
   const [filterCondition, setFilterCondition] = useState<'AND' | 'OR'>('AND');
 
+  // Carregar tabelas disponíveis
+  useEffect(() => {
+    const loadTables = async () => {
+      setLoadingTables(true);
+      try {
+        const response = await getAvailableTables();
+        if (response.success && Array.isArray(response.data)) {
+          setAvailableTables(response.data);
+        }
+      } catch (error) {
+        console.error('Error loading tables:', error);
+      } finally {
+        setLoadingTables(false);
+      }
+    };
+    loadTables();
+  }, []);
+
+  // Carregar colunas quando a tabela for selecionada
+  useEffect(() => {
+    const loadColumns = async () => {
+      if (!selectedTable) {
+        setTableColumns([]);
+        return;
+      }
+
+      setLoadingColumns(true);
+      try {
+        const response = await getTableData(selectedTable);
+        if (response.success && response.data) {
+          const data = response.data as {
+            schema?: { columns?: Array<{ name: string }> };
+          };
+          const cols = data.schema?.columns?.map((col) => col.name) || [];
+          setTableColumns(cols);
+        }
+      } catch (error) {
+        console.error('Error loading columns:', error);
+      } finally {
+        setLoadingColumns(false);
+      }
+    };
+    loadColumns();
+  }, [selectedTable]);
+
+  // Inicializar FormSelect da tabela quando availableTables for carregado
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (config?.tableName && availableTables.length > 0) {
+        setValue('tableName', config.tableName);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [config?.tableName, availableTables, setValue]);
+
   // Carregar config existente
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -74,9 +140,20 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
         setValue('operation', config.operation || 'insert');
         setValue('tableName', config.tableName || '');
 
+        // Definir a tabela selecionada
+        if (config.tableName) {
+          setSelectedTable(config.tableName);
+        }
+
         if (config.columns) {
-          setColumns(config.columns);
-          setValue('columns', JSON.stringify(config.columns));
+          const normalizedColumns = config.columns.map((col) => ({
+            name: col.name,
+            type: col.type,
+            required: col.required || false,
+            default: col.default || '',
+          }));
+          setColumns(normalizedColumns);
+          setValue('columns', JSON.stringify(normalizedColumns));
         }
 
         if (config.columnsToRemove) {
@@ -146,6 +223,20 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
     setValue('record', JSON.stringify(record));
   }, [recordFields, setValue]);
 
+  // Inicializar FormSelects de recordFields quando tableColumns for carregado
+  useEffect(() => {
+    if (tableColumns.length > 0 && recordFields.length > 0) {
+      const timer = setTimeout(() => {
+        recordFields.forEach((field, index) => {
+          if (field.key) {
+            setValue(`record_key_${index}`, field.key);
+          }
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [tableColumns, recordFields, setValue]);
+
   // Sincronizar updates com formulário
   useEffect(() => {
     const updates: Record<string, string> = {};
@@ -157,6 +248,20 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
     setValue('updates', JSON.stringify(updates));
   }, [updateFields, setValue]);
 
+  // Inicializar FormSelects de updateFields quando tableColumns for carregado
+  useEffect(() => {
+    if (tableColumns.length > 0 && updateFields.length > 0) {
+      const timer = setTimeout(() => {
+        updateFields.forEach((field, index) => {
+          if (field.key) {
+            setValue(`update_key_${index}`, field.key);
+          }
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [tableColumns, updateFields, setValue]);
+
   // Sincronizar filters com formulário
   useEffect(() => {
     const filters = {
@@ -165,6 +270,73 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
     };
     setValue('filters', JSON.stringify(filters));
   }, [filterRules, filterCondition, setValue]);
+
+  // Inicializar FormSelects de filterRules quando tableColumns for carregado
+  useEffect(() => {
+    if (tableColumns.length > 0 && filterRules.length > 0) {
+      const timer = setTimeout(() => {
+        filterRules.forEach((rule, index) => {
+          if (rule.field) {
+            setValue(`filter_field_${index}`, rule.field);
+          }
+          if (rule.operator) {
+            setValue(`filter_operator_${index}`, rule.operator);
+          }
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [tableColumns, filterRules, setValue]);
+
+  // Inicializar FormSelects de columnsToRemove quando tableColumns for carregado
+  useEffect(() => {
+    if (tableColumns.length > 0 && columnsToRemove.length > 0) {
+      const timer = setTimeout(() => {
+        columnsToRemove.forEach((column, index) => {
+          if (column) {
+            setValue(`remove_column_${index}`, column);
+          }
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [tableColumns, columnsToRemove, setValue]);
+
+  // Inicializar FormSelect de sortField quando tableColumns for carregado
+  useEffect(() => {
+    if (tableColumns.length > 0 && config?.sort?.field) {
+      const timer = setTimeout(() => {
+        if (config.sort) {
+          setValue('sortField', config.sort.field);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [tableColumns, config?.sort?.field, setValue]);
+
+  // Inicializar FormSelects de column_type quando columns for carregado
+  useEffect(() => {
+    if (columns.length > 0) {
+      const timer = setTimeout(() => {
+        columns.forEach((column, index) => {
+          if (column.type) {
+            setValue(`column_type_${index}`, column.type);
+          }
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [columns, setValue]);
+
+  // Inicializar FormSelect de filterCondition
+  useEffect(() => {
+    if (filterCondition) {
+      const timer = setTimeout(() => {
+        setValue('filterCondition', filterCondition);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [filterCondition, setValue]);
 
   // Funções para gerenciar columns
   const addColumn = () => {
@@ -297,13 +469,27 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
       {/* Nome da Tabela */}
       <div className="p-1">
         <FormControl variant="label">Nome da Tabela *</FormControl>
-        <Input
-          type="text"
+        <FormSelect
           fieldName="tableName"
-          placeholder="Ex: leads, customers, orders"
+          placeholder={
+            loadingTables
+              ? 'Carregando tabelas...'
+              : availableTables.length === 0
+                ? 'Nenhuma tabela encontrada'
+                : 'Selecione uma tabela'
+          }
+          onValueChange={(value) => {
+            setSelectedTable(value);
+            setValue('tableName', value);
+          }}
+          options={availableTables.map((table) => ({
+            value: table,
+            label: table,
+          }))}
+          className="w-full"
         />
         <Typography variant="span" className="text-xs text-gray-500 mt-1">
-          Use letras, números, _ e -
+          Selecione uma tabela existente ou crie uma nova
         </Typography>
       </div>
 
@@ -389,7 +575,6 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
                   <FormSelect
                     fieldName={`column_type_${index}`}
                     placeholder="Selecione o tipo"
-                    value={column.type}
                     onValueChange={(value) =>
                       updateColumn(index, 'type', value)
                     }
@@ -466,12 +651,22 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
           <div className="space-y-2">
             {columnsToRemove.map((column, index) => (
               <div key={index} className="flex items-center gap-2">
-                <Input
-                  type="text"
+                <FormSelect
                   fieldName={`remove_column_${index}`}
-                  value={column}
-                  onChange={(e) => updateColumnToRemove(index, e.target.value)}
-                  placeholder="Nome da coluna"
+                  placeholder={
+                    loadingColumns
+                      ? 'Carregando colunas...'
+                      : !selectedTable
+                        ? 'Selecione uma tabela primeiro'
+                        : tableColumns.length === 0
+                          ? 'Nenhuma coluna encontrada'
+                          : 'Selecione uma coluna'
+                  }
+                  onValueChange={(value) => updateColumnToRemove(index, value)}
+                  options={tableColumns.map((col) => ({
+                    value: col,
+                    label: col,
+                  }))}
                   className="flex-1"
                 />
                 {columnsToRemove.length > 1 && (
@@ -533,14 +728,25 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
                       Nome do Campo *
                     </Typography>
                   </FormControl>
-                  <Input
-                    type="text"
+                  <FormSelect
                     fieldName={`record_key_${index}`}
-                    value={field.key}
-                    onChange={(e) =>
-                      updateRecordField(index, 'key', e.target.value)
+                    placeholder={
+                      loadingColumns
+                        ? 'Carregando colunas...'
+                        : !selectedTable
+                          ? 'Selecione uma tabela primeiro'
+                          : tableColumns.length === 0
+                            ? 'Nenhuma coluna encontrada'
+                            : 'Selecione uma coluna'
                     }
-                    placeholder="Ex: name, email, score"
+                    onValueChange={(value) =>
+                      updateRecordField(index, 'key', value)
+                    }
+                    options={tableColumns.map((col) => ({
+                      value: col,
+                      label: col,
+                    }))}
+                    className="w-full"
                   />
                 </div>
 
@@ -585,7 +791,6 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
             <FormSelect
               fieldName="filterCondition"
               placeholder="Selecione"
-              value={filterCondition}
               onValueChange={(value) =>
                 setFilterCondition(value as 'AND' | 'OR')
               }
@@ -644,14 +849,25 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
                       Campo *
                     </Typography>
                   </FormControl>
-                  <Input
-                    type="text"
+                  <FormSelect
                     fieldName={`filter_field_${index}`}
-                    value={rule.field}
-                    onChange={(e) =>
-                      updateFilterRule(index, 'field', e.target.value)
+                    placeholder={
+                      loadingColumns
+                        ? 'Carregando colunas...'
+                        : !selectedTable
+                          ? 'Selecione uma tabela primeiro'
+                          : tableColumns.length === 0
+                            ? 'Nenhuma coluna encontrada'
+                            : 'Selecione uma coluna'
                     }
-                    placeholder="Ex: score, active, _createdAt"
+                    onValueChange={(value) =>
+                      updateFilterRule(index, 'field', value)
+                    }
+                    options={tableColumns.map((col) => ({
+                      value: col,
+                      label: col,
+                    }))}
+                    className="w-full"
                   />
                 </div>
 
@@ -664,7 +880,6 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
                   <FormSelect
                     fieldName={`filter_operator_${index}`}
                     placeholder="Selecione"
-                    value={rule.operator}
                     onValueChange={(value) =>
                       updateFilterRule(index, 'operator', value)
                     }
@@ -744,14 +959,25 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
                       Nome do Campo *
                     </Typography>
                   </FormControl>
-                  <Input
-                    type="text"
+                  <FormSelect
                     fieldName={`update_key_${index}`}
-                    value={field.key}
-                    onChange={(e) =>
-                      updateUpdateField(index, 'key', e.target.value)
+                    placeholder={
+                      loadingColumns
+                        ? 'Carregando colunas...'
+                        : !selectedTable
+                          ? 'Selecione uma tabela primeiro'
+                          : tableColumns.length === 0
+                            ? 'Nenhuma coluna encontrada'
+                            : 'Selecione uma coluna'
                     }
-                    placeholder="Ex: status, score, tags"
+                    onValueChange={(value) =>
+                      updateUpdateField(index, 'key', value)
+                    }
+                    options={tableColumns.map((col) => ({
+                      value: col,
+                      label: col,
+                    }))}
+                    className="w-full"
                   />
                 </div>
 
@@ -792,10 +1018,22 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <FormControl variant="label">Campo para Ordenar</FormControl>
-              <Input
-                type="text"
+              <FormSelect
                 fieldName="sortField"
-                placeholder="Ex: score, _createdAt"
+                placeholder={
+                  loadingColumns
+                    ? 'Carregando colunas...'
+                    : !selectedTable
+                      ? 'Selecione uma tabela primeiro'
+                      : tableColumns.length === 0
+                        ? 'Nenhuma coluna encontrada'
+                        : 'Selecione uma coluna'
+                }
+                options={tableColumns.map((col) => ({
+                  value: col,
+                  label: col,
+                }))}
+                className="w-full"
               />
             </div>
 

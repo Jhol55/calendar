@@ -1307,7 +1307,46 @@ async function processDatabaseNode(
       `✅ Database node completed: ${result.operation} - ${result.message}`,
     );
 
-    return result;
+    // Parsear strings JSON nos resultados
+    const parseJsonInObject = (obj: unknown): unknown => {
+      if (obj === null || obj === undefined) {
+        return obj;
+      }
+
+      if (typeof obj === 'string') {
+        // Tentar parsear se for uma string que parece JSON
+        if (
+          (obj.startsWith('{') && obj.endsWith('}')) ||
+          (obj.startsWith('[') && obj.endsWith(']'))
+        ) {
+          try {
+            return parseJsonInObject(JSON.parse(obj));
+          } catch {
+            // Se falhar, retornar a string original
+            return obj;
+          }
+        }
+        return obj;
+      }
+
+      if (Array.isArray(obj)) {
+        return obj.map((item) => parseJsonInObject(item));
+      }
+
+      if (typeof obj === 'object') {
+        const parsed: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(obj)) {
+          parsed[key] = parseJsonInObject(value);
+        }
+        return parsed;
+      }
+
+      return obj;
+    };
+
+    const parsedResult = parseJsonInObject(result);
+
+    return parsedResult;
   } catch (error) {
     console.error(`❌ Error processing database node:`, error);
     throw error;
