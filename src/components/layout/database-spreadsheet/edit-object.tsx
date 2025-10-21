@@ -28,7 +28,14 @@ interface EditObjectDialogProps {
   isNested?: boolean;
 }
 
-type ValueType = 'string' | 'number' | 'boolean' | 'null' | 'object' | 'array';
+type ValueType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'null'
+  | 'object'
+  | 'array'
+  | 'json';
 
 interface ObjectPair {
   id: string;
@@ -42,6 +49,8 @@ interface ObjectPair {
   objectPairs?: Array<{ key: string; value: string }>;
   // Para array
   arrayValue?: string;
+  // Para json
+  jsonValue?: string;
 }
 
 // Componente para editar arrays aninhados
@@ -319,6 +328,9 @@ function EditObjectForm({
           case 'array':
             newPair.arrayValue = '[]';
             break;
+          case 'json':
+            newPair.jsonValue = '';
+            break;
         }
 
         return newPair;
@@ -341,6 +353,12 @@ function EditObjectForm({
   const updatePairArrayValue = (id: string, arrayValue: string) => {
     setObjectPairs((prev) =>
       prev.map((pair) => (pair.id === id ? { ...pair, arrayValue } : pair)),
+    );
+  };
+
+  const updatePairJsonValue = (id: string, jsonValue: string) => {
+    setObjectPairs((prev) =>
+      prev.map((pair) => (pair.id === id ? { ...pair, jsonValue } : pair)),
     );
   };
 
@@ -422,6 +440,15 @@ function EditObjectForm({
             }
             break;
 
+          case 'json':
+            try {
+              processedObject[key] = JSON.parse(pair.jsonValue || 'null');
+            } catch {
+              // Se falhar o parse, retornar a string original
+              processedObject[key] = pair.jsonValue || null;
+            }
+            break;
+
           default:
             processedObject[key] = null;
         }
@@ -455,6 +482,7 @@ function EditObjectForm({
         updatePairValue={updatePairValue}
         updatePairBooleanValue={updatePairBooleanValue}
         updatePairArrayValue={updatePairArrayValue}
+        updatePairJsonValue={updatePairJsonValue}
         updatePairObjectPairs={updatePairObjectPairs}
       />
     </Form>
@@ -474,6 +502,7 @@ function FormContent({
   updatePairValue,
   updatePairBooleanValue,
   updatePairArrayValue,
+  updatePairJsonValue,
   updatePairObjectPairs,
 }: {
   objectPairs: ObjectPair[];
@@ -487,6 +516,7 @@ function FormContent({
   updatePairValue: (id: string, value: string) => void;
   updatePairBooleanValue: (id: string, booleanValue: boolean) => void;
   updatePairArrayValue: (id: string, arrayValue: string) => void;
+  updatePairJsonValue: (id: string, jsonValue: string) => void;
   updatePairObjectPairs: (
     id: string,
     objectPairs: Array<{ key: string; value: string }>,
@@ -524,6 +554,8 @@ function FormContent({
         return 'bg-purple-100 text-purple-700';
       case 'array':
         return 'bg-orange-100 text-orange-700';
+      case 'json':
+        return 'bg-pink-100 text-pink-700';
       default:
         return 'bg-neutral-100 text-neutral-700';
     }
@@ -543,6 +575,8 @@ function FormContent({
         return 'Object';
       case 'array':
         return 'Array';
+      case 'json':
+        return 'JSON';
       default:
         return type;
     }
@@ -654,12 +688,39 @@ function FormContent({
                         { value: 'null', label: '🚫 Null (vazio)' },
                         { value: 'object', label: '📦 Object (objeto)' },
                         { value: 'array', label: '📋 Array (lista)' },
+                        { value: 'json', label: '🔗 JSON (auto-parse)' },
                       ]}
                       className="w-full"
                     />
                   </div>
 
                   {/* Inputs baseados no tipo */}
+                  {pair.type === 'json' && (
+                    <div>
+                      <FormControl variant="label">
+                        <Typography variant="span" className="text-sm">
+                          JSON
+                        </Typography>
+                      </FormControl>
+                      <textarea
+                        value={pair.jsonValue || ''}
+                        onChange={(e) =>
+                          updatePairJsonValue(pair.id, e.target.value)
+                        }
+                        placeholder='Cole seu JSON aqui (ex: {"nome": "João"} ou [1,2,3])'
+                        rows={6}
+                        className="w-full rounded-md border border-gray-300 bg-white p-2.5 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"
+                      />
+                      <Typography
+                        variant="span"
+                        className="text-xs text-neutral-500 mt-1"
+                      >
+                        O JSON será parseado automaticamente. Pode ser objeto,
+                        array, string, número, etc.
+                      </Typography>
+                    </div>
+                  )}
+
                   {(pair.type === 'string' || pair.type === 'number') && (
                     <div>
                       <FormControl variant="label">

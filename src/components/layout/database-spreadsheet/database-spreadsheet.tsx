@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Plus, Trash2, RefreshCw, Save } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ColumnFilter, type FilterCondition } from './column-filter';
+import { ColumnActions } from './column-actions';
+import { DraggableColumnHeader } from './draggable-column-header';
+import { EditColumnDialog } from '@/components/features/forms/database-spreadsheet/edit-table-column/edit-table-column';
+import { DeleteColumnDialog } from './delete-column';
 import {
   getAvailableTables,
   getTableData,
@@ -15,6 +19,9 @@ import {
   deleteRow,
   createTable,
   addColumnsToTable,
+  renameColumn,
+  deleteColumn,
+  reorderColumns,
 } from '@/actions/database/operations';
 import { CreateTableDialog } from '../../features/forms/database-spreadsheet/create-database-table/create-database-table';
 import { AddColumnDialog } from '../../features/forms/database-spreadsheet/add-table-column/add-table-column';
@@ -68,10 +75,16 @@ export function DatabaseSpreadsheet({
     updates: Array<{ rowId: string; column: string; value: string }>;
     additions: Array<Record<string, unknown>>;
     deletions: Array<string>;
+    columnRenames: Array<{ oldName: string; newName: string }>;
+    columnDeletions: Array<string>;
+    columnReorder: boolean;
   }>({
     updates: [],
     additions: [],
     deletions: [],
+    columnRenames: [],
+    columnDeletions: [],
+    columnReorder: false,
   });
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>(
     {},
@@ -99,6 +112,18 @@ export function DatabaseSpreadsheet({
     object: Record<string, unknown>;
   } | null>(null);
 
+  const [showEditColumnDialog, setShowEditColumnDialog] = useState(false);
+  const [editingColumnData, setEditingColumnData] = useState<{
+    name: string;
+    type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+    required: boolean;
+    default: string;
+  } | null>(null);
+  const [showDeleteColumnDialog, setShowDeleteColumnDialog] = useState(false);
+  const [deletingColumn, setDeletingColumn] = useState<string>('');
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+
   // Carregar tabelas disponíveis
   useEffect(() => {
     if (isOpen) {
@@ -117,7 +142,14 @@ export function DatabaseSpreadsheet({
       setEditingCell(null);
       setEditingValue('');
       setHasUnsavedChanges(false);
-      setPendingChanges({ updates: [], additions: [], deletions: [] });
+      setPendingChanges({
+        updates: [],
+        additions: [],
+        deletions: [],
+        columnRenames: [],
+        columnDeletions: [],
+        columnReorder: false,
+      });
     }
   }, [isOpen]);
 
@@ -147,7 +179,14 @@ export function DatabaseSpreadsheet({
     if (selectedTable) {
       loadTableData();
       // Limpar mudanças pendentes ao mudar de tabela
-      setPendingChanges({ updates: [], additions: [], deletions: [] });
+      setPendingChanges({
+        updates: [],
+        additions: [],
+        deletions: [],
+        columnRenames: [],
+        columnDeletions: [],
+        columnReorder: false,
+      });
       setHasUnsavedChanges(false);
       // Limpar filtros e ordenação
       setColumnFilters({});
@@ -325,6 +364,40 @@ export function DatabaseSpreadsheet({
     try {
       setLoading(true);
 
+      // Processar renomeações de colunas primeiro
+      for (const rename of pendingChanges.columnRenames) {
+        const response = await renameColumn(
+          selectedTable,
+          rename.oldName,
+          rename.newName,
+        );
+        if (!response.success) {
+          console.error('Erro ao renomear coluna:', response.message);
+          alert(`Erro ao renomear coluna: ${response.message}`);
+        }
+      }
+
+      // Processar exclusões de colunas
+      for (const columnName of pendingChanges.columnDeletions) {
+        const response = await deleteColumn(selectedTable, columnName);
+        if (!response.success) {
+          console.error('Erro ao excluir coluna:', response.message);
+          alert(`Erro ao excluir coluna: ${response.message}`);
+        }
+      }
+
+      // Processar reordenação de colunas
+      if (pendingChanges.columnReorder && tableSchema) {
+        const response = await reorderColumns(
+          selectedTable,
+          tableSchema.columns,
+        );
+        if (!response.success) {
+          console.error('Erro ao reordenar colunas:', response.message);
+          alert(`Erro ao reordenar colunas: ${response.message}`);
+        }
+      }
+
       // Processar todas as atualizações
       for (const update of pendingChanges.updates) {
         const response = await updateCell(
@@ -355,7 +428,14 @@ export function DatabaseSpreadsheet({
       }
 
       // Limpar mudanças pendentes
-      setPendingChanges({ updates: [], additions: [], deletions: [] });
+      setPendingChanges({
+        updates: [],
+        additions: [],
+        deletions: [],
+        columnRenames: [],
+        columnDeletions: [],
+        columnReorder: false,
+      });
       setHasUnsavedChanges(false);
 
       // Recarregar dados da tabela para sincronizar
@@ -378,7 +458,14 @@ export function DatabaseSpreadsheet({
   const handleConfirmClose = () => {
     setShowCloseWarning(false);
     setHasUnsavedChanges(false);
-    setPendingChanges({ updates: [], additions: [], deletions: [] });
+    setPendingChanges({
+      updates: [],
+      additions: [],
+      deletions: [],
+      columnRenames: [],
+      columnDeletions: [],
+      columnReorder: false,
+    });
     onClose();
   };
 
@@ -596,6 +683,177 @@ export function DatabaseSpreadsheet({
 
     setShowEditObjectDialog(false);
     setEditingObjectData(null);
+  };
+
+  const handleEditColumn = async (updatedColumn: {
+    name: string;
+    type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+    required: boolean;
+    default: string;
+  }) => {
+    if (!editingColumnData) return;
+
+    const oldName = editingColumnData.name;
+
+    // Verificar se o novo nome já existe (e não é o nome atual)
+    if (updatedColumn.name !== oldName) {
+      const columnExists = tableSchema?.columns.some(
+        (col) => col.name === updatedColumn.name && col.name !== oldName,
+      );
+
+      if (columnExists) {
+        alert('Já existe uma coluna com esse nome');
+        throw new Error('Já existe uma coluna com esse nome');
+      }
+    }
+
+    // Se o nome mudou, adicionar/atualizar renomeação
+    if (updatedColumn.name !== oldName) {
+      const existingRenameIndex = pendingChanges.columnRenames.findIndex(
+        (r) => r.oldName === oldName,
+      );
+
+      if (existingRenameIndex >= 0) {
+        const newRenames = [...pendingChanges.columnRenames];
+        newRenames[existingRenameIndex].newName = updatedColumn.name;
+        setPendingChanges((prev) => ({
+          ...prev,
+          columnRenames: newRenames,
+        }));
+      } else {
+        setPendingChanges((prev) => ({
+          ...prev,
+          columnRenames: [
+            ...prev.columnRenames,
+            { oldName, newName: updatedColumn.name },
+          ],
+        }));
+      }
+    }
+
+    // Atualizar o schema local para refletir todas as mudanças
+    if (tableSchema) {
+      const updatedSchema = {
+        ...tableSchema,
+        columns: tableSchema.columns.map((col) =>
+          col.name === oldName
+            ? {
+                name: updatedColumn.name,
+                type: updatedColumn.type,
+                required: updatedColumn.required,
+                default: updatedColumn.default,
+              }
+            : col,
+        ),
+      };
+      setTableSchema(updatedSchema);
+    }
+
+    setHasUnsavedChanges(true);
+    setShowEditColumnDialog(false);
+    setEditingColumnData(null);
+  };
+
+  // Funções de drag and drop
+  const handleDragStart = (index: number) => {
+    setDraggedColumn(tableSchema?.columns[index].name || null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverColumn(tableSchema?.columns[index].name || null);
+  };
+
+  const handleDrop = (dropIndex: number) => {
+    if (!tableSchema || draggedColumn === null) return;
+
+    const dragIndex = tableSchema.columns.findIndex(
+      (col) => col.name === draggedColumn,
+    );
+
+    if (dragIndex === -1 || dragIndex === dropIndex) {
+      setDraggedColumn(null);
+      setDragOverColumn(null);
+      return;
+    }
+
+    // Reordenar colunas no schema
+    const newColumns = [...tableSchema.columns];
+    const [draggedCol] = newColumns.splice(dragIndex, 1);
+    newColumns.splice(dropIndex, 0, draggedCol);
+
+    setTableSchema({
+      ...tableSchema,
+      columns: newColumns,
+    });
+
+    // Reordenar dados da tabela
+    const reorderedData = tableData.map((row) => {
+      const newRow: Record<string, unknown> = {};
+      newColumns.forEach((col) => {
+        newRow[col.name] = row[col.name];
+      });
+      // Manter campos do sistema
+      newRow._id = row._id;
+      newRow._createdAt = row._createdAt;
+      newRow._updatedAt = row._updatedAt;
+      return newRow as TableData;
+    });
+
+    setTableData(reorderedData);
+    setHasUnsavedChanges(true);
+
+    // Marcar que houve reordenação
+    setPendingChanges((prev) => ({
+      ...prev,
+      columnReorder: true,
+    }));
+
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  };
+
+  const handleDeleteColumn = () => {
+    // Verificar se é a última coluna
+    if (tableSchema && tableSchema.columns.length === 1) {
+      alert('Não é possível excluir a última coluna da tabela');
+      return;
+    }
+
+    // Adicionar às exclusões pendentes
+    setPendingChanges((prev) => ({
+      ...prev,
+      columnDeletions: [...prev.columnDeletions, deletingColumn],
+    }));
+
+    // Atualizar o schema local para refletir a mudança
+    if (tableSchema) {
+      const updatedSchema = {
+        ...tableSchema,
+        columns: tableSchema.columns.filter(
+          (col) => col.name !== deletingColumn,
+        ),
+      };
+      setTableSchema(updatedSchema);
+    }
+
+    // Remover dados da coluna do tableData local
+    setTableData((prev) =>
+      prev.map((row) => {
+        const newRow = { ...row };
+        delete newRow[deletingColumn];
+        return newRow;
+      }),
+    );
+
+    setHasUnsavedChanges(true);
+    setShowDeleteColumnDialog(false);
+    setDeletingColumn('');
   };
 
   // Dados filtrados e ordenados
@@ -918,7 +1176,7 @@ export function DatabaseSpreadsheet({
                 <div className="flex-1 overflow-auto rounded-lg border-neutral-200 border">
                   <table className="w-full border-collapse">
                     <thead className="bg-neutral-100 sticky top-0 z-10">
-                      <tr className="bg-neutral-100">
+                      <tr className="bg-neutral-100 whitespace-nowrap">
                         <th className="border-l-0 border-t-0 border p-3 text-left">
                           <Typography
                             variant="span"
@@ -927,56 +1185,62 @@ export function DatabaseSpreadsheet({
                             #
                           </Typography>
                         </th>
-                        {tableSchema.columns.map((col) => (
-                          <th
+                        {tableSchema.columns.map((col, index) => (
+                          <DraggableColumnHeader
                             key={col.name}
-                            className="border p-3 text-left border-t-0"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex gap-1">
-                                <Typography
-                                  variant="span"
-                                  className="text-sm font-semibold text-neutral-700"
-                                >
-                                  {col.name}
-                                </Typography>
-                                <Typography
-                                  variant="span"
-                                  className="text-sm text-neutral-500 font-normal"
-                                >
-                                  ({col.type})
-                                  {col.required && (
-                                    <span className="text-red-500"> *</span>
-                                  )}
-                                </Typography>
-                              </div>
-                              <ColumnFilter
-                                columnName={col.name}
-                                onSort={(direction) =>
-                                  handleSort(col.name, direction)
-                                }
-                                onFilter={(value) =>
-                                  handleFilter(col.name, value)
-                                }
-                                onFilterByCondition={(condition, value) =>
-                                  handleFilterByCondition(
-                                    col.name,
-                                    condition,
-                                    value,
-                                  )
-                                }
-                                onClearFilter={() =>
-                                  handleClearFilter(col.name)
-                                }
-                                hasActiveFilter={
-                                  !!columnFilters[col.name] ||
-                                  !!columnConditions[col.name] ||
-                                  sortConfig?.column === col.name
-                                }
-                                uniqueValues={getUniqueValues(col.name)}
-                              />
-                            </div>
-                          </th>
+                            column={col}
+                            index={index}
+                            onDragStart={handleDragStart}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            onDragEnd={handleDragEnd}
+                            isDragging={draggedColumn === col.name}
+                            dragOverIndex={
+                              dragOverColumn === col.name ? index : null
+                            }
+                            onSort={(direction) =>
+                              handleSort(col.name, direction)
+                            }
+                            onFilter={(value) => handleFilter(col.name, value)}
+                            onFilterByCondition={(condition, value) =>
+                              handleFilterByCondition(
+                                col.name,
+                                condition,
+                                value,
+                              )
+                            }
+                            onClearFilter={() => handleClearFilter(col.name)}
+                            hasActiveFilter={
+                              !!columnFilters[col.name] ||
+                              !!columnConditions[col.name] ||
+                              sortConfig?.column === col.name
+                            }
+                            uniqueValues={getUniqueValues(col.name)}
+                            onRename={(columnName) => {
+                              const column = tableSchema?.columns.find(
+                                (c) => c.name === columnName,
+                              );
+                              if (column) {
+                                setEditingColumnData({
+                                  name: column.name,
+                                  type: column.type as
+                                    | 'string'
+                                    | 'number'
+                                    | 'boolean'
+                                    | 'date'
+                                    | 'array'
+                                    | 'object',
+                                  required: column.required,
+                                  default: String(column.default || ''),
+                                });
+                                setShowEditColumnDialog(true);
+                              }
+                            }}
+                            onDelete={(columnName) => {
+                              setDeletingColumn(columnName);
+                              setShowDeleteColumnDialog(true);
+                            }}
+                          />
                         ))}
                         <th className="border p-3 text-left border-t-0">
                           <Typography
@@ -1020,7 +1284,10 @@ export function DatabaseSpreadsheet({
                               </Typography>
                             </td>
                             {tableSchema.columns.map((col) => (
-                              <td key={col.name} className="border px-3">
+                              <td
+                                key={col.name}
+                                className="border px-3 whitespace-nowrap"
+                              >
                                 {editingCell?.rowId === row._id &&
                                 editingCell?.column === col.name ? (
                                   <input
@@ -1196,7 +1463,7 @@ export function DatabaseSpreadsheet({
                               </td>
                             ))}
                             <td
-                              className="border p-3"
+                              className="border p-3 whitespace-nowrap"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Typography
@@ -1209,7 +1476,7 @@ export function DatabaseSpreadsheet({
                               </Typography>
                             </td>
                             <td
-                              className="border border-r-0 p-3"
+                              className="border border-r-0 p-3 whitespace-nowrap"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Typography
@@ -1339,6 +1606,30 @@ export function DatabaseSpreadsheet({
           columnName={editingObjectData.column}
         />
       )}
+
+      {/* Modal de editar coluna */}
+      {editingColumnData && (
+        <EditColumnDialog
+          isOpen={showEditColumnDialog}
+          onClose={() => {
+            setShowEditColumnDialog(false);
+            setEditingColumnData(null);
+          }}
+          columnData={editingColumnData}
+          onSubmit={handleEditColumn}
+        />
+      )}
+
+      {/* Modal de excluir coluna */}
+      <DeleteColumnDialog
+        isOpen={showDeleteColumnDialog}
+        onClose={() => {
+          setShowDeleteColumnDialog(false);
+          setDeletingColumn('');
+        }}
+        columnName={deletingColumn}
+        onConfirm={handleDeleteColumn}
+      />
     </>
   );
 }

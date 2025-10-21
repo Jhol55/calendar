@@ -28,7 +28,14 @@ interface EditArrayDialogProps {
   isNested?: boolean;
 }
 
-type ItemType = 'string' | 'number' | 'boolean' | 'null' | 'object' | 'array';
+type ItemType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'null'
+  | 'object'
+  | 'array'
+  | 'json';
 
 interface ArrayItem {
   id: string;
@@ -39,8 +46,10 @@ interface ArrayItem {
   booleanValue?: boolean;
   // Para object
   objectPairs?: Array<{ key: string; value: string }>;
-  // Para array (vamos implementar depois)
+  // Para array
   arrayValue?: string;
+  // Para json
+  jsonValue?: string;
 }
 
 // Componente interno que usa useForm dentro do contexto do Form
@@ -97,6 +106,9 @@ function EditArrayForm({
           case 'array':
             newItem.arrayValue = '[]';
             break;
+          case 'json':
+            newItem.jsonValue = '';
+            break;
         }
 
         return newItem;
@@ -119,6 +131,12 @@ function EditArrayForm({
   const updateItemArrayValue = (id: string, arrayValue: string) => {
     setArrayItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, arrayValue } : item)),
+    );
+  };
+
+  const updateItemJsonValue = (id: string, jsonValue: string) => {
+    setArrayItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, jsonValue } : item)),
     );
   };
 
@@ -185,6 +203,14 @@ function EditArrayForm({
             return JSON.parse(item.arrayValue || '[]');
           } catch {
             return [];
+          }
+
+        case 'json':
+          try {
+            return JSON.parse(item.jsonValue || 'null');
+          } catch {
+            // Se falhar o parse, retornar a string original
+            return item.jsonValue || null;
           }
 
         default:
@@ -500,6 +526,9 @@ function FormContent({
           case 'array':
             newItem.arrayValue = '[]';
             break;
+          case 'json':
+            newItem.jsonValue = '';
+            break;
         }
 
         return newItem;
@@ -522,6 +551,12 @@ function FormContent({
   const updateItemArrayValue = (id: string, arrayValue: string) => {
     setArrayItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, arrayValue } : item)),
+    );
+  };
+
+  const updateItemJsonValue = (id: string, jsonValue: string) => {
+    setArrayItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, jsonValue } : item)),
     );
   };
 
@@ -548,6 +583,8 @@ function FormContent({
         return 'bg-purple-100 text-purple-700';
       case 'array':
         return 'bg-orange-100 text-orange-700';
+      case 'json':
+        return 'bg-pink-100 text-pink-700';
       default:
         return 'bg-neutral-100 text-neutral-700';
     }
@@ -567,6 +604,8 @@ function FormContent({
         return 'Object';
       case 'array':
         return 'Array';
+      case 'json':
+        return 'JSON';
       default:
         return type;
     }
@@ -652,12 +691,39 @@ function FormContent({
                       { value: 'null', label: '🚫 Null (vazio)' },
                       { value: 'object', label: '📦 Object (objeto)' },
                       { value: 'array', label: '📋 Array (lista)' },
+                      { value: 'json', label: '🔗 JSON (auto-parse)' },
                     ]}
                     className="w-full"
                   />
                 </div>
 
                 {/* Inputs baseados no tipo */}
+                {item.type === 'json' && (
+                  <div>
+                    <FormControl variant="label">
+                      <Typography variant="span" className="text-sm">
+                        JSON
+                      </Typography>
+                    </FormControl>
+                    <textarea
+                      value={item.jsonValue || ''}
+                      onChange={(e) =>
+                        updateItemJsonValue(item.id, e.target.value)
+                      }
+                      placeholder='Cole seu JSON aqui (ex: {"nome": "João"} ou [1,2,3])'
+                      rows={6}
+                      className="w-full rounded-md border border-gray-300 bg-white p-2.5 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"
+                    />
+                    <Typography
+                      variant="span"
+                      className="text-xs text-neutral-500 mt-1"
+                    >
+                      O JSON será parseado automaticamente. Pode ser objeto,
+                      array, string, número, etc.
+                    </Typography>
+                  </div>
+                )}
+
                 {(item.type === 'string' || item.type === 'number') && (
                   <div>
                     <FormControl variant="label">

@@ -219,7 +219,7 @@ export function ColumnFilter({
 
               {!selectedCondition ? (
                 /* Lista de condições */
-                <div className="py-1">
+                <div className="flex flex-col py-1">
                   <Button
                     type="button"
                     variant="ghost"

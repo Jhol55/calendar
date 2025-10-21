@@ -573,3 +573,316 @@ export async function addColumnsToTable(
     };
   }
 }
+
+export async function renameColumn(
+  tableName: string,
+  oldColumnName: string,
+  newColumnName: string,
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    // Validar novo nome da coluna
+    if (!newColumnName || !/^[a-zA-Z0-9_-]+$/.test(newColumnName)) {
+      return {
+        success: false,
+        message: 'Nome de coluna inválido. Use apenas letras, números, _ e -',
+        code: 400,
+      };
+    }
+
+    // Buscar todas as partições da tabela
+    const dataRecords = await prisma.dataTable.findMany({
+      where: {
+        userId,
+        tableName,
+      },
+    });
+
+    if (dataRecords.length === 0) {
+      return {
+        success: false,
+        message: 'Tabela não encontrada',
+        code: 404,
+      };
+    }
+
+    // Obter schema atual da primeira partição
+    const currentSchema = dataRecords[0].schema as {
+      columns: Array<{
+        name: string;
+        type: string;
+        default: unknown;
+        required: boolean;
+      }>;
+    };
+
+    // Verificar se a coluna antiga existe
+    const columnIndex = currentSchema.columns.findIndex(
+      (col) => col.name === oldColumnName,
+    );
+
+    if (columnIndex === -1) {
+      return {
+        success: false,
+        message: 'Coluna não encontrada',
+        code: 404,
+      };
+    }
+
+    // Verificar se o novo nome já existe
+    const newNameExists = currentSchema.columns.some(
+      (col) => col.name === newColumnName,
+    );
+
+    if (newNameExists) {
+      return {
+        success: false,
+        message: 'Já existe uma coluna com esse nome',
+        code: 409,
+      };
+    }
+
+    // Atualizar schema
+    const updatedSchema = {
+      columns: currentSchema.columns.map((col) =>
+        col.name === oldColumnName ? { ...col, name: newColumnName } : col,
+      ),
+    };
+
+    // Atualizar todas as partições
+    for (const record of dataRecords) {
+      const data = record.data as Array<Record<string, unknown>>;
+
+      // Renomear a propriedade em todos os registros
+      const updatedData = data.map((row) => {
+        const newRow = { ...row };
+        if (oldColumnName in newRow) {
+          newRow[newColumnName] = newRow[oldColumnName];
+          delete newRow[oldColumnName];
+        }
+        return newRow;
+      });
+
+      // Atualizar a partição
+      await prisma.dataTable.update({
+        where: { id: record.id },
+        data: {
+          schema: updatedSchema as Prisma.InputJsonValue,
+          data: updatedData as Prisma.InputJsonValue,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Coluna renomeada com sucesso',
+      code: 200,
+    };
+  } catch (error) {
+    console.error('Error renaming column:', error);
+    return {
+      success: false,
+      message: 'Erro ao renomear coluna',
+      code: 500,
+    };
+  }
+}
+
+export async function deleteColumn(
+  tableName: string,
+  columnName: string,
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    // Buscar todas as partições da tabela
+    const dataRecords = await prisma.dataTable.findMany({
+      where: {
+        userId,
+        tableName,
+      },
+    });
+
+    if (dataRecords.length === 0) {
+      return {
+        success: false,
+        message: 'Tabela não encontrada',
+        code: 404,
+      };
+    }
+
+    // Obter schema atual da primeira partição
+    const currentSchema = dataRecords[0].schema as {
+      columns: Array<{
+        name: string;
+        type: string;
+        default: unknown;
+        required: boolean;
+      }>;
+    };
+
+    // Verificar se a coluna existe
+    const columnExists = currentSchema.columns.some(
+      (col) => col.name === columnName,
+    );
+
+    if (!columnExists) {
+      return {
+        success: false,
+        message: 'Coluna não encontrada',
+        code: 404,
+      };
+    }
+
+    // Verificar se é a última coluna
+    if (currentSchema.columns.length === 1) {
+      return {
+        success: false,
+        message: 'Não é possível excluir a última coluna da tabela',
+        code: 400,
+      };
+    }
+
+    // Atualizar schema (remover coluna)
+    const updatedSchema = {
+      columns: currentSchema.columns.filter((col) => col.name !== columnName),
+    };
+
+    // Atualizar todas as partições
+    for (const record of dataRecords) {
+      const data = record.data as Array<Record<string, unknown>>;
+
+      // Remover a propriedade de todos os registros
+      const updatedData = data.map((row) => {
+        const newRow = { ...row };
+        delete newRow[columnName];
+        return newRow;
+      });
+
+      // Atualizar a partição
+      await prisma.dataTable.update({
+        where: { id: record.id },
+        data: {
+          schema: updatedSchema as Prisma.InputJsonValue,
+          data: updatedData as Prisma.InputJsonValue,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Coluna excluída com sucesso',
+      code: 200,
+    };
+  } catch (error) {
+    console.error('Error deleting column:', error);
+    return {
+      success: false,
+      message: 'Erro ao excluir coluna',
+      code: 500,
+    };
+  }
+}
+
+export async function reorderColumns(
+  tableName: string,
+  newColumnOrder: Array<{
+    name: string;
+    type: string;
+    default: unknown;
+    required: boolean;
+  }>,
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    // Buscar todas as partições da tabela
+    const dataRecords = await prisma.dataTable.findMany({
+      where: {
+        userId,
+        tableName,
+      },
+    });
+
+    if (dataRecords.length === 0) {
+      return {
+        success: false,
+        message: 'Tabela não encontrada',
+        code: 404,
+      };
+    }
+
+    // Atualizar schema com a nova ordem
+    const updatedSchema = {
+      columns: newColumnOrder,
+    };
+
+    // Atualizar todas as partições
+    for (const record of dataRecords) {
+      const data = record.data as Array<Record<string, unknown>>;
+
+      // Reordenar as propriedades de cada registro
+      const reorderedData = data.map((row) => {
+        const newRow: Record<string, unknown> = {};
+        newColumnOrder.forEach((col) => {
+          newRow[col.name] = row[col.name];
+        });
+        // Manter campos do sistema
+        newRow._id = row._id;
+        newRow._createdAt = row._createdAt;
+        newRow._updatedAt = row._updatedAt;
+        return newRow;
+      });
+
+      // Atualizar a partição
+      await prisma.dataTable.update({
+        where: { id: record.id },
+        data: {
+          schema: updatedSchema as Prisma.InputJsonValue,
+          data: reorderedData as Prisma.InputJsonValue,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Colunas reordenadas com sucesso',
+      code: 200,
+    };
+  } catch (error) {
+    console.error('Error reordering columns:', error);
+    return {
+      success: false,
+      message: 'Erro ao reordenar colunas',
+      code: 500,
+    };
+  }
+}
