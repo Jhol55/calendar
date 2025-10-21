@@ -759,7 +759,7 @@ function ConditionFormFields({
                               <div className="flex items-center justify-between mb-2">
                                 <Typography
                                   variant="span"
-                                  className="text-xs font-medium text-neutral-600"
+                                  className="text-sm font-medium text-neutral-600"
                                 >
                                   Regra {ruleIndex + 1}
                                 </Typography>
@@ -772,7 +772,7 @@ function ConditionFormFields({
                                     }
                                     className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
                                   >
-                                    <Trash2 className="w-3 h-3" />
+                                    <Trash2 className="w-4 h-4" />
                                   </Button>
                                 )}
                               </div>
