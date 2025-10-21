@@ -426,6 +426,9 @@ async function processNode(
       case 'condition':
         result = await processConditionNode(executionId, node, webhookData);
         break;
+      case 'http_request':
+        result = await processHttpRequestNode(executionId, node, webhookData);
+        break;
       case 'api':
         result = await processApiNode();
         break;
@@ -2103,6 +2106,284 @@ function executeValidationTransformation(
       return transformations.sanitize(input);
     default:
       throw new Error(`Unknown validation operation: ${operation}`);
+  }
+}
+
+// Interface para configuração de HTTP Request
+interface HttpRequestConfig {
+  url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  headers?: Array<{ key: string; value: string }>;
+  body?: string;
+  bodyType?: 'json' | 'text' | 'form';
+  timeout?: number;
+  followRedirects?: boolean;
+  validateSSL?: boolean;
+  saveResponse?: boolean;
+  responseVariable?: string;
+  memoryConfig?: MemoryConfig;
+}
+
+// Processador do HTTP Request Node
+async function processHttpRequestNode(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  console.log('🌐 Processing HTTP request node');
+
+  const httpRequestConfig = node.data?.httpRequestConfig as
+    | HttpRequestConfig
+    | undefined;
+
+  if (!httpRequestConfig) {
+    throw new Error('HTTP request configuration not found');
+  }
+
+  const {
+    url,
+    method,
+    headers,
+    body,
+    bodyType,
+    timeout,
+    followRedirects,
+    validateSSL,
+    saveResponse,
+    responseVariable,
+  } = httpRequestConfig;
+
+  if (!url || !method) {
+    throw new Error('URL and method are required');
+  }
+
+  try {
+    console.log(`📤 Making ${method} request to ${url}`);
+
+    // Buscar execução para obter dados de todos os nodes
+    const execution = await prisma.flow_executions.findUnique({
+      where: { id: executionId },
+      include: {
+        flow: true,
+      },
+    });
+
+    const nodeExecutions =
+      (execution?.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+
+    // Criar objeto $nodes com saídas de todos os nodes anteriores
+    const $nodes: Record<string, { output: unknown }> = {};
+    Object.keys(nodeExecutions).forEach((nodeId) => {
+      const nodeExec = nodeExecutions[nodeId];
+      if (nodeExec?.result) {
+        $nodes[nodeId] = {
+          output: nodeExec.result,
+        };
+      }
+    });
+
+    // Buscar todas as memórias do usuário para o contexto
+    const userId = execution?.flow?.userId
+      ? String(execution.flow.userId)
+      : null;
+    const $memory = userId ? await listarMemorias(userId) : {};
+
+    // Preparar contexto para substituição de variáveis
+    const variableContext = {
+      $node: {
+        input: webhookData.body,
+        webhook: {
+          body: webhookData.body,
+          headers: webhookData.headers,
+          queryParams: webhookData.queryParams,
+        },
+      },
+      $nodes,
+      $memory,
+    };
+
+    // Substituir variáveis na URL
+    const resolvedUrl = replaceVariables(url, variableContext);
+    console.log(`📝 Original URL: ${url}`);
+    console.log(`📝 Resolved URL: ${resolvedUrl}`);
+
+    // Preparar headers
+    const requestHeaders: Record<string, string> = {};
+    if (headers && headers.length > 0) {
+      headers.forEach((header) => {
+        if (header.key && header.value) {
+          const resolvedKey = replaceVariables(header.key, variableContext);
+          const resolvedValue = replaceVariables(header.value, variableContext);
+          requestHeaders[resolvedKey] = resolvedValue;
+        }
+      });
+    }
+
+    // Preparar body se necessário
+    let requestBody: string | undefined = undefined;
+    if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+      const resolvedBody = replaceVariables(body, variableContext);
+
+      // Definir Content-Type baseado no bodyType
+      if (bodyType === 'json') {
+        requestHeaders['Content-Type'] = 'application/json';
+        // Validar se é JSON válido
+        try {
+          JSON.parse(resolvedBody);
+          requestBody = resolvedBody;
+        } catch {
+          throw new Error('Invalid JSON in request body');
+        }
+      } else if (bodyType === 'form') {
+        requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        requestBody = resolvedBody;
+      } else {
+        // text
+        requestHeaders['Content-Type'] = 'text/plain';
+        requestBody = resolvedBody;
+      }
+    }
+
+    console.log(`📦 Request headers:`, requestHeaders);
+    console.log(`📦 Request body:`, requestBody);
+
+    // Fazer a requisição HTTP
+    const controller = new AbortController();
+    const timeoutId = timeout
+      ? setTimeout(() => controller.abort(), timeout)
+      : null;
+
+    try {
+      const response = await fetch(resolvedUrl, {
+        method,
+        headers: requestHeaders,
+        body: requestBody,
+        signal: controller.signal,
+        redirect: followRedirects !== false ? 'follow' : 'manual',
+        // Note: validateSSL não é suportado no fetch do Node.js padrão
+        // Para produção, considere usar bibliotecas como node-fetch ou axios
+      });
+
+      if (timeoutId) clearTimeout(timeoutId);
+
+      // Ler resposta
+      const responseText = await response.text();
+      console.log(`📄 Raw response text:`, responseText);
+      console.log(`📄 Raw response text type:`, typeof responseText);
+
+      let responseData: unknown;
+
+      // Tentar parsear como JSON recursivamente até não ser mais string
+      responseData = responseText;
+      let parseAttempts = 0;
+      const maxAttempts = 3; // Prevenir loop infinito
+
+      while (typeof responseData === 'string' && parseAttempts < maxAttempts) {
+        try {
+          const parsed = JSON.parse(responseData);
+          console.log(
+            `🔄 Parse attempt ${parseAttempts + 1}: success, type = ${typeof parsed}`,
+          );
+          responseData = parsed;
+          parseAttempts++;
+        } catch (error) {
+          console.log(`🔄 Parse attempt ${parseAttempts + 1}: failed`);
+
+          // Tentar corrigir JSONs malformados comuns apenas na primeira tentativa
+          if (parseAttempts === 0 && typeof responseData === 'string') {
+            console.log(`🔧 Attempting to fix malformed JSON...`);
+
+            // Tentar corrigir padrões comuns de JSON malformado
+            let fixedJson = responseData;
+
+            // Corrigir: { "data:" "success" } -> { "data": "success" }
+            // Remove os dois-pontos extras dentro das aspas e adiciona dois-pontos corretos
+            fixedJson = fixedJson.replace(
+              /"([^"]+):"\s+"([^"]+)"/g,
+              '"$1": "$2"',
+            );
+
+            // Corrigir: :" " -> ": " (espaço extra após dois pontos)
+            fixedJson = fixedJson.replace(/:\s*"\s+/g, ': "');
+
+            try {
+              const fixedParsed = JSON.parse(fixedJson);
+              console.log(`✅ Fixed JSON successfully!`);
+              responseData = fixedParsed;
+              parseAttempts++;
+              continue; // Tentar parsear novamente
+            } catch {
+              console.log(`❌ Could not fix malformed JSON, keeping as string`);
+            }
+          }
+
+          break; // Não é JSON válido, manter como string
+        }
+      }
+
+      console.log(`📋 Response status: ${response.status}`);
+      console.log(`📋 Final response data:`, responseData);
+      console.log(`📋 Final response data type:`, typeof responseData);
+      console.log(`📋 Total parse attempts:`, parseAttempts);
+
+      // Verificar se a resposta foi bem-sucedida
+      if (!response.ok) {
+        throw new Error(
+          `HTTP request failed with status ${response.status}: ${responseText}`,
+        );
+      }
+
+      const result = {
+        type: 'http_request',
+        status: 'success',
+        statusCode: response.status,
+        url: resolvedUrl,
+        method,
+        response: responseData,
+        // Se saveResponse estiver ativo, incluir em variável específica
+        ...(saveResponse && responseVariable
+          ? { [responseVariable]: responseData }
+          : {}),
+      };
+
+      // Processar memória se configurada
+      let memoryResult = undefined;
+      if (httpRequestConfig.memoryConfig) {
+        const httpVariableContext = {
+          ...variableContext,
+          $node: {
+            ...variableContext.$node,
+            output: result,
+          },
+        };
+
+        memoryResult = await processNodeMemory(
+          httpRequestConfig.memoryConfig,
+          executionId,
+          httpVariableContext,
+        );
+      }
+
+      console.log(
+        `✅ HTTP request completed successfully to ${resolvedUrl} from node ${node.id}`,
+      );
+
+      return {
+        ...result,
+        memoryResult,
+      };
+    } catch (fetchError) {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        throw new Error(`HTTP request timed out after ${timeout}ms`);
+      }
+
+      throw fetchError;
+    }
+  } catch (error) {
+    console.error(`❌ Error making HTTP request:`, error);
+    throw error;
   }
 }
 

@@ -30,6 +30,7 @@ import {
   TransformationNode,
   DatabaseNode,
 } from './nodes';
+import { HttpRequestNode } from './nodes/http-request-node/http-request-node';
 import {
   NodeType,
   NodeData,
@@ -39,6 +40,7 @@ import {
   TransformationConfig,
   ConditionConfig,
   DatabaseConfig,
+  HttpRequestConfig,
 } from '../../layout/chatbot-flow/types';
 import { Save, Download, Upload, Plus, Play, Database, X } from 'lucide-react';
 import {
@@ -55,6 +57,7 @@ import { MemoryNodeConfig } from './nodes/memory-node/memory-node-config';
 import { TransformationNodeConfig } from './nodes/transformation-node/transformation-node-config';
 import { ConditionNodeConfig } from './nodes/condition-node/condition-node-config';
 import { DatabaseNodeConfig } from './nodes/database-node/database-node-config';
+import { HttpRequestNodeConfig } from './nodes/http-request-node/http-request-node-config';
 import { ExecutionsPanel } from './executions-panel';
 import { DatabaseSpreadsheet } from '@/components/layout/database-spreadsheet/database-spreadsheet';
 
@@ -66,6 +69,7 @@ const nodeTypes = {
   memory: MemoryNode,
   transformation: TransformationNode,
   database: DatabaseNode,
+  http_request: HttpRequestNode,
 };
 
 // Função para gerar IDs únicos
@@ -87,6 +91,8 @@ function FlowEditorContent() {
   const [conditionConfigDialogOpen, setConditionConfigDialogOpen] =
     useState(false);
   const [databaseConfigDialogOpen, setDatabaseConfigDialogOpen] =
+    useState(false);
+  const [httpRequestConfigDialogOpen, setHttpRequestConfigDialogOpen] =
     useState(false);
   const [nodeToConfig, setNodeToConfig] = useState<Node<NodeData> | null>(null);
   const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
@@ -193,12 +199,26 @@ function FlowEditorContent() {
         y: event.clientY - reactFlowBounds.top,
       }) || { x: 0, y: 0 };
 
+      // Mapeamento de labels personalizados para cada tipo de node
+      const nodeLabels: Record<NodeType, string> = {
+        start: 'Start',
+        message: 'Message',
+        condition: 'Condition',
+        webhook: 'Webhook',
+        memory: 'Memory',
+        transformation: 'Transformation',
+        database: 'Database',
+        http_request: 'HTTP Request',
+        end: 'End',
+      };
+
       const newNode: Node<NodeData> = {
         id: generateNodeId(),
         type,
         position,
         data: {
-          label: type.charAt(0).toUpperCase() + type.slice(1),
+          label:
+            nodeLabels[type] || type.charAt(0).toUpperCase() + type.slice(1),
           type,
           content: type === 'message' ? 'Digite aqui...' : undefined,
         },
@@ -438,6 +458,9 @@ function FlowEditorContent() {
       } else if (node.type === 'database') {
         setNodeToConfig(node);
         setDatabaseConfigDialogOpen(true);
+      } else if (node.type === 'http_request') {
+        setNodeToConfig(node);
+        setHttpRequestConfigDialogOpen(true);
       } else if (node.type === 'start' || node.type === 'end') {
         // Start e End nodes não têm configuração
         return;
@@ -498,6 +521,15 @@ function FlowEditorContent() {
     (config: DatabaseConfig) => {
       if (nodeToConfig) {
         handleNodeUpdate(nodeToConfig.id, { databaseConfig: config });
+      }
+    },
+    [nodeToConfig, handleNodeUpdate],
+  );
+
+  const handleSaveHttpRequestConfig = useCallback(
+    (config: HttpRequestConfig) => {
+      if (nodeToConfig) {
+        handleNodeUpdate(nodeToConfig.id, { httpRequestConfig: config });
       }
     },
     [nodeToConfig, handleNodeUpdate],
@@ -827,6 +859,24 @@ function FlowEditorContent() {
         onSave={handleSaveDatabaseConfig}
         nodeId={nodeToConfig?.id}
         flowId={currentFlowId || undefined}
+      />
+
+      <HttpRequestNodeConfig
+        isOpen={httpRequestConfigDialogOpen}
+        onClose={() => {
+          setHttpRequestConfigDialogOpen(false);
+          setNodeToConfig(null);
+        }}
+        config={nodeToConfig?.data.httpRequestConfig}
+        onSave={handleSaveHttpRequestConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
+        nodeLabel={nodeToConfig?.data.label}
+        onNodeLabelChange={(label) => {
+          if (nodeToConfig) {
+            handleNodeUpdate(nodeToConfig.id, { label });
+          }
+        }}
       />
 
       <ExecutionsPanel

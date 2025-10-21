@@ -6,6 +6,7 @@ export type NodeType =
   | 'memory'
   | 'transformation'
   | 'database'
+  | 'http_request'
   | 'end';
 
 export type MessageType =
@@ -311,6 +312,22 @@ export interface DatabaseConfig {
   };
 }
 
+// HTTP Request Node Types
+export interface HttpRequestConfig {
+  url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  headers?: Array<{ key: string; value: string }>;
+  body?: string;
+  bodyType?: 'json' | 'text' | 'form';
+  timeout?: number;
+  followRedirects?: boolean;
+  validateSSL?: boolean;
+  saveResponse?: boolean;
+  responseVariable?: string;
+  // Configuração de memória (opcional)
+  memoryConfig?: MemoryConfig;
+}
+
 export interface NodeData {
   label: string;
   type: NodeType;
@@ -321,6 +338,7 @@ export interface NodeData {
   transformationConfig?: TransformationConfig;
   conditionConfig?: ConditionConfig;
   databaseConfig?: DatabaseConfig;
+  httpRequestConfig?: HttpRequestConfig;
   conditions?: Array<{
     field: string;
     operator: string;

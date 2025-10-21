@@ -6,6 +6,7 @@ import {
   Brain,
   Settings,
   Database,
+  Globe,
 } from 'lucide-react';
 import { NodeType } from './types';
 
@@ -59,6 +60,13 @@ const nodeTemplates: NodeTemplate[] = [
     icon: <Database className="w-5 h-5" />,
     description: 'Gerenciar tabelas de dados',
     color: 'bg-purple-500',
+  },
+  {
+    type: 'http_request',
+    label: 'HTTP Request',
+    icon: <Globe className="w-5 h-5" />,
+    description: 'Fazer requisições HTTP',
+    color: 'bg-green-600',
   },
 ];
 
