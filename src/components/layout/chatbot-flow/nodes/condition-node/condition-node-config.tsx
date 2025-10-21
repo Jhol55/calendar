@@ -926,11 +926,7 @@ function ConditionFormFields({
         setValue={setValue}
       />
 
-      <SubmitButton
-        variant="gradient"
-        className="mt-4"
-        onClick={() => console.log(errors)}
-      >
+      <SubmitButton variant="gradient" className="mt-4">
         Salvar Configuração
       </SubmitButton>
     </>
@@ -950,8 +946,6 @@ export function ConditionNodeConfig({
   ]);
 
   const handleSubmit = async (data: FieldValues) => {
-    console.log('📊 Dados recebidos no handleSubmit:', data);
-
     const conditionConfig: ConditionConfig = {
       conditionType: data.conditionType as ConditionType,
     };
@@ -966,7 +960,6 @@ export function ConditionNodeConfig({
       // Cases já vem como array
       conditionConfig.cases = data.cases || [];
       conditionConfig.useDefaultCase = data.useDefaultCase ?? true;
-      console.log('📦 Casos sendo salvos:', conditionConfig.cases);
     }
 
     // Adicionar configuração de memória se preenchida
@@ -990,7 +983,6 @@ export function ConditionNodeConfig({
       };
     }
 
-    console.log('💾 Configuração final:', conditionConfig);
     onSave(conditionConfig);
     onClose();
   };

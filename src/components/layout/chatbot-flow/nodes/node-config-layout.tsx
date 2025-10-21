@@ -85,9 +85,7 @@ export function NodeConfigLayout({
                 nodeId={nodeId}
                 flowId={flowId}
                 mode="input"
-                onVariableSelect={(variable) => {
-                  console.log('Variable selected:', variable);
-                }}
+                onVariableSelect={(variable) => {}}
               />
             </div>
           </div>
