@@ -51,33 +51,33 @@ function PreviousNodeDropdown({
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="mb-2 border border-gray-200 rounded-lg overflow-hidden">
+    <div className="mb-2 border z-50 !bg-white hover:!bg-neutral-100 border-neutral-200 rounded-lg overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 p-3 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center gap-2 p-3 transition-colors"
       >
         {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-gray-600" />
+          <ChevronDown className="w-4 h-4 text-neutral-600" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-gray-600" />
+          <ChevronRight className="w-4 h-4 text-neutral-600" />
         )}
         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
         <Typography
           variant="span"
-          className="text-sm font-medium text-gray-800"
+          className="text-sm font-medium text-neutral-800"
         >
           {nodeLabel}
         </Typography>
         <Typography
           variant="span"
-          className="text-xs text-gray-400 font-mono hidden"
+          className="text-xs text-neutral-400 font-mono hidden"
         >
           ({customLabel || `${nodeId.substring(0, 8)}...`})
         </Typography>
       </button>
 
       {isExpanded && (
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+        <div className="px-4 py-3 bg-white border-t border-neutral-200">
           {output ? (
             renderJsonTree(output, `$nodes.${nodeId}.output`, 0)
           ) : (
@@ -119,7 +119,7 @@ function JsonTreeItem({
 
   return (
     <div className="my-1">
-      <div className="flex items-center gap-2 group hover:bg-gray-50 rounded px-2 py-1">
+      <div className="flex items-center gap-2 group hover:bg-neutral-50 rounded px-2 py-1">
         {isObject && (
           <button onClick={() => setIsExpanded(!isExpanded)} className="p-0.5">
             <ChevronRight
@@ -127,7 +127,7 @@ function JsonTreeItem({
             />
           </button>
         )}
-        <span className="text-sm font-medium text-gray-700">{itemKey}:</span>
+        <span className="text-sm font-medium text-neutral-700">{itemKey}:</span>
         <div
           className={cn(
             'flex items-center gap-2 w-full justify-between',
@@ -141,13 +141,13 @@ function JsonTreeItem({
           )}
           <button
             onClick={() => onCopyPath(currentPath)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 rounded"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-neutral-100 rounded"
             title="Copiar variável"
           >
             {copiedPath === currentPath ? (
               <Check className="w-3 h-3 text-green-600" />
             ) : (
-              <Copy className="w-3 h-3 text-gray-400" />
+              <Copy className="w-3 h-3 text-neutral-400" />
             )}
           </button>
         </div>
@@ -306,7 +306,7 @@ export function NodeExecutionPanel({
     level: number = 0,
   ): React.ReactNode => {
     if (obj === null || obj === undefined) {
-      return <div className="ml-4 text-gray-500 text-sm">null</div>;
+      return <div className="ml-4 text-neutral-500 text-sm">null</div>;
     }
 
     if (typeof obj !== 'object') {
@@ -315,13 +315,13 @@ export function NodeExecutionPanel({
           <span className="text-blue-600 font-mono">{JSON.stringify(obj)}</span>
           <button
             onClick={() => handleCopyPath(parentPath)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 rounded"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-neutral-100 rounded"
             title="Copiar variável"
           >
             {copiedPath === parentPath ? (
               <Check className="w-3 h-3 text-green-600" />
             ) : (
-              <Copy className="w-3 h-3 text-gray-400" />
+              <Copy className="w-3 h-3 text-neutral-400" />
             )}
           </button>
         </div>
@@ -349,7 +349,7 @@ export function NodeExecutionPanel({
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Typography variant="p" className="text-gray-500">
+        <Typography variant="p" className="text-neutral-500">
           Carregando execuções...
         </Typography>
       </div>
@@ -404,7 +404,7 @@ export function NodeExecutionPanel({
               )}
             </div>
           ) : (
-            <Typography variant="p" className="text-gray-400">
+            <Typography variant="p" className="text-neutral-400">
               Nenhum node anterior encontrado
             </Typography>
           )
@@ -412,7 +412,7 @@ export function NodeExecutionPanel({
         data ? (
           renderJsonTree(data, pathPrefix)
         ) : (
-          <Typography variant="p" className="text-gray-400">
+          <Typography variant="p" className="text-neutral-400">
             Nenhum dado de saída
           </Typography>
         )}

@@ -55,6 +55,14 @@ function MemoryFormFields({
   const ttlPreset = (form.ttlPreset as string) || 'never';
   const saveMode = (form.saveMode as 'overwrite' | 'append') || 'overwrite';
 
+  // Sincronizar items com o formulário
+  useEffect(() => {
+    items.forEach((item, index) => {
+      setValue(`item_key_${index}`, item.key);
+      setValue(`item_value_${index}`, item.value);
+    });
+  }, [items, setValue]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (config) {
@@ -186,14 +194,12 @@ function MemoryFormFields({
                     type="text"
                     fieldName={`item_key_${index}`}
                     placeholder="Chave (ex: etapa, nome)"
-                    value={item.key}
                     onChange={(e) => updateItem(index, 'key', e.target.value)}
                   />
                   <Input
                     type="text"
                     fieldName={`item_value_${index}`}
                     placeholder="Valor ou variável: {{$node.input.campo}}"
-                    value={item.value}
                     onChange={(e) => updateItem(index, 'value', e.target.value)}
                   />
                 </div>
@@ -299,6 +305,8 @@ export function MemoryNodeConfig({
       setItems([{ key: '', value: '' }]);
     }
   }, [config]);
+
+  // Sincronizar items com o formulário - será feito dentro do MemoryFormFields
 
   const handleSubmit = async (data: FieldValues) => {
     // Processar TTL baseado no preset selecionado

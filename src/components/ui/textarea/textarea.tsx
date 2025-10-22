@@ -2,7 +2,7 @@
 
 import { useForm } from '@/hooks/use-form';
 import { TextareaProps } from './textarea.type';
-import { forwardRef, useMemo } from 'react';
+import { forwardRef, useMemo, useState, useRef, useEffect } from 'react';
 import { mergeRefs } from '@/utils/mergeRefs';
 import { cn } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -13,6 +13,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ fieldName, className, onChange, value: externalValue, ...props }, ref) => {
     const { register, setValue, form } = useForm();
     const flowExecution = useFlowExecutionOptional();
+    const [isEditing, setIsEditing] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const {
       ref: registerRef,
       onChange: registerOnChange,
@@ -25,6 +27,31 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       registerOnChange?.(e);
       onChange?.(e);
     };
+
+    // Detectar clique fora do textarea para voltar ao modo de visualização
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (
+          textareaRef.current &&
+          !textareaRef.current.contains(event.target as Node)
+        ) {
+          setIsEditing(false);
+        }
+      };
+
+      if (isEditing) {
+        document.addEventListener('mousedown', handleClickOutside);
+        return () =>
+          document.removeEventListener('mousedown', handleClickOutside);
+      }
+    }, [isEditing]);
+
+    // Focar no textarea quando entrar no modo de edição
+    useEffect(() => {
+      if (isEditing && textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    }, [isEditing]);
 
     const defaultStyle =
       'w-full rounded-md border border-gray-300 bg-neutral-100 p-2.5 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] text-sm resize-none';
@@ -115,11 +142,24 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       );
     }
 
+    // Se estiver no modo de edição, renderizar textarea normal
+    if (isEditing) {
+      return (
+        <textarea
+          ref={mergeRefs(ref, registerRef, textareaRef)}
+          onChange={handleOnChange}
+          className={cn(defaultStyle, className)}
+          {...props}
+          {...registerProps}
+        />
+      );
+    }
+
     // Renderizar com overlay para variáveis
     return (
       <div className="relative w-full">
         <textarea
-          ref={mergeRefs(ref, registerRef)}
+          ref={mergeRefs(ref, registerRef, textareaRef)}
           onChange={handleOnChange}
           className={cn(
             defaultStyle,
@@ -197,6 +237,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
                       fontFamily: 'inherit',
                       boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
                     }}
+                    onClick={() => setIsEditing(true)}
                   >
                     {part.text}
                   </span>

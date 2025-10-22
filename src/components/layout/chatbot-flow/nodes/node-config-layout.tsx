@@ -80,7 +80,7 @@ function NodeConfigLayoutContent({
         {showLeftPanel && nodeId && flowId && (
           <div
             className={cn(
-              'h-screen border-r bg-gray-50 flex flex-col',
+              'h-screen border-r bg-white flex flex-col',
               showLeftPanel && showRightPanel && '!w-1/4',
               showLeftPanel && !showRightPanel && '!w-2/4',
               !showLeftPanel && showRightPanel && '!w-2/4',
@@ -210,7 +210,7 @@ function NodeConfigLayoutContent({
         {showRightPanel && nodeId && flowId && (
           <div
             className={cn(
-              'h-screen border-l bg-gray-50 flex flex-col',
+              'h-screen border-l bg-white flex flex-col',
               showLeftPanel && showRightPanel && '!w-1/4',
               showLeftPanel && !showRightPanel && '!w-2/4',
               !showLeftPanel && showRightPanel && '!w-2/4',

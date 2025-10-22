@@ -2,7 +2,7 @@
 
 import { useForm } from '@/hooks/use-form';
 import { InputProps } from './input.type';
-import { forwardRef, useMemo } from 'react';
+import { forwardRef, useMemo, useState, useRef, useEffect } from 'react';
 import { mergeRefs } from '@/utils/mergeRefs';
 import { cn } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -24,6 +24,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ) => {
     const { register, setValue, maskSchema, form } = useForm();
     const flowExecution = useFlowExecutionOptional();
+    const [isEditing, setIsEditing] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
     const {
       ref: registerRef,
       onChange: registerOnChange,
@@ -37,6 +39,31 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       registerOnChange?.(e);
       onChange?.(e);
     };
+
+    // Detectar clique fora do input para voltar ao modo de visualização
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (
+          inputRef.current &&
+          !inputRef.current.contains(event.target as Node)
+        ) {
+          setIsEditing(false);
+        }
+      };
+
+      if (isEditing) {
+        document.addEventListener('mousedown', handleClickOutside);
+        return () =>
+          document.removeEventListener('mousedown', handleClickOutside);
+      }
+    }, [isEditing]);
+
+    // Focar no input quando entrar no modo de edição
+    useEffect(() => {
+      if (isEditing && inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, [isEditing]);
 
     const styles: Record<string, string> = {
       default:
@@ -143,11 +170,26 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       );
     }
 
+    // Se estiver no modo de edição, renderizar input normal
+    if (isEditing) {
+      return (
+        <input
+          ref={mergeRefs(ref, registerRef, inputRef)}
+          type={type}
+          autoComplete={autoComplete}
+          onChange={handleOnChange}
+          className={cn(styles.default, className)}
+          {...props}
+          {...registerProps}
+        />
+      );
+    }
+
     // Para inputs text com variáveis, renderizar com overlay
     return (
       <div className="relative w-full">
         <input
-          ref={mergeRefs(ref, registerRef)}
+          ref={mergeRefs(ref, registerRef, inputRef)}
           type={type}
           autoComplete={autoComplete}
           onChange={handleOnChange}
@@ -229,6 +271,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                       fontFamily: 'inherit',
                       boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
                     }}
+                    onClick={() => setIsEditing(true)}
                   >
                     {part.text}
                   </span>
