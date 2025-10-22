@@ -574,6 +574,109 @@ export async function addColumnsToTable(
   }
 }
 
+export async function updateColumnMetadata(
+  tableName: string,
+  columnName: string,
+  metadata: {
+    type?: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+    required?: boolean;
+    default?: unknown;
+  },
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    // Buscar todas as partições da tabela
+    const dataRecords = await prisma.dataTable.findMany({
+      where: {
+        userId,
+        tableName,
+      },
+    });
+
+    if (dataRecords.length === 0) {
+      return {
+        success: false,
+        message: 'Tabela não encontrada',
+        code: 404,
+      };
+    }
+
+    // Obter schema atual da primeira partição
+    const currentSchema = dataRecords[0].schema as {
+      columns: Array<{
+        name: string;
+        type: string;
+        default: unknown;
+        required: boolean;
+      }>;
+    };
+
+    // Verificar se a coluna existe
+    const columnIndex = currentSchema.columns.findIndex(
+      (col) => col.name === columnName,
+    );
+
+    if (columnIndex === -1) {
+      return {
+        success: false,
+        message: 'Coluna não encontrada',
+        code: 404,
+      };
+    }
+
+    // Atualizar schema com os novos metadados
+    const updatedSchema = {
+      columns: currentSchema.columns.map((col) =>
+        col.name === columnName
+          ? {
+              ...col,
+              ...(metadata.type !== undefined && { type: metadata.type }),
+              ...(metadata.required !== undefined && {
+                required: metadata.required,
+              }),
+              ...(metadata.default !== undefined && {
+                default: metadata.default,
+              }),
+            }
+          : col,
+      ),
+    };
+
+    // Atualizar todas as partições
+    for (const record of dataRecords) {
+      await prisma.dataTable.update({
+        where: { id: record.id },
+        data: {
+          schema: updatedSchema as Prisma.InputJsonValue,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Metadados da coluna atualizados com sucesso',
+      code: 200,
+    };
+  } catch (error) {
+    console.error('Error updating column metadata:', error);
+    return {
+      success: false,
+      message: 'Erro ao atualizar metadados da coluna',
+      code: 500,
+    };
+  }
+}
+
 export async function renameColumn(
   tableName: string,
   oldColumnName: string,
@@ -882,6 +985,142 @@ export async function reorderColumns(
     return {
       success: false,
       message: 'Erro ao reordenar colunas',
+      code: 500,
+    };
+  }
+}
+
+export async function renameTable(
+  oldTableName: string,
+  newTableName: string,
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    // Validar novo nome da tabela
+    if (!newTableName || !/^[a-zA-Z0-9_-]+$/.test(newTableName)) {
+      return {
+        success: false,
+        message: 'Nome de tabela inválido. Use apenas letras, números, _ e -',
+        code: 400,
+      };
+    }
+
+    // Verificar se a tabela antiga existe
+    const oldTableExists = await prisma.dataTable.findFirst({
+      where: {
+        userId,
+        tableName: oldTableName,
+      },
+    });
+
+    if (!oldTableExists) {
+      return {
+        success: false,
+        message: 'Tabela não encontrada',
+        code: 404,
+      };
+    }
+
+    // Verificar se o novo nome já existe
+    const newTableExists = await prisma.dataTable.findFirst({
+      where: {
+        userId,
+        tableName: newTableName,
+      },
+    });
+
+    if (newTableExists) {
+      return {
+        success: false,
+        message: 'Já existe uma tabela com esse nome',
+        code: 409,
+      };
+    }
+
+    // Renomear todas as partições da tabela
+    await prisma.dataTable.updateMany({
+      where: {
+        userId,
+        tableName: oldTableName,
+      },
+      data: {
+        tableName: newTableName,
+        updatedAt: new Date(),
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Tabela renomeada com sucesso',
+      code: 200,
+    };
+  } catch (error) {
+    console.error('Error renaming table:', error);
+    return {
+      success: false,
+      message: 'Erro ao renomear tabela',
+      code: 500,
+    };
+  }
+}
+
+export async function deleteTable(
+  tableName: string,
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    // Verificar se a tabela existe
+    const tableExists = await prisma.dataTable.findFirst({
+      where: {
+        userId,
+        tableName,
+      },
+    });
+
+    if (!tableExists) {
+      return {
+        success: false,
+        message: 'Tabela não encontrada',
+        code: 404,
+      };
+    }
+
+    // Deletar todas as partições da tabela
+    await prisma.dataTable.deleteMany({
+      where: {
+        userId,
+        tableName,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Tabela deletada com sucesso',
+      code: 200,
+    };
+  } catch (error) {
+    console.error('Error deleting table:', error);
+    return {
+      success: false,
+      message: 'Erro ao deletar tabela',
       code: 500,
     };
   }

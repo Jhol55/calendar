@@ -49,12 +49,9 @@ import {
   CodeExecutionConfig,
 } from '../../layout/chatbot-flow/types';
 import { Save, Download, Upload, Plus, Play, Database, X } from 'lucide-react';
-import {
-  createFlow,
-  updateFlow,
-  ChatbotFlow,
-} from '@/actions/chatbot-flows/flows';
+import { ChatbotFlow } from '@/actions/chatbot-flows/flows';
 import { useUser } from '@/hooks/use-user';
+import { useCreateWorkflow, useUpdateWorkflow } from '@/lib/react-query/hooks';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { CreateWorkflowDialog } from '@/components/features/dialogs/create-workflow-dialog';
@@ -118,7 +115,11 @@ function FlowEditorContent() {
   const [isSpreadsheetOpen, setIsSpreadsheetOpen] = useState(false);
   const [copiedNode, setCopiedNode] = useState<Node<NodeData> | null>(null);
   const [hasExecutionHighlight, setHasExecutionHighlight] = useState(false);
-  const { user, workflows, setWorkflows } = useUser();
+  const { user } = useUser();
+
+  // Mutations
+  const createWorkflowMutation = useCreateWorkflow();
+  const updateWorkflowMutation = useUpdateWorkflow();
 
   // Handler para deletar nodes selecionados
   const onNodesDelete = useCallback(
@@ -226,6 +227,8 @@ function FlowEditorContent() {
         database: 'Database',
         http_request: 'HTTP Request',
         agent: 'AI Agent',
+        loop: 'Loop',
+        code_execution: 'Code Execution',
         end: 'End',
       };
 
@@ -257,26 +260,27 @@ function FlowEditorContent() {
     try {
       const flowData = {
         name: flowName,
+        description: '',
         nodes: nodes,
         edges: edges,
+        token: currentFlowId || `flow-${Date.now()}`,
         userId: user?.id,
+        isActive: false,
       };
 
-      let result;
-
       if (currentFlowId) {
-        result = await updateFlow(currentFlowId, flowData);
+        // Atualizar flow existente usando mutation
+        await updateWorkflowMutation.mutateAsync({
+          id: currentFlowId,
+          data: flowData,
+        });
+        console.log('✅ Flow atualizado com sucesso!');
       } else {
-        result = await createFlow(flowData);
-        if (result.success && result.flow) {
-          setCurrentFlowId(result.flow.id);
-        }
-      }
-
-      if (result.success) {
-        console.log('✅ Flow salvo com sucesso!');
-      } else {
-        alert(`Erro ao salvar fluxo: ${result.error}`);
+        // Criar novo flow usando mutation
+        const newFlow = await createWorkflowMutation.mutateAsync(flowData);
+        console.log('✅ Flow criado com sucesso!');
+        setCurrentFlowId(newFlow.id);
+        setFlowName(newFlow.name);
       }
     } catch (error) {
       console.error('Error saving flow:', error);
@@ -284,7 +288,15 @@ function FlowEditorContent() {
     } finally {
       setIsSaving(false);
     }
-  }, [nodes, edges, flowName, currentFlowId, user]);
+  }, [
+    nodes,
+    edges,
+    flowName,
+    currentFlowId,
+    user,
+    updateWorkflowMutation,
+    createWorkflowMutation,
+  ]);
 
   const clearExecutionHighlight = useCallback(() => {
     // Limpar highlight dos nodes
@@ -412,30 +424,28 @@ function FlowEditorContent() {
         // Criar o fluxo no banco de dados com nodes e edges vazios
         const flowData = {
           name: flowName,
+          description: '',
           nodes: [],
           edges: [],
+          token: `flow-${Date.now()}`,
           userId: user?.id,
+          isActive: false,
         };
 
-        const result = await createFlow(flowData);
+        const newFlow = await createWorkflowMutation.mutateAsync(flowData);
 
-        if (result.success && result.flow) {
-          // Limpar o canvas e definir o novo fluxo como atual
-          setNodes([]);
-          setEdges([]);
-          setFlowName(flowName);
-          setCurrentFlowId(result.flow.id);
-          setIsCreateDialogOpen(false);
-          setWorkflows([...workflows, result.flow]);
-        } else {
-          alert(`Erro ao criar fluxo: ${result.error}`);
-        }
+        // Limpar o canvas e definir o novo fluxo como atual
+        setNodes([]);
+        setEdges([]);
+        setFlowName(flowName);
+        setCurrentFlowId(newFlow.id);
+        setIsCreateDialogOpen(false);
       } catch (error) {
         console.error('Error creating flow:', error);
         alert('Erro ao criar fluxo');
       }
     },
-    [setNodes, setEdges, user, workflows, setWorkflows],
+    [setNodes, setEdges, user, createWorkflowMutation],
   );
 
   const handleNodeUpdate = useCallback(
@@ -707,6 +717,12 @@ function FlowEditorContent() {
           onNodeDoubleClick={onNodeDoubleClick}
           nodeTypes={nodeTypes}
           fitView
+          fitViewOptions={{
+            padding: 0.1,
+            minZoom: 0.1,
+            maxZoom: 2,
+          }}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.1 }}
           proOptions={{ hideAttribution: true }}
           className="bg-gray-50"
         >

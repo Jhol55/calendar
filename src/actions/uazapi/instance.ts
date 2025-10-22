@@ -1,6 +1,7 @@
 'use server';
 
 import { getSession } from '@/utils/security/session';
+import { prisma } from '@/services/prisma';
 
 interface SessionUser {
   user: {
@@ -18,6 +19,11 @@ type UazapiResponse = {
   data?: unknown;
 };
 
+/**
+ * Buscar instâncias do usuário
+ * Acesso direto ao Prisma (sem HTTP overhead)
+ * Fallback para UAZAPI se não encontrar no banco
+ */
 export async function getInstances(): Promise<UazapiResponse> {
   try {
     const session = (await getSession()) as SessionUser | null;
@@ -31,28 +37,57 @@ export async function getInstances(): Promise<UazapiResponse> {
       };
     }
 
-    const response = await fetch(
-      `http://localhost:3000/api/uazapi/admin/instance/all`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+    // Buscar do PostgreSQL diretamente
+    try {
+      const instances = await prisma.instances.findMany({
+        where: {
+          adminField01: email,
         },
-        body: JSON.stringify({
-          email,
-          admintoken: `${process.env.UAZAPI_ADMIN_TOKEN}`,
-        }),
+      });
+
+      if (instances && instances.length > 0) {
+        console.log(
+          `✅ Found ${instances.length} instances in PostgreSQL for ${email}`,
+        );
+        return {
+          success: true,
+          message: 'Instâncias carregadas com sucesso',
+          code: 200,
+          data: instances,
+        };
+      }
+
+      console.log(
+        '⚠️ No instances found in PostgreSQL, trying UAZAPI fallback',
+      );
+    } catch (dbError) {
+      console.error(
+        '❌ Error fetching from PostgreSQL, falling back to UAZAPI:',
+        dbError,
+      );
+    }
+
+    // Fallback: buscar da UAZAPI
+    const response = await fetch(`${process.env.UAZAPI_URL}/instance/all`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        admintoken: `${process.env.UAZAPI_ADMIN_TOKEN}`,
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        Pragma: 'no-cache',
+        Expires: '0',
       },
-    );
+      cache: 'no-store',
+    });
 
     const data = await response.json();
 
-    // Verificar se data é um array antes de usar filter
-    const filteredData = Array.isArray(data)
-      ? data.filter(
-          (item: { adminField01: string }) => item.adminField01 === email,
-        )
-      : [];
+    // Garantir que data é um array
+    const instancesArray = Array.isArray(data) ? data : [];
+
+    const filteredData = instancesArray.filter(
+      (item: { adminField01: string }) => item.adminField01 === email,
+    );
 
     return {
       success: response.ok,
@@ -72,6 +107,10 @@ export async function getInstances(): Promise<UazapiResponse> {
   }
 }
 
+/**
+ * Conectar instância WhatsApp
+ * Proxy necessário para API UAZAPI externa
+ */
 export async function connectInstance(token: string): Promise<UazapiResponse> {
   try {
     const session = (await getSession()) as SessionUser | null;
@@ -119,6 +158,10 @@ export async function connectInstance(token: string): Promise<UazapiResponse> {
   }
 }
 
+/**
+ * Buscar status da instância WhatsApp
+ * Proxy necessário para API UAZAPI externa
+ */
 export async function getInstanceStatus(
   token: string,
 ): Promise<UazapiResponse> {
@@ -152,9 +195,7 @@ export async function getInstanceStatus(
 
     return {
       success: response.ok,
-      message: response.ok
-        ? 'Instância conectada com sucesso'
-        : response.statusText,
+      message: response.ok ? 'Status obtido com sucesso' : response.statusText,
       code: response.status,
       data: data,
     };
@@ -168,6 +209,10 @@ export async function getInstanceStatus(
   }
 }
 
+/**
+ * Deletar instância WhatsApp
+ * Proxy necessário para API UAZAPI externa
+ */
 export async function deleteInstance(token: string): Promise<UazapiResponse> {
   try {
     const session = (await getSession()) as SessionUser | null;
@@ -215,6 +260,10 @@ export async function deleteInstance(token: string): Promise<UazapiResponse> {
   }
 }
 
+/**
+ * Criar nova instância WhatsApp
+ * Proxy necessário para API UAZAPI externa
+ */
 export async function createInstance(name: string): Promise<UazapiResponse> {
   try {
     const session = (await getSession()) as SessionUser | null;
@@ -271,29 +320,52 @@ export async function createInstance(name: string): Promise<UazapiResponse> {
   }
 }
 
+/**
+ * Buscar webhook da instância
+ * Acesso direto ao Prisma (sem HTTP overhead)
+ */
 export async function getInstanceWebhook(
   token: string,
 ): Promise<UazapiResponse> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/debug/instance-webhook`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!token) {
+      return {
+        success: false,
+        message: 'Token é obrigatório',
+        code: 400,
+      };
     }
 
-    const data = await response.json();
+    // Buscar instância no banco PostgreSQL
+    const instance = await prisma.instances.findFirst({
+      where: { token },
+      select: { webhook: true, name: true, profileName: true },
+    });
+
+    if (!instance) {
+      return {
+        success: false,
+        message: 'Instância não encontrada',
+        code: 404,
+      };
+    }
+
+    console.log('🔍 Instance webhook found:', {
+      name: instance.name,
+      profileName: instance.profileName,
+      webhook: instance.webhook,
+    });
 
     return {
       success: true,
       message: 'Webhook da instância obtido com sucesso',
-      code: response.status,
-      data: data,
+      code: 200,
+      data: {
+        token,
+        webhook: instance.webhook,
+        name: instance.name,
+        profileName: instance.profileName,
+      },
     };
   } catch (error) {
     console.error('Erro ao buscar webhook da instância:', error);

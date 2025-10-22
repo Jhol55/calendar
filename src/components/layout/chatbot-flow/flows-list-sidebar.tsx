@@ -1,12 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  ChatbotFlow,
-  listFlows,
-  deleteFlow,
-} from '@/actions/chatbot-flows/flows';
-import { useUser } from '@/hooks/use-user';
+import React, { useState } from 'react';
+import { ChatbotFlow } from '@/actions/chatbot-flows/flows';
+import { useWorkflows, useDeleteWorkflow } from '@/lib/react-query/hooks';
 import {
   FileText,
   Trash2,
@@ -31,49 +27,29 @@ export function FlowsListSidebar({
   currentFlowId,
   onCreateNewFlow,
 }: FlowsListSidebarProps) {
-  const { user } = useUser();
-  const [loading, setLoading] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const { workflows, setWorkflows } = useUser();
 
-  const loadWorkflows = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await listFlows({ userId: user?.id });
-      if (result.success && result.flows) {
-        setWorkflows(result.flows as ChatbotFlow[]);
-      }
-    } catch (error) {
-      console.error('Error loading flows:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [setWorkflows, user?.id]);
+  // Usar React Query para buscar workflows
+  const { data: workflows = [], isLoading: loading } = useWorkflows();
 
-  useEffect(() => {
-    if (user?.id) {
-      loadWorkflows();
-    }
-  }, [user?.id, loadWorkflows]);
+  // Hook para deletar workflow
+  const { mutate: deleteWorkflow } = useDeleteWorkflow({
+    onSuccess: () => {
+      alert('Fluxo deletado com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Error deleting flow:', error);
+      alert(`Erro ao deletar: ${error.message}`);
+    },
+  });
 
-  const handleDelete = async (flowId: string, e: React.MouseEvent) => {
+  const handleDelete = (flowId: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (!confirm('Deseja realmente deletar este fluxo?')) return;
 
-    try {
-      const result = await deleteFlow(flowId);
-      if (result.success) {
-        setWorkflows(workflows.filter((f) => f.id !== flowId));
-        alert('Fluxo deletado com sucesso!');
-      } else {
-        alert(`Erro ao deletar: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Error deleting flow:', error);
-      alert('Erro ao deletar fluxo');
-    }
+    deleteWorkflow(flowId);
   };
 
   const formatDate = (date: Date) => {
@@ -87,7 +63,7 @@ export function FlowsListSidebar({
   const handleCreateFlow = (flowName: string) => {
     onCreateNewFlow(flowName);
     setIsCreateDialogOpen(false);
-    loadWorkflows();
+    // React Query invalida automaticamente a lista após criação
   };
 
   if (isCollapsed) {
@@ -159,7 +135,7 @@ export function FlowsListSidebar({
                 onClick={() => onSelectFlow(flow)}
                 className={`w-full text-left px-6 py-3 rounded-lg transition-all group hover:shadow-md ${
                   currentFlowId === flow.id
-                    ? 'bg-white border border-neutral-200 shadow-lg ring-1 ring-[#47e897]'
+                    ? 'bg-white border border-neutral-200 shadow-lg ring-1 ring-neutral-400'
                     : 'border bg-neutral-50 border-neutral-200'
                 }`}
               >

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { UserProvider } from '@/contexts/user';
+import { ReactQueryProvider } from '@/components/providers';
 
 export const metadata: Metadata = {
   title: 'Create Next App',
@@ -18,7 +19,9 @@ export default function RootLayout({
         className="antialiased !overflow-x-hidden flex"
         suppressHydrationWarning
       >
-        <UserProvider>{children}</UserProvider>
+        <ReactQueryProvider enablePersistence={false} enableCrossTabSync={true}>
+          <UserProvider>{children}</UserProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );

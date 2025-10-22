@@ -71,14 +71,15 @@ function FormContent({
 }) {
   const { errors, setValue } = useForm();
 
-  // Inicializar o valor do select quando o dialog abrir
+  // Inicializar todos os valores do formulário quando o dialog abrir
   useEffect(() => {
-    if (columnData.type) {
-      setTimeout(() => {
-        setValue('column_type', columnData.type);
-      }, 100);
-    }
-  }, [columnData.type, setValue]);
+    setTimeout(() => {
+      setValue('column_name', columnData.name);
+      setValue('column_type', columnData.type);
+      setValue('column_required', columnData.required);
+      setValue('column_default', columnData.default);
+    }, 100);
+  }, [columnData, setValue]);
 
   return (
     <>

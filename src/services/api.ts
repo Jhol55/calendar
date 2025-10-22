@@ -1,3 +1,28 @@
+/**
+ * ⚠️ IMPORTANTE: Este serviço é APENAS para chamadas a APIs EXTERNAS!
+ *
+ * NÃO use este serviço para:
+ * ❌ Chamar endpoints internos (/api/*)
+ * ❌ Buscar dados do banco de dados
+ * ❌ Operações CRUD internas
+ *
+ * Para operações internas, use:
+ * ✅ Server Actions (src/actions/*) que acessam Prisma diretamente
+ * ✅ React Query Hooks (src/lib/react-query/hooks/*) que chamam Server Actions
+ *
+ * Use este serviço APENAS para:
+ * ✅ Chamadas a APIs externas de terceiros (ex: OpenAI, Judge0, etc.)
+ * ✅ Integrações com serviços externos
+ *
+ * Exemplos válidos:
+ * - api.post('https://api.openai.com/v1/chat/completions', ...)
+ * - api.get('https://api.judge0.com/submissions', ...)
+ *
+ * Exemplos INVÁLIDOS:
+ * - api.get('/chatbot-flows') ❌ Use useWorkflows() hook
+ * - api.post('/database/add-row') ❌ Use useInsertTableRow() hook
+ */
+
 // Define interfaces para as respostas e configurações
 interface ApiResponse {
   data: object;

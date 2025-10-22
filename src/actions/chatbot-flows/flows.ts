@@ -2,6 +2,15 @@
 
 import { Node, Edge } from 'reactflow';
 import { NodeData } from '@/components/layout/chatbot-flow';
+import { prisma } from '@/services/prisma';
+import { getSession } from '@/utils/security/session';
+
+interface SessionUser {
+  user: {
+    id: number;
+    email: string;
+  };
+}
 
 export interface ChatbotFlow {
   id: string;
@@ -33,6 +42,7 @@ export interface CreateFlowData {
   edges: Edge[];
   token?: string;
   userId?: number;
+  isActive?: boolean;
 }
 
 export interface UpdateFlowData {
@@ -44,93 +54,230 @@ export interface UpdateFlowData {
   isActive?: boolean;
 }
 
-// Listar todos os fluxos
-export async function listFlows(filters?: { userId?: number; token?: string }) {
-  try {
-    const params = new URLSearchParams();
-    if (filters?.userId) params.append('userId', filters.userId.toString());
-    if (filters?.token) params.append('token', filters.token);
+export interface FlowFilters {
+  userId?: number;
+  token?: string;
+}
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/chatbot-flows?${params}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
+/**
+ * Listar todos os fluxos ativos
+ * Acesso direto ao Prisma (sem HTTP overhead)
+ */
+export async function listFlows(filters?: FlowFilters) {
+  try {
+    // Validação de sessão opcional (se precisar forçar autenticação, descomente)
+    // const session = (await getSession()) as SessionUser | null;
+    // if (!session) {
+    //   return { success: false, error: 'Unauthorized', code: 401 };
+    // }
+
+    const where: { isActive: boolean; userId?: number; token?: string } = {
+      isActive: true,
+    };
+
+    if (filters?.userId) where.userId = filters.userId;
+    if (filters?.token) where.token = filters.token;
+
+    const flows = await prisma.chatbot_flows.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        instance: {
+          select: {
+            id: true,
+            name: true,
+            profileName: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
     });
 
-    const data = await response.json();
-    return data;
+    return { success: true, flows };
   } catch (error) {
     console.error('Error listing flows:', error);
     return { success: false, error: 'Erro ao listar fluxos' };
   }
 }
 
-// Buscar fluxo específico
+/**
+ * Buscar fluxo específico por ID
+ * Acesso direto ao Prisma (sem HTTP overhead)
+ */
 export async function getFlow(id: string) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/chatbot-flows/${id}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
+    if (!id) {
+      return { success: false, error: 'ID do fluxo é obrigatório' };
+    }
+
+    const flow = await prisma.chatbot_flows.findUnique({
+      where: { id },
+      include: {
+        instance: {
+          select: {
+            id: true,
+            name: true,
+            profileName: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
     });
 
-    const data = await response.json();
-    return data;
+    if (!flow) {
+      return { success: false, error: 'Fluxo não encontrado' };
+    }
+
+    return { success: true, flow };
   } catch (error) {
     console.error('Error getting flow:', error);
     return { success: false, error: 'Erro ao buscar fluxo' };
   }
 }
 
-// Criar novo fluxo
+/**
+ * Criar novo fluxo
+ * Acesso direto ao Prisma (sem HTTP overhead)
+ */
 export async function createFlow(flowData: CreateFlowData) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/chatbot-flows`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(flowData),
+    const { name, description, nodes, edges, token, userId, isActive } =
+      flowData;
+
+    if (!name || !nodes || !edges) {
+      return {
+        success: false,
+        error: 'Nome, nodes e edges são obrigatórios',
+      };
+    }
+
+    const flow = await prisma.chatbot_flows.create({
+      data: {
+        name,
+        description,
+        nodes: nodes as any,
+        edges: edges as any,
+        token,
+        userId,
+        isActive: isActive !== undefined ? isActive : true,
+      },
+      include: {
+        instance: {
+          select: {
+            id: true,
+            name: true,
+            profileName: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
     });
 
-    const data = await response.json();
-    return data;
+    return { success: true, flow };
   } catch (error) {
     console.error('Error creating flow:', error);
     return { success: false, error: 'Erro ao criar fluxo' };
   }
 }
 
-// Atualizar fluxo
+/**
+ * Atualizar fluxo existente
+ * Acesso direto ao Prisma (sem HTTP overhead)
+ */
 export async function updateFlow(id: string, flowData: UpdateFlowData) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/chatbot-flows/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(flowData),
+    if (!id) {
+      return { success: false, error: 'ID do fluxo é obrigatório' };
+    }
+
+    // Verificar se o fluxo existe
+    const existingFlow = await prisma.chatbot_flows.findUnique({
+      where: { id },
     });
 
-    const data = await response.json();
-    return data;
+    if (!existingFlow) {
+      return { success: false, error: 'Fluxo não encontrado' };
+    }
+
+    const { name, description, nodes, edges, token, isActive } = flowData;
+
+    const flow = await prisma.chatbot_flows.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(nodes !== undefined && { nodes: nodes as any }),
+        ...(edges !== undefined && { edges: edges as any }),
+        ...(token !== undefined && { token }),
+        ...(isActive !== undefined && { isActive }),
+      },
+      include: {
+        instance: {
+          select: {
+            id: true,
+            name: true,
+            profileName: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    return { success: true, flow };
   } catch (error) {
     console.error('Error updating flow:', error);
     return { success: false, error: 'Erro ao atualizar fluxo' };
   }
 }
 
-// Deletar fluxo
+/**
+ * Deletar fluxo
+ * Acesso direto ao Prisma (sem HTTP overhead)
+ */
 export async function deleteFlow(id: string) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/chatbot-flows/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+    if (!id) {
+      return { success: false, error: 'ID do fluxo é obrigatório' };
+    }
+
+    // Verificar se o fluxo existe
+    const existingFlow = await prisma.chatbot_flows.findUnique({
+      where: { id },
     });
 
-    const data = await response.json();
-    return data;
+    if (!existingFlow) {
+      return { success: false, error: 'Fluxo não encontrado' };
+    }
+
+    await prisma.chatbot_flows.delete({
+      where: { id },
+    });
+
+    return { success: true, message: 'Fluxo deletado com sucesso' };
   } catch (error) {
     console.error('Error deleting flow:', error);
     return { success: false, error: 'Erro ao deletar fluxo' };

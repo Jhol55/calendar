@@ -2,7 +2,7 @@
  * Serviço para gerenciar histórico de conversas dos agents
  */
 
-import prisma from './prisma';
+import { prisma } from './prisma';
 import { ChatMessage } from './openai.service';
 
 export interface ConversationMessage {

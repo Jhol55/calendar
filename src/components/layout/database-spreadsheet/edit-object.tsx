@@ -528,9 +528,16 @@ function FormContent({
   React.useEffect(() => {
     const timer = setTimeout(() => {
       objectPairs.forEach((pair) => {
+        // Definir chave
+        setValue(`key_${pair.id}`, pair.key);
+
+        // Definir tipo
         setValue(`type_${pair.id}`, pair.type);
 
-        if (pair.type === 'boolean') {
+        // Definir valores baseados no tipo
+        if (pair.type === 'string' || pair.type === 'number') {
+          setValue(`value_${pair.id}`, pair.value || '');
+        } else if (pair.type === 'boolean') {
           const boolValue = pair.booleanValue ? 'true' : 'false';
           setValue(`booleanValue_${pair.id}`, boolValue);
         }

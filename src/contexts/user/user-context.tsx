@@ -1,14 +1,17 @@
 'use client';
 
 import React, { createContext, useCallback, useState } from 'react';
-import {
+import type {
   UserProps,
   UserContextProps,
   InstanceProps,
 } from './user-context.type';
 import { useEffect } from 'react';
-import { getUser } from '@/services/user';
-import { getInstances } from '@/actions/uazapi/instance';
+import {
+  useUser as useUserQuery,
+  useInstances as useInstancesQuery,
+  useInvalidateUser,
+} from '@/lib/react-query/hooks/use-user';
 import { ChatbotFlow } from '@/actions/chatbot-flows/flows';
 
 export const UserContext = createContext<UserContextProps>({
@@ -26,46 +29,65 @@ interface UserProviderProps {
 }
 
 export const UserProvider = ({ children }: UserProviderProps) => {
-  const [user, setUser] = useState<UserProps | undefined>(undefined);
-  const [instances, setInstances] = useState<InstanceProps[]>([]);
+  // Usar React Query para buscar dados
+  // safeQueryFn já extrai o .data automaticamente, então recebemos diretamente os dados
+  const { data: user, error: userError } = useUserQuery();
+
+  const {
+    data: instances = [], // Array de instâncias, com default []
+    error: instancesError,
+  } = useInstancesQuery();
+
+  const { invalidateProfile, invalidateInstances } = useInvalidateUser();
+
+  // Estados locais para compatibilidade
   const [workflows, setWorkflows] = useState<ChatbotFlow[]>([]);
 
-  const [trigger, setTrigger] = useState(0);
-  const handleUpdate = useCallback(() => setTrigger((prev) => prev + 1), []);
+  /**
+   * Função para forçar atualização de dados do usuário
+   * Agora usa invalidate do React Query
+   */
+  const handleUpdate = useCallback(() => {
+    invalidateProfile();
+    invalidateInstances();
+  }, [invalidateProfile, invalidateInstances]);
 
+  /**
+   * Setter para user (mantido para compatibilidade)
+   * Não é mais necessário com React Query, mas mantido para não quebrar código existente
+   */
+  const setUser = useCallback(() => {
+    // Com React Query, atualizações vêm automaticamente das queries
+    // Esta função é mantida apenas para compatibilidade com código legado
+    invalidateProfile();
+  }, [invalidateProfile]);
+
+  /**
+   * Setter para instances (mantido para compatibilidade)
+   */
+  const setInstances = useCallback(() => {
+    // Com React Query, atualizações vêm automaticamente das queries
+    invalidateInstances();
+  }, [invalidateInstances]);
+
+  // Log de erros (apenas em desenvolvimento)
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await getUser();
-        if (response.success && response.data) {
-          setUser(response.data as UserProps);
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error);
+    if (process.env.NODE_ENV === 'development') {
+      if (userError) {
+        console.error('❌ Error fetching user:', userError);
       }
-    };
-
-    const fetchInstances = async () => {
-      try {
-        const response = await getInstances();
-        if (response.success && response.data) {
-          setInstances(response.data as InstanceProps[]);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar instâncias:', error);
+      if (instancesError) {
+        console.error('❌ Error fetching instances:', instancesError);
       }
-    };
-
-    fetchUser();
-    fetchInstances();
-  }, [trigger]);
+    }
+  }, [userError, instancesError]);
 
   return (
     <UserContext.Provider
       value={{
-        user,
+        user: user as UserProps | undefined,
         setUser,
-        instances,
+        instances: instances as InstanceProps[],
         setInstances,
         handleUpdate,
         workflows,

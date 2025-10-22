@@ -19,14 +19,21 @@ import {
   deleteRow,
   createTable,
   addColumnsToTable,
+  updateColumnMetadata,
   renameColumn,
   deleteColumn,
   reorderColumns,
+  renameTable,
+  deleteTable,
 } from '@/actions/database/operations';
 import { CreateTableDialog } from '../../features/forms/database-spreadsheet/create-database-table/create-database-table';
 import { AddColumnDialog } from '../../features/forms/database-spreadsheet/add-table-column/add-table-column';
 import { EditArrayDialog } from './edit-array';
 import { EditObjectDialog } from './edit-object';
+import { TableActions } from './table-actions';
+import { RenameTableDialog } from './rename-table-dialog';
+import { DeleteTableDialog } from './delete-table-dialog';
+import { cn } from '@/lib/utils';
 
 interface DatabaseSpreadsheetProps {
   isOpen: boolean;
@@ -76,6 +83,12 @@ export function DatabaseSpreadsheet({
     additions: Array<Record<string, unknown>>;
     deletions: Array<string>;
     columnRenames: Array<{ oldName: string; newName: string }>;
+    columnMetadataUpdates: Array<{
+      columnName: string;
+      type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+      required: boolean;
+      default: string;
+    }>;
     columnDeletions: Array<string>;
     columnReorder: boolean;
   }>({
@@ -83,6 +96,7 @@ export function DatabaseSpreadsheet({
     additions: [],
     deletions: [],
     columnRenames: [],
+    columnMetadataUpdates: [],
     columnDeletions: [],
     columnReorder: false,
   });
@@ -123,6 +137,10 @@ export function DatabaseSpreadsheet({
   const [deletingColumn, setDeletingColumn] = useState<string>('');
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [showRenameTableDialog, setShowRenameTableDialog] = useState(false);
+  const [renamingTable, setRenamingTable] = useState<string>('');
+  const [showDeleteTableDialog, setShowDeleteTableDialog] = useState(false);
+  const [deletingTable, setDeletingTable] = useState<string>('');
 
   // Carregar tabelas disponíveis
   useEffect(() => {
@@ -147,6 +165,7 @@ export function DatabaseSpreadsheet({
         additions: [],
         deletions: [],
         columnRenames: [],
+        columnMetadataUpdates: [],
         columnDeletions: [],
         columnReorder: false,
       });
@@ -184,6 +203,7 @@ export function DatabaseSpreadsheet({
         additions: [],
         deletions: [],
         columnRenames: [],
+        columnMetadataUpdates: [],
         columnDeletions: [],
         columnReorder: false,
       });
@@ -364,7 +384,7 @@ export function DatabaseSpreadsheet({
     try {
       setLoading(true);
 
-      // Processar renomeações de colunas primeiro
+      // Processar renomeações de colunas primeiro (antes dos metadados)
       for (const rename of pendingChanges.columnRenames) {
         const response = await renameColumn(
           selectedTable,
@@ -374,6 +394,26 @@ export function DatabaseSpreadsheet({
         if (!response.success) {
           console.error('Erro ao renomear coluna:', response.message);
           alert(`Erro ao renomear coluna: ${response.message}`);
+        }
+      }
+
+      // Processar atualizações de metadados de colunas
+      for (const metadata of pendingChanges.columnMetadataUpdates) {
+        const response = await updateColumnMetadata(
+          selectedTable,
+          metadata.columnName,
+          {
+            type: metadata.type,
+            required: metadata.required,
+            default: metadata.default,
+          },
+        );
+        if (!response.success) {
+          console.error(
+            'Erro ao atualizar metadados da coluna:',
+            response.message,
+          );
+          alert(`Erro ao atualizar metadados da coluna: ${response.message}`);
         }
       }
 
@@ -433,6 +473,7 @@ export function DatabaseSpreadsheet({
         additions: [],
         deletions: [],
         columnRenames: [],
+        columnMetadataUpdates: [],
         columnDeletions: [],
         columnReorder: false,
       });
@@ -463,6 +504,7 @@ export function DatabaseSpreadsheet({
       additions: [],
       deletions: [],
       columnRenames: [],
+      columnMetadataUpdates: [],
       columnDeletions: [],
       columnReorder: false,
     });
@@ -694,6 +736,7 @@ export function DatabaseSpreadsheet({
     if (!editingColumnData) return;
 
     const oldName = editingColumnData.name;
+    const finalColumnName = updatedColumn.name; // Nome final após renomeação (se houver)
 
     // Verificar se o novo nome já existe (e não é o nome atual)
     if (updatedColumn.name !== oldName) {
@@ -726,6 +769,42 @@ export function DatabaseSpreadsheet({
           columnRenames: [
             ...prev.columnRenames,
             { oldName, newName: updatedColumn.name },
+          ],
+        }));
+      }
+    }
+
+    // Se tipo, required ou default mudaram, adicionar/atualizar metadados
+    if (
+      updatedColumn.type !== editingColumnData.type ||
+      updatedColumn.required !== editingColumnData.required ||
+      updatedColumn.default !== editingColumnData.default
+    ) {
+      const existingMetadataIndex =
+        pendingChanges.columnMetadataUpdates.findIndex(
+          (m) => m.columnName === oldName,
+        );
+
+      const metadataUpdate = {
+        columnName: finalColumnName, // Usar o nome final (após renomeação)
+        type: updatedColumn.type,
+        required: updatedColumn.required,
+        default: updatedColumn.default,
+      };
+
+      if (existingMetadataIndex >= 0) {
+        const newMetadata = [...pendingChanges.columnMetadataUpdates];
+        newMetadata[existingMetadataIndex] = metadataUpdate;
+        setPendingChanges((prev) => ({
+          ...prev,
+          columnMetadataUpdates: newMetadata,
+        }));
+      } else {
+        setPendingChanges((prev) => ({
+          ...prev,
+          columnMetadataUpdates: [
+            ...prev.columnMetadataUpdates,
+            metadataUpdate,
           ],
         }));
       }
@@ -854,6 +933,54 @@ export function DatabaseSpreadsheet({
     setHasUnsavedChanges(true);
     setShowDeleteColumnDialog(false);
     setDeletingColumn('');
+  };
+
+  const handleRenameTable = async (oldName: string, newName: string) => {
+    try {
+      setLoading(true);
+      const response = await renameTable(oldName, newName);
+      if (response.success) {
+        // Recarregar lista de tabelas
+        await loadAvailableTables();
+        // Se a tabela renomeada está selecionada, atualizar seleção
+        if (selectedTable === oldName) {
+          setSelectedTable(newName);
+        }
+      } else {
+        console.error('Erro ao renomear tabela:', response.message);
+        alert(response.message || 'Erro ao renomear tabela');
+      }
+    } catch (error) {
+      console.error('Erro ao renomear tabela:', error);
+      alert('Erro ao renomear tabela');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTable = async () => {
+    try {
+      setLoading(true);
+      const response = await deleteTable(deletingTable);
+      if (response.success) {
+        // Se a tabela deletada estava selecionada, limpar seleção
+        if (selectedTable === deletingTable) {
+          setSelectedTable('');
+          setTableData([]);
+          setTableSchema(null);
+        }
+        // Recarregar lista de tabelas
+        await loadAvailableTables();
+      } else {
+        console.error('Erro ao deletar tabela:', response.message);
+        alert(response.message || 'Erro ao deletar tabela');
+      }
+    } catch (error) {
+      console.error('Erro ao deletar tabela:', error);
+      alert('Erro ao deletar tabela');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Dados filtrados e ordenados
@@ -1042,19 +1169,41 @@ export function DatabaseSpreadsheet({
                 </div>
               ) : (
                 availableTables.map((table) => (
-                  <Button
+                  <div
                     key={table}
-                    variant="ghost"
-                    onClick={() => setSelectedTable(table)}
-                    className={`px-3 !py-1 rounded-md text-sm transition-colors ${
+                    className={cn(
+                      'flex items-center justify-between w-full gap-2 group rounded-md text-sm transition-colors bg-white',
                       selectedTable === table
-                        ? 'bg-white text-neutral-700 font-semibold border border-neutral-300 shadow-md ring-1 ring-[#47e897]'
-                        : 'bg-white text-neutral-700 hover:bg-neutral-200/50 font-medium border border-neutral-200'
-                    }`}
-                    textClassName="justify-start"
+                        ? 'border border-neutral-300 shadow-md ring-1 ring-neutral-400'
+                        : 'border border-neutral-200',
+                    )}
                   >
-                    {table}
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSelectedTable(table)}
+                      className={`flex-1 px-3 !py-1 rounded-md text-sm transition-colors ${
+                        selectedTable === table
+                          ? 'bg-white text-neutral-700 font-semibold '
+                          : 'bg-white text-neutral-700 font-medium'
+                      }`}
+                      textClassName="justify-start"
+                    >
+                      {table}
+                    </Button>
+                    <div>
+                      <TableActions
+                        tableName={table}
+                        onRename={(tableName) => {
+                          setRenamingTable(tableName);
+                          setShowRenameTableDialog(true);
+                        }}
+                        onDelete={(tableName) => {
+                          setDeletingTable(tableName);
+                          setShowDeleteTableDialog(true);
+                        }}
+                      />
+                    </div>
+                  </div>
                 ))
               )}
             </div>
@@ -1629,6 +1778,28 @@ export function DatabaseSpreadsheet({
         }}
         columnName={deletingColumn}
         onConfirm={handleDeleteColumn}
+      />
+
+      {/* Modal de renomear tabela */}
+      <RenameTableDialog
+        isOpen={showRenameTableDialog}
+        onClose={() => {
+          setShowRenameTableDialog(false);
+          setRenamingTable('');
+        }}
+        tableName={renamingTable}
+        onSubmit={handleRenameTable}
+      />
+
+      {/* Modal de excluir tabela */}
+      <DeleteTableDialog
+        isOpen={showDeleteTableDialog}
+        onClose={() => {
+          setShowDeleteTableDialog(false);
+          setDeletingTable('');
+        }}
+        tableName={deletingTable}
+        onConfirm={handleDeleteTable}
       />
     </>
   );
