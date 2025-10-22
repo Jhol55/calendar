@@ -718,10 +718,12 @@ function FlowEditorContent() {
           nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{
-            padding: 0.1,
-            minZoom: 0.1,
+            padding: 0.2,
+            minZoom: 0.05,
             maxZoom: 2,
           }}
+          minZoom={0.05}
+          maxZoom={2}
           defaultViewport={{ x: 0, y: 0, zoom: 0.1 }}
           proOptions={{ hideAttribution: true }}
           className="bg-gray-50"
