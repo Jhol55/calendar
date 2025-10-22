@@ -66,3 +66,9 @@ export function useFlowExecution() {
   }
   return context;
 }
+
+// Hook opcional que retorna null se não estiver dentro do provider
+export function useFlowExecutionOptional() {
+  const context = useContext(FlowExecutionContext);
+  return context || null;
+}

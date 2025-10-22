@@ -1,11 +1,16 @@
 'use client';
 
-import React, { useState, ReactNode, useEffect } from 'react';
+import React, { useState, ReactNode, useEffect, useCallback } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Typography } from '@/components/ui/typography';
 import { NodeExecutionPanel } from '../node-execution-panel';
 import { cn } from '@/lib/utils';
 import { Pencil, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  FlowExecutionProvider,
+  useFlowExecution,
+} from '@/contexts/flow-execution/flow-execution-context';
+import { listExecutions } from '@/actions/executions';
 
 interface NodeConfigLayoutProps {
   isOpen: boolean;
@@ -18,7 +23,7 @@ interface NodeConfigLayoutProps {
   onNodeLabelChange?: (label: string) => void;
 }
 
-export function NodeConfigLayout({
+function NodeConfigLayoutContent({
   isOpen,
   onClose,
   title,
@@ -27,12 +32,21 @@ export function NodeConfigLayout({
   children,
   nodeLabel,
   onNodeLabelChange,
-}: NodeConfigLayoutProps) {
+  execution,
+}: NodeConfigLayoutProps & { execution: any }) {
+  const { setSelectedExecution } = useFlowExecution();
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [localLabel, setLocalLabel] = useState(nodeLabel || '');
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [tempLabel, setTempLabel] = useState(nodeLabel || '');
+
+  // Atualizar execução no contexto quando mudar
+  useEffect(() => {
+    if (execution) {
+      setSelectedExecution(execution);
+    }
+  }, [execution, setSelectedExecution]);
 
   useEffect(() => {
     setLocalLabel(nodeLabel || '');
@@ -224,5 +238,59 @@ export function NodeConfigLayout({
         )}
       </div>
     </Dialog>
+  );
+}
+
+export function NodeConfigLayout(props: NodeConfigLayoutProps) {
+  const [execution, setExecution] = useState<any>(null);
+
+  const loadExecution = useCallback(async () => {
+    if (!props.flowId) return;
+
+    try {
+      // Primeiro, tentar pegar do sessionStorage (execução selecionada)
+      const selectedExecutionStr = sessionStorage.getItem('selectedExecution');
+      let executionData = null;
+
+      if (selectedExecutionStr) {
+        try {
+          executionData = JSON.parse(selectedExecutionStr);
+        } catch {
+          // Se falhar, buscar do servidor
+        }
+      }
+
+      // Se não houver execução selecionada, buscar a última
+      if (!executionData) {
+        const result = await listExecutions({
+          flowId: props.flowId,
+          limit: 1,
+        });
+
+        if (
+          result.success &&
+          result.executions &&
+          result.executions.length > 0
+        ) {
+          executionData = result.executions[0];
+        }
+      }
+
+      setExecution(executionData);
+    } catch (error) {
+      console.error('Error loading execution:', error);
+    }
+  }, [props.flowId]);
+
+  useEffect(() => {
+    if (props.isOpen && props.flowId) {
+      loadExecution();
+    }
+  }, [props.isOpen, props.flowId, loadExecution]);
+
+  return (
+    <FlowExecutionProvider>
+      <NodeConfigLayoutContent {...props} execution={execution} />
+    </FlowExecutionProvider>
   );
 }
