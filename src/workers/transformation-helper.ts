@@ -328,6 +328,339 @@ export function sumArray(input: any): number {
   return result;
 }
 
+/**
+ * Deleta chaves específicas de cada objeto em um array
+ * @param input Array de objetos ou string JSON
+ * @param keysToDelete String com chaves separadas por vírgula (ex: "campo1, campo2, campo3")
+ * @returns Array de objetos sem as chaves especificadas
+ *
+ * @example
+ * deleteKeys([{nome: "João", idade: 30, cpf: "123"}], "cpf")
+ * // Retorna: [{nome: "João", idade: 30}]
+ */
+export function deleteKeys(input: any, keysToDelete: string): any[] {
+  const array = parseArrayInput(input);
+
+  // Parsear chaves a deletar (remover espaços em branco)
+  const keys = keysToDelete
+    .split(',')
+    .map((key) => key.trim())
+    .filter((key) => key.length > 0);
+
+  if (keys.length === 0) {
+    throw new Error('Nenhuma chave para deletar foi especificada');
+  }
+
+  // Processar cada objeto do array
+  return array.map((item) => {
+    // Se não for objeto, retornar o item original
+    if (typeof item !== 'object' || item === null) {
+      return item;
+    }
+
+    // Criar cópia do objeto
+    const newItem = { ...item };
+
+    // Deletar as chaves especificadas
+    keys.forEach((key) => {
+      delete newItem[key];
+    });
+
+    return newItem;
+  });
+}
+
+/**
+ * Renomeia chaves de cada objeto em um array
+ * @param input Array de objetos ou string JSON
+ * @param keyMappings String com mapeamentos no formato "chave_antiga:chave_nova" separados por vírgula
+ * @returns Array de objetos com chaves renomeadas
+ *
+ * @example
+ * renameKeys([{nome: "João", valor: 100}], "valor:preco, nome:cliente")
+ * // Retorna: [{cliente: "João", preco: 100}]
+ */
+export function renameKeys(input: any, keyMappings: string): any[] {
+  const array = parseArrayInput(input);
+
+  // Parsear mapeamentos
+  const mappings: Record<string, string> = {};
+  const mappingPairs = keyMappings
+    .split(',')
+    .map((pair) => pair.trim())
+    .filter((pair) => pair.length > 0);
+
+  if (mappingPairs.length === 0) {
+    throw new Error('Nenhum mapeamento de chaves foi especificado');
+  }
+
+  // Processar cada par "chave_antiga:chave_nova"
+  mappingPairs.forEach((pair) => {
+    const [oldKey, newKey] = pair.split(':').map((k) => k.trim());
+    if (!oldKey || !newKey) {
+      throw new Error(
+        `Mapeamento inválido: "${pair}". Use o formato "chave_antiga:chave_nova"`,
+      );
+    }
+    mappings[oldKey] = newKey;
+  });
+
+  // Processar cada objeto do array
+  return array.map((item) => {
+    // Se não for objeto, retornar o item original
+    if (typeof item !== 'object' || item === null) {
+      return item;
+    }
+
+    // Criar novo objeto com chaves renomeadas
+    const newItem: Record<string, any> = {};
+
+    Object.keys(item).forEach((key) => {
+      // Se a chave tem um mapeamento, usar o novo nome
+      const newKey = mappings[key] || key;
+      newItem[newKey] = item[key];
+    });
+
+    return newItem;
+  });
+}
+
+/**
+ * Extrai um campo específico de cada elemento do array
+ * @param input Array de objetos/arrays ou string JSON
+ * @param fieldName Nome do campo (para objetos) ou índice (para arrays). Suporta dot notation
+ * @returns Array com os valores extraídos
+ *
+ * @example
+ * // Extrair campo de objetos
+ * extractArrayField([{nome: "João", idade: 30}, {nome: "Maria", idade: 25}], "nome")
+ * // Retorna: ["João", "Maria"]
+ *
+ * @example
+ * // Extrair com dot notation
+ * extractArrayField([{user: {name: "João"}}, {user: {name: "Maria"}}], "user.name")
+ * // Retorna: ["João", "Maria"]
+ *
+ * @example
+ * // Extrair índice de arrays
+ * extractArrayField([["a", "b", "c"], ["d", "e", "f"]], "0")
+ * // Retorna: ["a", "d"]
+ */
+export function extractArrayField(input: any, fieldName: string): any[] {
+  const array = parseArrayInput(input);
+
+  if (!fieldName || fieldName.trim() === '') {
+    throw new Error('Nome do campo ou índice não especificado');
+  }
+
+  const trimmedField = fieldName.trim();
+
+  // Verificar se é um índice numérico
+  const isNumericIndex = /^\d+$/.test(trimmedField);
+
+  return array.map((item) => {
+    // Se for índice numérico e o item for array
+    if (isNumericIndex && Array.isArray(item)) {
+      const index = parseInt(trimmedField, 10);
+      return item[index];
+    }
+
+    // Se for objeto, extrair o campo (suporta dot notation)
+    if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+      // Suportar dot notation (ex: "user.name")
+      const fields = trimmedField.split('.');
+      let result = item;
+
+      for (const field of fields) {
+        result = result?.[field];
+        if (result === undefined) {
+          return null;
+        }
+      }
+
+      return result;
+    }
+
+    // Se não for objeto nem array, retornar o próprio valor se for o campo solicitado
+    // ou null se não puder extrair
+    return null;
+  });
+}
+
+/**
+ * Transforma cada elemento do array em um objeto usando um template JSON
+ * @param input Array de objetos ou string JSON
+ * @param objectTemplate Template de objeto JSON como string
+ * @returns Array de objetos transformados
+ *
+ * @example
+ * // Transformar produtos em formato de carousel
+ * mapObjectArray([{nome: "Produto", valor: "100"}], '{"id": "{{_id}}", "title": "{{nome}}", "description": "R$ {{valor}}"}')
+ * // Retorna: [{id: "...", title: "Produto", description: "R$ 100"}]
+ *
+ * @example
+ * // Template com arrays e objetos aninhados
+ * mapObjectArray([{nome: "Item"}], '{"title": "{{nome}}", "buttons": [{"text": "Comprar", "id": "{{nome}}"}]}')
+ * // Retorna: [{title: "Item", buttons: [{text: "Comprar", id: "Item"}]}]
+ */
+export function mapObjectArray(input: any, objectTemplate: string): any[] {
+  const array = parseArrayInput(input);
+
+  if (!objectTemplate || objectTemplate.trim() === '') {
+    throw new Error('Template de objeto não especificado');
+  }
+
+  const trimmedTemplate = objectTemplate.trim();
+
+  // Função recursiva para processar o template
+  const processTemplate = (template: any, sourceObj: any): any => {
+    // Se for string, substituir variáveis
+    if (typeof template === 'string') {
+      return template.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+        const trimmedKey = key.trim();
+
+        // Suportar dot notation
+        const fields = trimmedKey.split('.');
+        let result = sourceObj;
+
+        for (const field of fields) {
+          result = result?.[field];
+          if (result === undefined || result === null) {
+            return '';
+          }
+        }
+
+        // Se for objeto ou array, converter para JSON
+        if (typeof result === 'object') {
+          return JSON.stringify(result);
+        }
+
+        return String(result);
+      });
+    }
+
+    // Se for array, processar cada elemento
+    if (Array.isArray(template)) {
+      return template.map((item) => processTemplate(item, sourceObj));
+    }
+
+    // Se for objeto, processar cada propriedade
+    if (typeof template === 'object' && template !== null) {
+      const processed: Record<string, any> = {};
+      for (const [key, value] of Object.entries(template)) {
+        processed[key] = processTemplate(value, sourceObj);
+      }
+      return processed;
+    }
+
+    // Outros tipos (number, boolean, null)
+    return template;
+  };
+
+  // Parsear o template
+  let templateObj: any;
+  try {
+    templateObj = JSON.parse(trimmedTemplate);
+  } catch (error) {
+    throw new Error(
+      'Template inválido. Use um objeto JSON válido: {"field": "{{value}}"}',
+    );
+  }
+
+  // Aplicar template a cada item do array
+  return array.map((item) => {
+    // Se não for objeto, retornar vazio
+    if (typeof item !== 'object' || item === null) {
+      return {};
+    }
+
+    return processTemplate(templateObj, item);
+  });
+}
+
+/**
+ * Transforma cada elemento do array usando um template e achata o resultado
+ * @param input Array de objetos ou string JSON
+ * @param template Template JSON como string que será aplicado a cada objeto
+ * @returns Array achatado com os resultados da transformação
+ *
+ * @example
+ * // Transformar objetos em múltiplos elementos
+ * flatMapArray([{title: "A", desc: "B"}], '["[{{title}}]", "{{desc}}"]')
+ * // Retorna: ["[A]", "B"]
+ *
+ * @example
+ * // Criar estrutura de carousel
+ * flatMapArray([{title: "Produto", imageUrl: "http://..."}], '["[{{title}}]", "{{{imageUrl}}}"]')
+ * // Retorna: ["[Produto]", "{http://...}"]
+ */
+export function flatMapArray(input: any, template: string): any[] {
+  const array = parseArrayInput(input);
+
+  if (!template || template.trim() === '') {
+    throw new Error('Template não especificado');
+  }
+
+  const trimmedTemplate = template.trim();
+
+  // Tentar parsear o template como JSON array
+  let templateArray: string[];
+  try {
+    const parsed = JSON.parse(trimmedTemplate);
+    if (!Array.isArray(parsed)) {
+      throw new Error('Template deve ser um array JSON');
+    }
+    templateArray = parsed;
+  } catch (error) {
+    throw new Error(
+      'Template inválido. Use formato JSON array: ["item1", "item2"]',
+    );
+  }
+
+  // Função para substituir variáveis no template
+  const replaceVars = (templateStr: string, obj: any): string => {
+    return templateStr.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+      const trimmedKey = key.trim();
+
+      // Suportar dot notation
+      const fields = trimmedKey.split('.');
+      let result = obj;
+
+      for (const field of fields) {
+        result = result?.[field];
+        if (result === undefined || result === null) {
+          return '';
+        }
+      }
+
+      // Se for objeto ou array, converter para JSON
+      if (typeof result === 'object') {
+        return JSON.stringify(result);
+      }
+
+      return String(result);
+    });
+  };
+
+  // Processar cada objeto e achatar os resultados
+  const result: any[] = [];
+
+  array.forEach((item) => {
+    // Se não for objeto, pular
+    if (typeof item !== 'object' || item === null) {
+      return;
+    }
+
+    // Aplicar template a cada item
+    templateArray.forEach((templateItem) => {
+      const processed = replaceVars(templateItem, item);
+      result.push(processed);
+    });
+  });
+
+  return result;
+}
+
 // ==================== OBJECT OPERATIONS ====================
 
 export function extractField(input: any, field: string): any {

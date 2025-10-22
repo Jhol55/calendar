@@ -7,6 +7,9 @@ import {
   Settings,
   Database,
   Globe,
+  Bot,
+  Repeat,
+  Code2,
 } from 'lucide-react';
 import { NodeType } from './types';
 
@@ -67,6 +70,27 @@ const nodeTemplates: NodeTemplate[] = [
     icon: <Globe className="w-5 h-5" />,
     description: 'Fazer requisições HTTP',
     color: 'bg-green-600',
+  },
+  {
+    type: 'agent',
+    label: 'AI Agent',
+    icon: <Bot className="w-5 h-5" />,
+    description: 'Integrar IA (OpenAI GPT)',
+    color: 'bg-gradient-to-r from-purple-500 to-pink-500',
+  },
+  {
+    type: 'loop',
+    label: 'Loop',
+    icon: <Repeat className="w-5 h-5" />,
+    description: 'Iterar sobre arrays e listas',
+    color: 'bg-purple-600',
+  },
+  {
+    type: 'code_execution',
+    label: 'Code Execution',
+    icon: <Code2 className="w-5 h-5" />,
+    description: 'Executar código JS/Python seguro',
+    color: 'bg-indigo-600',
   },
 ];
 

@@ -80,9 +80,12 @@ export const messageConfigSchema = baseSchema.refine(
         return false;
 
       try {
-        const choices = data.interactiveMenuChoices
-          ? JSON.parse(data.interactiveMenuChoices)
-          : [];
+        const choicesStr = data.interactiveMenuChoices || '';
+
+        // Se for modo JSON (valor dummy), considerar válido
+        if (choicesStr === '__JSON_MODE__') return true;
+
+        const choices = choicesStr ? JSON.parse(choicesStr) : [];
         if (!Array.isArray(choices) || choices.length === 0) return false;
 
         // Validações específicas por tipo
@@ -149,9 +152,8 @@ export const messageConfigSchema = baseSchema.refine(
       }
 
       try {
-        const choices = data.interactiveMenuChoices
-          ? JSON.parse(data.interactiveMenuChoices)
-          : [];
+        const choicesStr = data.interactiveMenuChoices || '';
+        const choices = choicesStr ? JSON.parse(choicesStr) : [];
 
         if (data.interactiveMenuType === 'button') {
           if (choices.length === 0) {

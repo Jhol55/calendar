@@ -44,18 +44,70 @@ const messageTypes: { value: MessageType; label: string }[] = [
   { value: 'interactive_menu', label: 'Menu Interativo' },
 ];
 
+// Modelo JSON de exemplo para cartões de carrossel
+const JSON_CAROUSEL_TEMPLATE = `[
+  {
+    "title": "Produto Premium 1",
+    "description": "Descrição detalhada do produto 1",
+    "imageUrl": "https://exemplo.com/produto1.jpg",
+    "buttons": [
+      {
+        "text": "Ver Detalhes",
+        "actionType": "link",
+        "id": "https://exemplo.com/produto1"
+      },
+      {
+        "text": "Código Promocional",
+        "actionType": "copy",
+        "id": "PROMO123"
+      },
+      {
+        "text": "Ligar para Vendas",
+        "actionType": "call",
+        "id": "+5511999999999"
+      }
+    ]
+  },
+  {
+    "title": "Produto Premium 2",
+    "description": "Descrição detalhada do produto 2",
+    "imageUrl": "https://exemplo.com/produto2.jpg",
+    "buttons": [
+      {
+        "text": "Comprar Agora",
+        "actionType": "link",
+        "id": "https://exemplo.com/comprar"
+      },
+      {
+        "text": "Selecionar",
+        "actionType": "return_id",
+        "id": "produto_2"
+      }
+    ]
+  }
+  // Adicione mais cartões conforme necessário
+]`;
+
 function MessageFormFields({
   instances,
   config,
   memoryItems,
   setMemoryItems,
+  configMode,
+  setConfigMode,
+  jsonConfig,
+  setJsonConfig,
 }: {
   instances: InstanceProps[];
   config?: MessageConfig;
   memoryItems: MemoryItem[];
   setMemoryItems: React.Dispatch<React.SetStateAction<MemoryItem[]>>;
+  configMode: 'manual' | 'json';
+  setConfigMode: React.Dispatch<React.SetStateAction<'manual' | 'json'>>;
+  jsonConfig: string;
+  setJsonConfig: React.Dispatch<React.SetStateAction<string>>;
 }) {
-  const { form, setValue } = useForm();
+  const { form, setValue, errors } = useForm();
   const messageType = (form.messageType as MessageType) || 'text';
   const interactiveMenuType =
     (form.interactiveMenuType as InteractiveMenuType) || 'button';
@@ -121,6 +173,26 @@ function MessageFormFields({
       return newSet;
     });
   };
+
+  // Sincronizar JSON quando o modo mudar para JSON ou quando carouselCards mudar
+  useEffect(() => {
+    if (configMode === 'json' && carouselCards.length > 0) {
+      setJsonConfig(JSON.stringify(carouselCards, null, 2));
+    }
+  }, [configMode, carouselCards, setJsonConfig]);
+
+  // Atualizar campo do formulário quando JSON mudar (para passar validação Zod)
+  useEffect(() => {
+    if (
+      configMode === 'json' &&
+      interactiveMenuType === 'carousel' &&
+      jsonConfig.trim() !== ''
+    ) {
+      // Setar um valor dummy para passar a validação
+      // O handleSubmit vai processar o JSON corretamente
+      setValue('interactiveMenuChoices', '__JSON_MODE__');
+    }
+  }, [configMode, interactiveMenuType, jsonConfig, setValue]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1360,250 +1432,343 @@ function MessageFormFields({
             ) : interactiveMenuType === 'carousel' ? (
               // UI Hierárquica para tipo CAROUSEL
               <div className="space-y-4 mt-2">
-                {carouselCards.map((card, cardIndex) => (
-                  <div
-                    key={card.id}
-                    className="p-4 border-2 border-neutral-200 rounded-lg bg-white"
-                  >
-                    {/* Header do Cartão */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex flex-1 flex-col space-y-3">
-                        <div className="flex items-center justify-between gap-2 relative">
-                          <FormControl variant="label" className="mb-2">
-                            <Typography
-                              variant="span"
-                              className="font-semibold"
-                            >
-                              🎴 Cartão {cardIndex + 1}
-                            </Typography>
-                          </FormControl>
-                          {carouselCards?.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              onClick={() => removeCarouselCard(card.id)}
-                              disabled={carouselCards.length === 1}
-                              className="absolute right-0 -top-3 text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-fit w-fit"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Título do Cartão */}
-                        <div>
-                          <FormControl variant="label">
-                            <Typography variant="span" className="text-sm">
-                              Título *
-                            </Typography>
-                          </FormControl>
-                          <Input
-                            type="text"
-                            fieldName={`card_title_${card.id}`}
-                            value={card.title}
-                            onChange={(e) =>
-                              updateCarouselCard(
-                                card.id,
-                                'title',
-                                e.target.value,
-                              )
-                            }
-                            placeholder="Ex: Smartphone XYZ"
-                          />
-                        </div>
-
-                        {/* Descrição do Cartão */}
-                        <div>
-                          <FormControl variant="label">
-                            <Typography variant="span" className="text-sm">
-                              Descrição{' '}
-                              <Typography
-                                variant="span"
-                                className="text-xs text-gray-500 font-normal"
-                              >
-                                (opcional)
-                              </Typography>
-                            </Typography>
-                          </FormControl>
-                          <Textarea
-                            fieldName={`card_description_${card.id}`}
-                            value={card.description}
-                            onChange={(e) =>
-                              updateCarouselCard(
-                                card.id,
-                                'description',
-                                e.target.value,
-                              )
-                            }
-                            placeholder="Ex: O mais avançado smartphone da linha"
-                            rows={2}
-                          />
-                        </div>
-
-                        {/* URL da Imagem */}
-                        <div>
-                          <FormControl variant="label">
-                            <Typography variant="span" className="text-sm">
-                              URL da Imagem *
-                            </Typography>
-                          </FormControl>
-                          <Input
-                            type="url"
-                            fieldName={`card_image_${card.id}`}
-                            value={card.imageUrl}
-                            onChange={(e) =>
-                              updateCarouselCard(
-                                card.id,
-                                'imageUrl',
-                                e.target.value,
-                              )
-                            }
-                            placeholder="https://exemplo.com/produto.jpg"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Botões do Cartão */}
-                    <div className="space-y-2 ml-4 pl-4 border-l-2 border-neutral-300">
+                {/* Toggle entre modo Manual e JSON para Carrossel */}
+                <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col gap-1">
                       <Typography
                         variant="span"
-                        className="text-sm font-medium text-gray-700"
+                        className="text-sm font-medium"
                       >
-                        Botões do cartão:
+                        Modo de Configuração dos Cartões
                       </Typography>
-                      {card.buttons.map((button, buttonIndex) => (
-                        <div
-                          key={buttonIndex}
-                          className="p-3 border border-gray-300 rounded-lg bg-white space-y-2"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <Typography
-                              variant="span"
-                              className="text-sm font-semibold text-neutral-600"
-                            >
-                              Botão {buttonIndex + 1}
-                            </Typography>
-                            {card.buttons?.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() =>
-                                  removeButtonFromCard(card.id, buttonIndex)
-                                }
-                                disabled={card.buttons.length === 1}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-
-                          <div>
-                            <FormControl variant="label">
-                              <Typography variant="span" className="text-sm">
-                                Texto do Botão *
-                              </Typography>
-                            </FormControl>
-                            <Input
-                              type="text"
-                              fieldName={`card_${card.id}_button_text_${buttonIndex}`}
-                              value={button.text}
-                              onChange={(e) =>
-                                updateCardButton(
-                                  card.id,
-                                  buttonIndex,
-                                  'text',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Ex: Copiar Código"
-                            />
-                          </div>
-
-                          <div>
-                            <FormControl variant="label">
-                              <Typography variant="span" className="text-sm">
-                                Tipo de Ação *
-                              </Typography>
-                            </FormControl>
-                            <FormSelect
-                              fieldName={`card_${card.id}_button_actionType_${buttonIndex}`}
-                              placeholder="Selecione o tipo"
-                              options={[
-                                { value: 'copy', label: '📋 Copiar' },
-                                { value: 'link', label: '🔗 Link' },
-                                { value: 'call', label: '📞 Ligação' },
-                                {
-                                  value: 'return_id',
-                                  label: '🔄 Retornar Identificador',
-                                },
-                              ]}
-                              onValueChange={(value) =>
-                                updateCardButton(
-                                  card.id,
-                                  buttonIndex,
-                                  'actionType',
-                                  value,
-                                )
-                              }
-                              className="w-full"
-                            />
-                          </div>
-
-                          <div>
-                            <FormControl variant="label">
-                              <Typography variant="span" className="text-sm">
-                                {button.actionType === 'copy' &&
-                                  'Código para Copiar *'}
-                                {button.actionType === 'link' &&
-                                  'URL do Link *'}
-                                {button.actionType === 'call' &&
-                                  'Número para Ligar *'}
-                                {button.actionType === 'return_id' &&
-                                  'Identificador *'}
-                                {!button.actionType && 'Valor *'}
-                              </Typography>
-                            </FormControl>
-                            <Input
-                              type="text"
-                              fieldName={`card_${card.id}_button_id_${buttonIndex}`}
-                              value={button.id}
-                              onChange={(e) =>
-                                updateCardButton(
-                                  card.id,
-                                  buttonIndex,
-                                  'id',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder={
-                                button.actionType === 'copy'
-                                  ? 'Ex: PROMO123'
-                                  : button.actionType === 'link'
-                                    ? 'Ex: https://exemplo.com'
-                                    : button.actionType === 'call'
-                                      ? 'Ex: +5511999999999'
-                                      : button.actionType === 'return_id'
-                                        ? 'Ex: etapa_1'
-                                        : 'Selecione o tipo de ação primeiro'
-                              }
-                            />
-                          </div>
-                        </div>
-                      ))}
+                      <Typography
+                        variant="span"
+                        className="text-xs text-neutral-600"
+                      >
+                        {configMode === 'manual'
+                          ? 'Configure através da interface visual'
+                          : 'Configure através de JSON'}
+                      </Typography>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white rounded-lg p-1 border border-neutral-300">
                       <Button
                         type="button"
-                        variant="default"
-                        onClick={() => addButtonToCard(card.id)}
-                        className="w-full gap-2 text-sm"
+                        variant={configMode === 'manual' ? 'gradient' : 'ghost'}
+                        onClick={() => setConfigMode('manual')}
+                        className="w-fit px-4 py-2 text-sm"
                       >
-                        <Plus className="w-3 h-3" />
-                        Adicionar Botão neste Cartão
+                        📝 Manual
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={configMode === 'json' ? 'gradient' : 'ghost'}
+                        onClick={() => setConfigMode('json')}
+                        className="w-fit px-4 py-2 text-sm"
+                      >
+                        {} JSON
                       </Button>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {configMode === 'json' ? (
+                  // Modo JSON para Carrossel
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <FormControl variant="label">
+                        Configuração JSON dos Cartões
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setJsonConfig(JSON_CAROUSEL_TEMPLATE)}
+                        className="w-fit text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        📄 Carregar Modelo de Exemplo
+                      </Button>
+                    </div>
+                    <textarea
+                      value={jsonConfig}
+                      onChange={(e) => setJsonConfig(e.target.value)}
+                      placeholder="Cole ou edite o JSON de configuração aqui..."
+                      rows={15}
+                      className="w-full rounded-md border border-gray-300 bg-white p-3 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"
+                    />
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <Typography
+                        variant="span"
+                        className="text-xs text-blue-800"
+                      >
+                        <strong>💡 Dica:</strong> Você pode usar:
+                        <br />• <strong>Variável dinâmica:</strong>{' '}
+                        <code className="text-xs">{`{{carousel_produtos}}`}</code>{' '}
+                        (resultado de transformation node)
+                        <br />• <strong>JSON literal:</strong>{' '}
+                        <code className="text-xs">{`[{ "title": "...", "imageUrl": "...", "buttons": [...] }]`}</code>
+                        <br />• <strong>Comentários:</strong> Use // no JSON
+                        para documentar (serão removidos ao salvar)
+                      </Typography>
+                    </div>
+                  </div>
+                ) : (
+                  // Modo Manual para Carrossel
+                  <div className="space-y-4">
+                    {carouselCards.map((card, cardIndex) => (
+                      <div
+                        key={card.id}
+                        className="p-4 border-2 border-neutral-200 rounded-lg bg-white"
+                      >
+                        {/* Header do Cartão */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="flex flex-1 flex-col space-y-3">
+                            <div className="flex items-center justify-between gap-2 relative">
+                              <FormControl variant="label" className="mb-2">
+                                <Typography
+                                  variant="span"
+                                  className="font-semibold"
+                                >
+                                  🎴 Cartão {cardIndex + 1}
+                                </Typography>
+                              </FormControl>
+                              {carouselCards?.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => removeCarouselCard(card.id)}
+                                  disabled={carouselCards.length === 1}
+                                  className="absolute right-0 -top-3 text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-fit w-fit"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+
+                            {/* Título do Cartão */}
+                            <div>
+                              <FormControl variant="label">
+                                <Typography variant="span" className="text-sm">
+                                  Título *
+                                </Typography>
+                              </FormControl>
+                              <Input
+                                type="text"
+                                fieldName={`card_title_${card.id}`}
+                                value={card.title}
+                                onChange={(e) =>
+                                  updateCarouselCard(
+                                    card.id,
+                                    'title',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Ex: Smartphone XYZ"
+                              />
+                            </div>
+
+                            {/* Descrição do Cartão */}
+                            <div>
+                              <FormControl variant="label">
+                                <Typography variant="span" className="text-sm">
+                                  Descrição{' '}
+                                  <Typography
+                                    variant="span"
+                                    className="text-xs text-gray-500 font-normal"
+                                  >
+                                    (opcional)
+                                  </Typography>
+                                </Typography>
+                              </FormControl>
+                              <Textarea
+                                fieldName={`card_description_${card.id}`}
+                                value={card.description}
+                                onChange={(e) =>
+                                  updateCarouselCard(
+                                    card.id,
+                                    'description',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Ex: O mais avançado smartphone da linha"
+                                rows={2}
+                              />
+                            </div>
+
+                            {/* URL da Imagem */}
+                            <div>
+                              <FormControl variant="label">
+                                <Typography variant="span" className="text-sm">
+                                  URL da Imagem *
+                                </Typography>
+                              </FormControl>
+                              <Input
+                                type="url"
+                                fieldName={`card_image_${card.id}`}
+                                value={card.imageUrl}
+                                onChange={(e) =>
+                                  updateCarouselCard(
+                                    card.id,
+                                    'imageUrl',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="https://exemplo.com/produto.jpg"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Botões do Cartão */}
+                        <div className="space-y-2 ml-4 pl-4 border-l-2 border-neutral-300">
+                          <Typography
+                            variant="span"
+                            className="text-sm font-medium text-gray-700"
+                          >
+                            Botões do cartão:
+                          </Typography>
+                          {card.buttons.map((button, buttonIndex) => (
+                            <div
+                              key={buttonIndex}
+                              className="p-3 border border-gray-300 rounded-lg bg-white space-y-2"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <Typography
+                                  variant="span"
+                                  className="text-sm font-semibold text-neutral-600"
+                                >
+                                  Botão {buttonIndex + 1}
+                                </Typography>
+                                {card.buttons?.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      removeButtonFromCard(card.id, buttonIndex)
+                                    }
+                                    disabled={card.buttons.length === 1}
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+
+                              <div>
+                                <FormControl variant="label">
+                                  <Typography
+                                    variant="span"
+                                    className="text-sm"
+                                  >
+                                    Texto do Botão *
+                                  </Typography>
+                                </FormControl>
+                                <Input
+                                  type="text"
+                                  fieldName={`card_${card.id}_button_text_${buttonIndex}`}
+                                  value={button.text}
+                                  onChange={(e) =>
+                                    updateCardButton(
+                                      card.id,
+                                      buttonIndex,
+                                      'text',
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Ex: Copiar Código"
+                                />
+                              </div>
+
+                              <div>
+                                <FormControl variant="label">
+                                  <Typography
+                                    variant="span"
+                                    className="text-sm"
+                                  >
+                                    Tipo de Ação *
+                                  </Typography>
+                                </FormControl>
+                                <FormSelect
+                                  fieldName={`card_${card.id}_button_actionType_${buttonIndex}`}
+                                  placeholder="Selecione o tipo"
+                                  options={[
+                                    { value: 'copy', label: '📋 Copiar' },
+                                    { value: 'link', label: '🔗 Link' },
+                                    { value: 'call', label: '📞 Ligação' },
+                                    {
+                                      value: 'return_id',
+                                      label: '🔄 Retornar Identificador',
+                                    },
+                                  ]}
+                                  onValueChange={(value) =>
+                                    updateCardButton(
+                                      card.id,
+                                      buttonIndex,
+                                      'actionType',
+                                      value,
+                                    )
+                                  }
+                                  className="w-full"
+                                />
+                              </div>
+
+                              <div>
+                                <FormControl variant="label">
+                                  <Typography
+                                    variant="span"
+                                    className="text-sm"
+                                  >
+                                    {button.actionType === 'copy' &&
+                                      'Código para Copiar *'}
+                                    {button.actionType === 'link' &&
+                                      'URL do Link *'}
+                                    {button.actionType === 'call' &&
+                                      'Número para Ligar *'}
+                                    {button.actionType === 'return_id' &&
+                                      'Identificador *'}
+                                    {!button.actionType && 'Valor *'}
+                                  </Typography>
+                                </FormControl>
+                                <Input
+                                  type="text"
+                                  fieldName={`card_${card.id}_button_id_${buttonIndex}`}
+                                  value={button.id}
+                                  onChange={(e) =>
+                                    updateCardButton(
+                                      card.id,
+                                      buttonIndex,
+                                      'id',
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={
+                                    button.actionType === 'copy'
+                                      ? 'Ex: PROMO123'
+                                      : button.actionType === 'link'
+                                        ? 'Ex: https://exemplo.com'
+                                        : button.actionType === 'call'
+                                          ? 'Ex: +5511999999999'
+                                          : button.actionType === 'return_id'
+                                            ? 'Ex: etapa_1'
+                                            : 'Selecione o tipo de ação primeiro'
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="default"
+                            onClick={() => addButtonToCard(card.id)}
+                            className="w-full gap-2 text-sm"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Adicionar Botão neste Cartão
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               // UI Simples para outros tipos (button, poll)
@@ -2211,6 +2376,7 @@ function MessageFormFields({
       <SubmitButton
         variant="gradient"
         className="absolute top-2 right-12 w-fit mt-4"
+        onClick={() => console.log(errors)}
       >
         Salvar Configuração
       </SubmitButton>
@@ -2235,6 +2401,12 @@ export function MessageNodeConfig({
     { key: '', value: '' },
   ]);
 
+  // Estado para armazenar o modo de configuração (precisamos dele aqui para o submit)
+  const [currentConfigMode, setCurrentConfigMode] = useState<'manual' | 'json'>(
+    'manual',
+  );
+  const [currentJsonConfig, setCurrentJsonConfig] = useState<string>('');
+
   // Carregar configuração de memória quando config mudar
   useEffect(() => {
     if (config?.memoryConfig?.items && config.memoryConfig.items.length > 0) {
@@ -2245,6 +2417,90 @@ export function MessageNodeConfig({
   }, [config]);
 
   const handleSubmit = async (data: FieldValues) => {
+    // Se estiver no modo JSON e for interactive_menu do tipo carousel, processar o JSON dos cartões
+    if (
+      currentConfigMode === 'json' &&
+      data.messageType === 'interactive_menu' &&
+      data.interactiveMenuType === 'carousel'
+    ) {
+      // Se o JSON for apenas uma variável (ex: {{carousel_produtos}}), salvar diretamente
+      const trimmedJson = currentJsonConfig.trim();
+      const isVariable = /^\{\{[^}]+\}\}$/.test(trimmedJson);
+
+      if (isVariable) {
+        // Se for uma variável dinâmica, salvar como string para ser processada no worker
+        data.interactiveMenuChoices = trimmedJson;
+      } else {
+        // Se for JSON literal, processar normalmente
+        try {
+          // Remover comentários do JSON antes de parsear
+          const jsonWithoutComments = currentJsonConfig.replace(
+            /\/\/.*$/gm,
+            '',
+          );
+          const parsedCards = JSON.parse(jsonWithoutComments);
+
+          // Validar se é um array
+          if (!Array.isArray(parsedCards)) {
+            alert(
+              'O JSON deve ser um array de cartões. Exemplo:\\n[{ "title": "...", "description": "...", "imageUrl": "...", "buttons": [...] }]',
+            );
+            return;
+          }
+
+          // Converter os cartões parseados para o formato do choices
+          const choicesStrings: string[] = [];
+
+          parsedCards.forEach((card) => {
+            // Adicionar título e descrição do cartão (formato: [Título\nDescrição])
+            if (card.title && card.title.trim() !== '') {
+              const titleLine = card.description
+                ? `[${card.title}\n${card.description}]`
+                : `[${card.title}]`;
+              choicesStrings.push(titleLine);
+            }
+
+            // Adicionar URL da imagem (formato: {URL})
+            if (card.imageUrl && card.imageUrl.trim() !== '') {
+              choicesStrings.push(`{${card.imageUrl}}`);
+            }
+
+            // Adicionar botões do cartão
+            if (card.buttons && Array.isArray(card.buttons)) {
+              card.buttons.forEach(
+                (button: { text: string; id: string; actionType?: string }) => {
+                  if (button.text && button.text.trim() !== '') {
+                    // Montar ID com prefixo baseado no actionType
+                    let finalId = button.id || '';
+                    if (button.actionType === 'copy') {
+                      finalId = `copy:${button.id}`;
+                    } else if (button.actionType === 'call') {
+                      finalId = `call:${button.id}`;
+                    } else if (button.actionType === 'return_id') {
+                      finalId = `${button.id}`;
+                    }
+                    // Para 'link', não adiciona prefixo (já é a URL completa)
+
+                    choicesStrings.push(`${button.text}|${finalId}`);
+                  }
+                },
+              );
+            }
+          });
+
+          // Atualizar data com os choices convertidos
+          data.interactiveMenuChoices = JSON.stringify(choicesStrings);
+        } catch (error) {
+          alert(
+            'Erro ao parsear JSON dos cartões. Verifique se o formato está correto.\\n\\n' +
+              (error instanceof Error ? error.message : String(error)),
+          );
+          return;
+        }
+      }
+    }
+
+    // Modo manual (código original)
     const messageConfig: MessageConfig = {
       token: data.token,
       phoneNumber: data.phoneNumber,
@@ -2274,9 +2530,26 @@ export function MessageNodeConfig({
 
     // Se for menu interativo, adicionar configuração
     if (data.messageType === 'interactive_menu') {
-      const choices = data.interactiveMenuChoices
-        ? JSON.parse(data.interactiveMenuChoices)
-        : [];
+      let choices: string[] = [];
+
+      if (data.interactiveMenuChoices) {
+        const choicesStr = data.interactiveMenuChoices;
+        // Verificar se é uma variável dinâmica (ex: {{carousel_produtos}})
+        const isVariable = /^\{\{[^}]+\}\}$/.test(choicesStr.trim());
+
+        if (isVariable) {
+          // Se for variável, salvar como array com a variável
+          choices = [choicesStr];
+        } else {
+          // Se for JSON, fazer parse
+          try {
+            choices = JSON.parse(choicesStr);
+          } catch (error) {
+            console.error('Error parsing choices:', error);
+            choices = [];
+          }
+        }
+      }
 
       messageConfig.interactiveMenu = {
         type: data.interactiveMenuType as InteractiveMenuType,
@@ -2343,6 +2616,10 @@ export function MessageNodeConfig({
           config={config}
           memoryItems={memoryItems}
           setMemoryItems={setMemoryItems}
+          configMode={currentConfigMode}
+          setConfigMode={setCurrentConfigMode}
+          jsonConfig={currentJsonConfig}
+          setJsonConfig={setCurrentJsonConfig}
         />
       </Form>
     </NodeConfigLayout>

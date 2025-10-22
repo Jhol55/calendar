@@ -16,6 +16,7 @@ interface MemoryConfigSectionProps {
   form: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setValue: (name: string, value: any) => void;
+  showMemoryConfig?: boolean; // Controla se a seção deve ser exibida (false por padrão)
 }
 
 export function MemoryConfigSection({
@@ -23,6 +24,7 @@ export function MemoryConfigSection({
   setMemoryItems,
   form,
   setValue,
+  showMemoryConfig = false,
 }: MemoryConfigSectionProps) {
   // Funções para manipular memory items
   const addMemoryItem = () => {
@@ -49,6 +51,11 @@ export function MemoryConfigSection({
     setMemoryItems(newItems);
     setValue('memoryItems', newItems);
   };
+
+  // Não renderizar nada se showMemoryConfig for false
+  if (!showMemoryConfig) {
+    return null;
+  }
 
   return (
     <div className="border-t pt-4 mt-4">

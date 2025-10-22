@@ -133,6 +133,7 @@ model flow_executions {
   data        Json?     @db.JsonB // Dados de entrada
   result      Json?     @db.JsonB // Dados de saída
   nodeExecutions Json?  @db.JsonB // Execução de cada nó
+  loopStates  Json?     @db.JsonB // Estado dos loops ativos {[nodeId]: {currentIndex, items, etc}}
   
   flow        chatbot_flows @relation(fields: [flowId], references: [id], onDelete: Cascade)
   
@@ -177,4 +178,28 @@ model DataTable {
   @@unique([userId, tableName, partition])
   @@index([userId, tableName])
   @@index([userId, tableName, isFull])
+}
+
+model agent_conversations {
+  id            String   @id @default(uuid())
+  userId        String   @db.VarChar(255)  // ID do usuário final (WhatsApp, etc)
+  flowId        String?  @db.VarChar(255)  // ID do fluxo (opcional)
+  nodeId        String?  @db.VarChar(255)  // ID do node agent (opcional)
+  
+  messages      Json     @db.JsonB         // Array de mensagens [{role, content, timestamp}]
+  
+  maxLength     Int      @default(10)      // Máximo de mensagens a manter
+  lastMessageAt DateTime @default(now())   // Última mensagem adicionada
+  expiresAt     DateTime?                  // TTL opcional
+  
+  metadata      Json?    @db.JsonB         // Metadados extras (tokens usados, etc)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, flowId, nodeId])
+  @@index([userId])
+  @@index([flowId])
+  @@index([lastMessageAt])
+  @@index([expiresAt])
 }

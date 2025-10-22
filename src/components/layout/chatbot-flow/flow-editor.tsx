@@ -29,8 +29,11 @@ import {
   MemoryNode,
   TransformationNode,
   DatabaseNode,
+  LoopNode,
+  CodeExecutionNode,
 } from './nodes';
 import { HttpRequestNode } from './nodes/http-request-node/http-request-node';
+import AgentNode from './nodes/agent-node/agent-node';
 import {
   NodeType,
   NodeData,
@@ -41,6 +44,9 @@ import {
   ConditionConfig,
   DatabaseConfig,
   HttpRequestConfig,
+  AgentConfig,
+  LoopConfig,
+  CodeExecutionConfig,
 } from '../../layout/chatbot-flow/types';
 import { Save, Download, Upload, Plus, Play, Database, X } from 'lucide-react';
 import {
@@ -58,6 +64,9 @@ import { TransformationNodeConfig } from './nodes/transformation-node/transforma
 import { ConditionNodeConfig } from './nodes/condition-node/condition-node-config';
 import { DatabaseNodeConfig } from './nodes/database-node/database-node-config';
 import { HttpRequestNodeConfig } from './nodes/http-request-node/http-request-node-config';
+import AgentNodeConfig from './nodes/agent-node/agent-node-config';
+import { LoopNodeConfig } from './nodes/loop-node/loop-node-config';
+import { CodeExecutionNodeConfig } from './nodes/code-execution-node/code-execution-node-config';
 import { ExecutionsPanel } from './executions-panel';
 import { DatabaseSpreadsheet } from '@/components/layout/database-spreadsheet/database-spreadsheet';
 
@@ -70,6 +79,9 @@ const nodeTypes = {
   transformation: TransformationNode,
   database: DatabaseNode,
   http_request: HttpRequestNode,
+  agent: AgentNode,
+  loop: LoopNode,
+  code_execution: CodeExecutionNode,
 };
 
 // Função para gerar IDs únicos
@@ -93,6 +105,10 @@ function FlowEditorContent() {
   const [databaseConfigDialogOpen, setDatabaseConfigDialogOpen] =
     useState(false);
   const [httpRequestConfigDialogOpen, setHttpRequestConfigDialogOpen] =
+    useState(false);
+  const [agentConfigDialogOpen, setAgentConfigDialogOpen] = useState(false);
+  const [loopConfigDialogOpen, setLoopConfigDialogOpen] = useState(false);
+  const [codeExecutionConfigDialogOpen, setCodeExecutionConfigDialogOpen] =
     useState(false);
   const [nodeToConfig, setNodeToConfig] = useState<Node<NodeData> | null>(null);
   const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
@@ -209,6 +225,7 @@ function FlowEditorContent() {
         transformation: 'Transformation',
         database: 'Database',
         http_request: 'HTTP Request',
+        agent: 'AI Agent',
         end: 'End',
       };
 
@@ -426,16 +443,21 @@ function FlowEditorContent() {
       setNodes((nds) =>
         nds.map((node) => {
           if (node.id === nodeId) {
-            return {
+            const updatedNode = {
               ...node,
               data: { ...node.data, ...data },
             };
+            // Atualizar nodeToConfig se for o node que está sendo editado
+            if (nodeToConfig?.id === nodeId) {
+              setNodeToConfig(updatedNode);
+            }
+            return updatedNode;
           }
           return node;
         }),
       );
     },
-    [setNodes],
+    [setNodes, nodeToConfig],
   );
 
   const onNodeDoubleClick = useCallback(
@@ -461,6 +483,15 @@ function FlowEditorContent() {
       } else if (node.type === 'http_request') {
         setNodeToConfig(node);
         setHttpRequestConfigDialogOpen(true);
+      } else if (node.type === 'agent') {
+        setNodeToConfig(node);
+        setAgentConfigDialogOpen(true);
+      } else if (node.type === 'loop') {
+        setNodeToConfig(node);
+        setLoopConfigDialogOpen(true);
+      } else if (node.type === 'code_execution') {
+        setNodeToConfig(node);
+        setCodeExecutionConfigDialogOpen(true);
       } else if (node.type === 'start' || node.type === 'end') {
         // Start e End nodes não têm configuração
         return;
@@ -535,6 +566,33 @@ function FlowEditorContent() {
     [nodeToConfig, handleNodeUpdate],
   );
 
+  const handleSaveAgentConfig = useCallback(
+    (config: AgentConfig) => {
+      if (nodeToConfig) {
+        handleNodeUpdate(nodeToConfig.id, { agentConfig: config });
+      }
+    },
+    [nodeToConfig, handleNodeUpdate],
+  );
+
+  const handleSaveLoopConfig = useCallback(
+    (config: LoopConfig) => {
+      if (nodeToConfig) {
+        handleNodeUpdate(nodeToConfig.id, { loopConfig: config });
+      }
+    },
+    [nodeToConfig, handleNodeUpdate],
+  );
+
+  const handleSaveCodeExecutionConfig = useCallback(
+    (config: CodeExecutionConfig) => {
+      if (nodeToConfig) {
+        handleNodeUpdate(nodeToConfig.id, { codeExecutionConfig: config });
+      }
+    },
+    [nodeToConfig, handleNodeUpdate],
+  );
+
   // Copiar node selecionado (Ctrl+C)
   const handleCopyNode = useCallback(() => {
     const selectedNode = nodes.find((node) => node.selected);
@@ -552,6 +610,9 @@ function FlowEditorContent() {
     // Gerar novo ID único
     const newId = generateNodeId();
 
+    // Fazer deep clone do data para evitar compartilhamento de referências
+    const clonedData: NodeData = JSON.parse(JSON.stringify(copiedNode.data));
+
     // Criar novo node com offset na posição
     const newNode: Node<NodeData> = {
       ...copiedNode,
@@ -561,9 +622,7 @@ function FlowEditorContent() {
         y: copiedNode.position.y + 50,
       },
       selected: true,
-      data: {
-        ...copiedNode.data,
-      },
+      data: clonedData,
     };
 
     // Desselecionar outros nodes e adicionar o novo
@@ -823,6 +882,12 @@ function FlowEditorContent() {
         onSave={handleSaveMemoryConfig}
         nodeId={nodeToConfig?.id}
         flowId={currentFlowId || undefined}
+        nodeLabel={nodeToConfig?.data.label}
+        onNodeLabelChange={(label: string) => {
+          if (nodeToConfig) {
+            handleNodeUpdate(nodeToConfig.id, { label });
+          }
+        }}
       />
 
       <TransformationNodeConfig
@@ -869,6 +934,60 @@ function FlowEditorContent() {
         }}
         config={nodeToConfig?.data.httpRequestConfig}
         onSave={handleSaveHttpRequestConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
+        nodeLabel={nodeToConfig?.data.label}
+        onNodeLabelChange={(label) => {
+          if (nodeToConfig) {
+            handleNodeUpdate(nodeToConfig.id, { label });
+          }
+        }}
+      />
+
+      <AgentNodeConfig
+        isOpen={agentConfigDialogOpen}
+        onClose={() => {
+          setAgentConfigDialogOpen(false);
+          setNodeToConfig(null);
+        }}
+        config={nodeToConfig?.data.agentConfig}
+        onSave={handleSaveAgentConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
+        nodeLabel={nodeToConfig?.data.label}
+        onNodeLabelChange={(label) => {
+          if (nodeToConfig) {
+            handleNodeUpdate(nodeToConfig.id, { label });
+          }
+        }}
+      />
+
+      <LoopNodeConfig
+        isOpen={loopConfigDialogOpen}
+        onClose={() => {
+          setLoopConfigDialogOpen(false);
+          setNodeToConfig(null);
+        }}
+        config={nodeToConfig?.data.loopConfig}
+        onSave={handleSaveLoopConfig}
+        nodeId={nodeToConfig?.id}
+        flowId={currentFlowId || undefined}
+        nodeLabel={nodeToConfig?.data.label}
+        onNodeLabelChange={(label) => {
+          if (nodeToConfig) {
+            handleNodeUpdate(nodeToConfig.id, { label });
+          }
+        }}
+      />
+
+      <CodeExecutionNodeConfig
+        isOpen={codeExecutionConfigDialogOpen}
+        onClose={() => {
+          setCodeExecutionConfigDialogOpen(false);
+          setNodeToConfig(null);
+        }}
+        config={nodeToConfig?.data.codeExecutionConfig}
+        onSave={handleSaveCodeExecutionConfig}
         nodeId={nodeToConfig?.id}
         flowId={currentFlowId || undefined}
         nodeLabel={nodeToConfig?.data.label}

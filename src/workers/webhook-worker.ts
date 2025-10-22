@@ -8,7 +8,13 @@ import {
 } from './memory-helper';
 import * as transformations from './transformation-helper';
 import executeDatabaseNode from './database-helper';
-import type { MessageConfig } from '../components/layout/chatbot-flow/types';
+import { processAgentNode as processAgentNodeHelper } from './agent-helper';
+import { processLoopNode } from './loop-helper';
+import { processCodeExecutionNode } from './code-execution-helper';
+import type {
+  MessageConfig,
+  AgentConfig,
+} from '../components/layout/chatbot-flow/types';
 
 // Função para substituir variáveis no texto
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -336,12 +342,23 @@ async function processNodeChain(
       console.log(`     Node type: ${targetNode?.type}, ID: ${targetNode?.id}`);
 
       // 🚨 DETECÇÃO DE LOOP CIRCULAR
-      if (edge.target === currentNodeId) {
+      // Permitir loops intencionais quando vêm de um Loop Node com handle 'loop'
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const isIntentionalLoop =
+        (edge as any).sourceHandle === 'loop' && currentNode.type === 'loop';
+
+      if (edge.target === currentNodeId && !isIntentionalLoop) {
         console.error(
           `🔴 LOOP DETECTED! Node ${currentNodeId} connects to itself!`,
         );
         throw new Error(
           `Circular loop detected: node ${currentNodeId} connects back to itself`,
+        );
+      }
+
+      if (isIntentionalLoop) {
+        console.log(
+          `🔁 Intentional loop detected from Loop Node - allowing loop back`,
         );
       }
 
@@ -428,6 +445,19 @@ async function processNode(
         break;
       case 'http_request':
         result = await processHttpRequestNode(executionId, node, webhookData);
+        break;
+      case 'agent':
+        result = await processAgentNode(executionId, node, webhookData);
+        break;
+      case 'loop':
+        result = await processLoopNodeWrapper(executionId, node, webhookData);
+        break;
+      case 'code_execution':
+        result = await processCodeExecutionNodeWrapper(
+          executionId,
+          node,
+          webhookData,
+        );
         break;
       case 'api':
         result = await processApiNode();
@@ -546,52 +576,17 @@ async function processMessageNode(
       `📤 Sending ${messageType || 'text'} message to ${phoneNumber}`,
     );
 
-    // Buscar execução para obter dados de todos os nodes
-    const execution = await prisma.flow_executions.findUnique({
-      where: { id: executionId },
-      include: {
-        flow: true,
-      },
-    });
-
-    const nodeExecutions =
-      (execution?.nodeExecutions as unknown as NodeExecutionsRecord) || {};
-
-    // Criar objeto $nodes com saídas de todos os nodes anteriores
-    const $nodes: Record<string, { output: unknown }> = {};
-    Object.keys(nodeExecutions).forEach((nodeId) => {
-      const nodeExec = nodeExecutions[nodeId];
-      if (nodeExec?.result) {
-        $nodes[nodeId] = {
-          output: nodeExec.result,
-        };
-      }
-    });
-
-    // Buscar todas as memórias do usuário para o contexto
-    const userId = execution?.flow?.userId
-      ? String(execution.flow.userId)
-      : null;
-    const $memory = userId ? await listarMemorias(userId) : {};
-
-    // Preparar contexto para substituição de variáveis
-    const variableContext = {
-      $node: {
-        input: webhookData.body,
-        webhook: {
-          body: webhookData.body,
-          headers: webhookData.headers,
-          queryParams: webhookData.queryParams,
-        },
-      },
-      $nodes, // Adicionar todos os nodes anteriores
-      $memory, // Adicionar todas as memórias do usuário
-    };
+    // Usar helper para construir contexto de variáveis
+    const variableContext = await buildVariableContext(
+      executionId,
+      webhookData,
+    );
 
     // Debug: Log do contexto disponível
     console.log('🔍 Variable context available:', {
       hasNodeInput: !!variableContext.$node.input,
       availableNodes: Object.keys(variableContext.$nodes),
+      hasLoop: !!variableContext.$loop,
     });
 
     // Substituir variáveis em todos os campos
@@ -659,9 +654,69 @@ async function processMessageNode(
           interactiveMenu.text,
           variableContext,
         );
-        const resolvedMenuChoices = interactiveMenu.choices.map(
+        let resolvedMenuChoices = interactiveMenu.choices.map(
           (choice: string) => replaceVariables(choice, variableContext),
         );
+
+        // Se o primeiro choice for uma variável de carousel (array de objetos), processar
+        if (
+          resolvedMenuChoices.length === 1 &&
+          typeof resolvedMenuChoices[0] === 'string'
+        ) {
+          try {
+            const parsedValue = JSON.parse(resolvedMenuChoices[0]);
+            if (Array.isArray(parsedValue) && parsedValue.length > 0) {
+              // Verificar se é um array de objetos (formato carousel)
+              if (typeof parsedValue[0] === 'object' && parsedValue[0].title) {
+                // Converter formato carousel para choices
+                const carouselChoices: string[] = [];
+                parsedValue.forEach((card) => {
+                  // Adicionar título e descrição
+                  if (card.title && card.title.trim() !== '') {
+                    const titleLine = card.description
+                      ? `[${card.title}\n${card.description}]`
+                      : `[${card.title}]`;
+                    carouselChoices.push(titleLine);
+                  }
+
+                  // Adicionar imagem
+                  if (card.imageUrl && card.imageUrl.trim() !== '') {
+                    carouselChoices.push(`{${card.imageUrl}}`);
+                  }
+
+                  // Adicionar botões
+                  if (card.buttons && Array.isArray(card.buttons)) {
+                    card.buttons.forEach(
+                      (button: {
+                        text: string;
+                        id: string;
+                        actionType?: string;
+                      }) => {
+                        if (button.text && button.text.trim() !== '') {
+                          let finalId = button.id || '';
+                          if (button.actionType === 'copy') {
+                            finalId = `copy:${button.id}`;
+                          } else if (button.actionType === 'call') {
+                            finalId = `call:${button.id}`;
+                          } else if (button.actionType === 'return_id') {
+                            finalId = `${button.id}`;
+                          }
+                          carouselChoices.push(`${button.text}|${finalId}`);
+                        }
+                      },
+                    );
+                  }
+                });
+                resolvedMenuChoices = carouselChoices;
+                console.log(
+                  `🎠 Converted carousel variable to ${carouselChoices.length} choices`,
+                );
+              }
+            }
+          } catch {
+            // Se não for JSON válido, manter como está
+          }
+        }
         const resolvedMenuFooter = interactiveMenu.footerText
           ? replaceVariables(interactiveMenu.footerText, variableContext)
           : undefined;
@@ -1519,6 +1574,189 @@ async function processTransformationNode(
   }
 }
 
+// ==================== HELPER: BUILD VARIABLE CONTEXT ====================
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function buildVariableContext(
+  executionId: string,
+  webhookData: WebhookJobData,
+): Promise<any> {
+  // Buscar execução para obter dados de todos os nodes
+  const execution = await prisma.flow_executions.findUnique({
+    where: { id: executionId },
+    include: {
+      flow: true,
+    },
+  });
+
+  const nodeExecutions =
+    (execution?.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+
+  // Criar objeto $nodes com saídas de todos os nodes anteriores
+  const $nodes: Record<string, { output: unknown }> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let $loop: any = null;
+  Object.keys(nodeExecutions).forEach((nodeId) => {
+    const nodeExec = nodeExecutions[nodeId];
+    if (nodeExec?.result) {
+      $nodes[nodeId] = {
+        output: nodeExec.result,
+      };
+
+      // Se for um loop node, adicionar ao $loop
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((nodeExec.result as any)?.loopVariable) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        $loop = (nodeExec.result as any).loopVariable;
+      }
+    }
+  });
+
+  // Buscar todas as memórias do usuário para o contexto
+  const userId = execution?.flow?.userId ? String(execution.flow.userId) : null;
+  const $memory = userId ? await listarMemorias(userId) : {};
+
+  console.log('🔹 [BUILD-CONTEXT] $nodes:', Object.keys($nodes));
+  console.log(
+    '🔹 [BUILD-CONTEXT] $nodes content:',
+    JSON.stringify($nodes, null, 2).substring(0, 500),
+  );
+
+  // Preparar contexto para substituição de variáveis
+  return {
+    $node: {
+      input: webhookData.body,
+      webhook: {
+        body: webhookData.body,
+        headers: webhookData.headers,
+        queryParams: webhookData.queryParams,
+      },
+    },
+    $nodes,
+    $memory,
+    $loop,
+  };
+}
+
+// ==================== LOOP NODE ====================
+
+async function processLoopNodeWrapper(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  console.log('🔁 Processing loop node');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const loopConfig = node.data?.loopConfig as any;
+
+  if (!loopConfig || !loopConfig.inputData) {
+    throw new Error(
+      'Loop node is not configured. Please configure the input data.',
+    );
+  }
+
+  try {
+    // Usar helper para construir contexto de variáveis
+    const variableContext = await buildVariableContext(
+      executionId,
+      webhookData,
+    );
+
+    console.log('🔍 Loop variable context:', {
+      hasLoop: !!variableContext.$loop,
+      loopKeys: variableContext.$loop ? Object.keys(variableContext.$loop) : [],
+      availableNodes: Object.keys(variableContext.$nodes),
+    });
+
+    // Processar o loop node usando o helper
+    const result = await processLoopNode({
+      executionId,
+      nodeId: node.id,
+      config: loopConfig,
+      variableContext,
+    });
+
+    console.log('📤 Loop result:', {
+      hasMore: result.hasMore,
+      selectedHandle: result.selectedHandle,
+      loopVariableKeys: Object.keys(result.loopVariable),
+    });
+
+    // Retornar resultado com selectedHandle para controlar o fluxo
+    return {
+      ...result,
+      selectedHandle: result.selectedHandle, // 'loop' ou 'done'
+    };
+  } catch (error) {
+    console.error(`❌ Error processing loop node:`, error);
+    throw error;
+  }
+}
+
+async function processCodeExecutionNodeWrapper(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  console.log('💻 Processing code execution node');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const codeConfig = node.data?.codeExecutionConfig as any;
+
+  if (!codeConfig || !codeConfig.code || !codeConfig.language) {
+    throw new Error(
+      'Code execution node is not configured. Please configure the code and language.',
+    );
+  }
+
+  try {
+    // Usar helper para construir contexto de variáveis
+    const variableContext = await buildVariableContext(
+      executionId,
+      webhookData,
+    );
+
+    console.log('🔍 Code execution variable context:', {
+      availableNodes: Object.keys(variableContext.$nodes),
+      hasLoop: !!variableContext.$loop,
+      hasMemory: !!variableContext.$memory,
+    });
+
+    // Processar o código usando o helper
+    const result = await processCodeExecutionNode(codeConfig, variableContext);
+
+    console.log('📤 Code execution result:', {
+      success: result.success,
+      hasOutput: !!result.output,
+      hasError: !!result.error,
+      executionTime: result.executionTime,
+    });
+
+    // Processar memória se configurada
+    if (codeConfig.memoryConfig && result.success) {
+      const memoryVariableContext = {
+        ...variableContext,
+        $node: {
+          ...variableContext.$node,
+          output: result.result,
+        },
+      };
+
+      await processNodeMemory(
+        codeConfig.memoryConfig,
+        executionId,
+        memoryVariableContext,
+      );
+    }
+
+    return result.result;
+  } catch (error) {
+    console.error(`❌ Error processing code execution node:`, error);
+    throw error;
+  }
+}
+
 // Condition Node Types
 interface ConditionRule {
   id: string;
@@ -1568,50 +1806,16 @@ async function processConditionNode(
   }
 
   try {
-    // Buscar execução para obter contexto de variáveis
-    const execution = await prisma.flow_executions.findUnique({
-      where: { id: executionId },
-      include: {
-        flow: true,
-      },
+    // Usar helper para construir contexto de variáveis
+    const variableContext = await buildVariableContext(
+      executionId,
+      webhookData,
+    );
+
+    console.log('🔍 Condition variable context:', {
+      hasLoop: !!variableContext.$loop,
+      availableNodes: Object.keys(variableContext.$nodes),
     });
-
-    if (!execution) {
-      throw new Error('Execution not found');
-    }
-
-    // Preparar contexto de variáveis
-    const nodeExecutions =
-      (execution.nodeExecutions as unknown as NodeExecutionsRecord) || {};
-
-    const $nodes: Record<string, { output: unknown }> = {};
-    Object.keys(nodeExecutions).forEach((nodeId) => {
-      const nodeExec = nodeExecutions[nodeId];
-      if (nodeExec?.result) {
-        $nodes[nodeId] = {
-          output: nodeExec.result,
-        };
-      }
-    });
-
-    // Buscar memórias do usuário
-    const userId = execution?.flow?.userId
-      ? String(execution.flow.userId)
-      : null;
-    const $memory = userId ? await listarMemorias(userId) : {};
-
-    const variableContext = {
-      $node: {
-        input: webhookData.body,
-        webhook: {
-          body: webhookData.body,
-          headers: webhookData.headers,
-          queryParams: webhookData.queryParams,
-        },
-      },
-      $nodes,
-      $memory,
-    };
 
     // Processar baseado no tipo de condição
     if (conditionConfig.conditionType === 'if') {
@@ -2091,6 +2295,33 @@ function executeArrayTransformation(
       return transformations.arrayLength(input);
     case 'sum':
       return transformations.sumArray(input);
+    case 'deleteKeys':
+      if (!params.keysToDelete) {
+        throw new Error('deleteKeys operation requires keysToDelete parameter');
+      }
+      return transformations.deleteKeys(input, params.keysToDelete);
+    case 'renameKeys':
+      if (!params.keyMappings) {
+        throw new Error('renameKeys operation requires keyMappings parameter');
+      }
+      return transformations.renameKeys(input, params.keyMappings);
+    case 'extractField':
+      if (!params.fieldName) {
+        throw new Error('extractField operation requires fieldName parameter');
+      }
+      return transformations.extractArrayField(input, params.fieldName);
+    case 'flatMap':
+      if (!params.template) {
+        throw new Error('flatMap operation requires template parameter');
+      }
+      return transformations.flatMapArray(input, params.template);
+    case 'mapObject':
+      if (!params.objectTemplate) {
+        throw new Error(
+          'mapObject operation requires objectTemplate parameter',
+        );
+      }
+      return transformations.mapObjectArray(input, params.objectTemplate);
     default:
       throw new Error(`Unknown array operation: ${operation}`);
   }
@@ -2187,7 +2418,6 @@ async function processHttpRequestNode(
     bodyType,
     timeout,
     followRedirects,
-    validateSSL,
     saveResponse,
     responseVariable,
   } = httpRequestConfig;
@@ -2199,47 +2429,16 @@ async function processHttpRequestNode(
   try {
     console.log(`📤 Making ${method} request to ${url}`);
 
-    // Buscar execução para obter dados de todos os nodes
-    const execution = await prisma.flow_executions.findUnique({
-      where: { id: executionId },
-      include: {
-        flow: true,
-      },
+    // Usar helper para construir contexto de variáveis
+    const variableContext = await buildVariableContext(
+      executionId,
+      webhookData,
+    );
+
+    console.log('🔍 HTTP Request variable context:', {
+      hasLoop: !!variableContext.$loop,
+      availableNodes: Object.keys(variableContext.$nodes),
     });
-
-    const nodeExecutions =
-      (execution?.nodeExecutions as unknown as NodeExecutionsRecord) || {};
-
-    // Criar objeto $nodes com saídas de todos os nodes anteriores
-    const $nodes: Record<string, { output: unknown }> = {};
-    Object.keys(nodeExecutions).forEach((nodeId) => {
-      const nodeExec = nodeExecutions[nodeId];
-      if (nodeExec?.result) {
-        $nodes[nodeId] = {
-          output: nodeExec.result,
-        };
-      }
-    });
-
-    // Buscar todas as memórias do usuário para o contexto
-    const userId = execution?.flow?.userId
-      ? String(execution.flow.userId)
-      : null;
-    const $memory = userId ? await listarMemorias(userId) : {};
-
-    // Preparar contexto para substituição de variáveis
-    const variableContext = {
-      $node: {
-        input: webhookData.body,
-        webhook: {
-          body: webhookData.body,
-          headers: webhookData.headers,
-          queryParams: webhookData.queryParams,
-        },
-      },
-      $nodes,
-      $memory,
-    };
 
     // Substituir variáveis na URL
     const resolvedUrl = replaceVariables(url, variableContext);
@@ -2325,7 +2524,7 @@ async function processHttpRequestNode(
           );
           responseData = parsed;
           parseAttempts++;
-        } catch (error) {
+        } catch {
           console.log(`🔄 Parse attempt ${parseAttempts + 1}: failed`);
 
           // Tentar corrigir JSONs malformados comuns apenas na primeira tentativa
@@ -2424,6 +2623,76 @@ async function processHttpRequestNode(
     console.error(`❌ Error making HTTP request:`, error);
     throw error;
   }
+}
+
+async function processAgentNode(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  console.log('🤖 Processing agent node');
+
+  const agentConfig = node.data?.agentConfig as AgentConfig | undefined;
+  if (!agentConfig) {
+    throw new Error('Agent configuration not found');
+  }
+
+  // Usar helper para construir contexto de variáveis
+  const variableContext = await buildVariableContext(executionId, webhookData);
+
+  console.log('🔍 Agent variable context:', {
+    hasLoop: !!variableContext.$loop,
+    availableNodes: Object.keys(variableContext.$nodes),
+  });
+
+  // Buscar execução para obter flowId
+  const execution = await prisma.flow_executions.findUnique({
+    where: { id: executionId },
+    include: { flow: true },
+  });
+
+  // Extrair userId do WhatsApp (número do remetente)
+  const whatsappUserId =
+    webhookData.body?.data?.from ||
+    webhookData.body?.data?.key?.remoteJid ||
+    'unknown';
+
+  // Processar agent node
+  const result = await processAgentNodeHelper({
+    config: agentConfig,
+    userId: whatsappUserId,
+    flowId: execution?.flowId,
+    nodeId: node.id,
+    variableContext,
+    replaceVariables,
+  });
+
+  // Salvar resposta em memória se configurado
+  if (agentConfig.memoryConfig) {
+    const memoryValue = result.response || result;
+    const memoryUserId = execution?.flow?.userId
+      ? String(execution.flow.userId)
+      : null;
+
+    if (memoryUserId) {
+      if (
+        agentConfig.memoryConfig.action === 'save' ||
+        agentConfig.memoryConfig.action === 'update'
+      ) {
+        await salvarMemoria(
+          memoryUserId,
+          agentConfig.memoryConfig.name,
+          memoryValue,
+          agentConfig.memoryConfig.ttl,
+        );
+      } else if (agentConfig.memoryConfig.action === 'delete') {
+        await deletarMemoria(memoryUserId, agentConfig.memoryConfig.name);
+      }
+    }
+  }
+
+  console.log('✅ Agent node processed successfully');
+  return result;
 }
 
 async function processApiNode(): Promise<unknown> {

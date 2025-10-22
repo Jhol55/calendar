@@ -22,6 +22,8 @@ interface MemoryNodeConfigProps {
   onSave: (config: MemoryConfig) => void;
   nodeId?: string;
   flowId?: string;
+  nodeLabel?: string;
+  onNodeLabelChange?: (label: string) => void;
 }
 
 const actionOptions = [
@@ -284,6 +286,8 @@ export function MemoryNodeConfig({
   onSave,
   nodeId,
   flowId,
+  nodeLabel,
+  onNodeLabelChange,
 }: MemoryNodeConfigProps) {
   const [items, setItems] = useState<MemoryItem[]>([{ key: '', value: '' }]);
 
@@ -331,6 +335,8 @@ export function MemoryNodeConfig({
       title="🧠 Configurar Memória"
       nodeId={nodeId}
       flowId={flowId}
+      nodeLabel={nodeLabel}
+      onNodeLabelChange={onNodeLabelChange}
     >
       <Form
         key={`${isOpen}-${config?.memoryName || 'novo'}`}

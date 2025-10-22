@@ -64,6 +64,7 @@ export const OPERATIONS_BY_TYPE = {
   array: [
     { value: 'filter', label: 'Filtrar elementos' },
     { value: 'map', label: 'Transformar cada elemento' },
+    { value: 'mapObject', label: '🎨 Transformar em Objeto (mapObject)' },
     { value: 'sort', label: 'Ordenar' },
     { value: 'first', label: 'Primeiro elemento' },
     { value: 'last', label: 'Último elemento' },
@@ -71,6 +72,10 @@ export const OPERATIONS_BY_TYPE = {
     { value: 'unique', label: 'Remover duplicados' },
     { value: 'length', label: 'Contar elementos' },
     { value: 'sum', label: 'Somar elementos' },
+    { value: 'deleteKeys', label: '🗑️ Deletar chaves de objetos' },
+    { value: 'renameKeys', label: '✏️ Renomear chaves de objetos' },
+    { value: 'extractField', label: '📤 Extrair campo de objetos' },
+    { value: 'flatMap', label: '🔄 Transformar e Achatar (flatMap)' },
   ],
   object: [
     { value: 'extract', label: 'Extrair campo' },
@@ -114,8 +119,13 @@ export const OPERATION_PARAMS = {
   // Array operations
   filter: ['condition'],
   map: ['transformation'],
+  mapObject: ['objectTemplate'],
   sort: ['order'],
   join: ['separator'],
+  deleteKeys: ['keysToDelete'],
+  renameKeys: ['keyMappings'],
+  extractField: ['fieldName'],
+  flatMap: ['template'],
 
   // Object operations
   extract: ['field'],

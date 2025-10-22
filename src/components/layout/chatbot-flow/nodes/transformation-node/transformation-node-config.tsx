@@ -10,6 +10,7 @@ import { Typography } from '@/components/ui/typography';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
 import { SubmitButton } from '@/components/ui/submit-button';
+import { Textarea } from '@/components/ui/textarea';
 import { NodeConfigLayout } from '../node-config-layout';
 import {
   transformationConfigSchema,
@@ -51,6 +52,11 @@ const PARAM_LABELS: Record<string, string> = {
   order: 'Ordem',
   field: 'Campo',
   mergeWith: 'Mesclar com',
+  keysToDelete: 'Chaves para deletar',
+  keyMappings: 'Mapeamento de chaves',
+  fieldName: 'Nome do campo ou índice',
+  template: 'Template de transformação',
+  objectTemplate: 'Template de objeto JSON',
 };
 
 function TransformationFormFields({
@@ -375,22 +381,81 @@ function TransformationFormFields({
               {/* Parâmetros dinâmicos baseados na operação */}
               {OPERATION_PARAMS[
                 step.operation as keyof typeof OPERATION_PARAMS
-              ]?.map((param) => (
-                <div key={param} className="p-1">
-                  <FormControl variant="label">
-                    {PARAM_LABELS[param] || param}
-                  </FormControl>
-                  <Input
-                    type="text"
-                    fieldName={`step_param_${index}_${param}`}
-                    value={step.params?.[param] || ''}
-                    onChange={(e) =>
-                      updateStep(index, 'params', { [param]: e.target.value })
-                    }
-                    placeholder={`Digite ${PARAM_LABELS[param]?.toLowerCase() || param}`}
-                  />
-                </div>
-              ))}
+              ]?.map((param) => {
+                // Placeholders e ajuda contextuais
+                let placeholder = `Digite ${PARAM_LABELS[param]?.toLowerCase() || param}`;
+                let helpText = '';
+
+                if (param === 'keysToDelete') {
+                  placeholder = 'Ex: campo1, campo2, campo3';
+                  helpText =
+                    'Lista de chaves separadas por vírgula que serão removidas de cada objeto';
+                } else if (param === 'keyMappings') {
+                  placeholder = 'Ex: nome_antigo:nome_novo, preco:valor';
+                  helpText =
+                    'Mapeamento de chaves no formato "chave_antiga:chave_nova", separadas por vírgula';
+                } else if (param === 'fieldName') {
+                  placeholder = 'Ex: nome (para objetos) ou 0 (para índice)';
+                  helpText =
+                    'Nome do campo para extrair de cada objeto, ou índice numérico para arrays. Suporta dot notation (ex: user.name)';
+                } else if (param === 'template') {
+                  placeholder =
+                    'Ex: ["[{{title}}\\n{{description}}]", "{{{imageUrl}}}"]';
+                  helpText =
+                    'Template JSON com {{variáveis}} do objeto. Use \\n para quebra de linha. Retorna array achatado.';
+                } else if (param === 'objectTemplate') {
+                  placeholder =
+                    'Ex: {"id": "{{_id}}", "title": "{{nome}}", "buttons": [...]}';
+                  helpText =
+                    'Template de objeto JSON com {{variáveis}}. Suporta objetos aninhados e arrays. Transforma cada item do array.';
+                }
+
+                // Usar Textarea para templates JSON
+                const isJsonTemplate =
+                  param === 'objectTemplate' || param === 'template';
+
+                return (
+                  <div key={param} className="p-1">
+                    <FormControl variant="label">
+                      {PARAM_LABELS[param] || param}
+                    </FormControl>
+                    {isJsonTemplate ? (
+                      <Textarea
+                        fieldName={`step_param_${index}_${param}`}
+                        value={step.params?.[param] || ''}
+                        onChange={(e) =>
+                          updateStep(index, 'params', {
+                            [param]: e.target.value,
+                          })
+                        }
+                        placeholder={placeholder}
+                        rows={8}
+                        className="font-mono text-sm"
+                      />
+                    ) : (
+                      <Input
+                        type="text"
+                        fieldName={`step_param_${index}_${param}`}
+                        value={step.params?.[param] || ''}
+                        onChange={(e) =>
+                          updateStep(index, 'params', {
+                            [param]: e.target.value,
+                          })
+                        }
+                        placeholder={placeholder}
+                      />
+                    )}
+                    {helpText && (
+                      <Typography
+                        variant="span"
+                        className="text-xs text-neutral-600 mt-1"
+                      >
+                        {helpText}
+                      </Typography>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>

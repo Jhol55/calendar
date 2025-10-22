@@ -7,6 +7,9 @@ export type NodeType =
   | 'transformation'
   | 'database'
   | 'http_request'
+  | 'agent'
+  | 'loop'
+  | 'code_execution'
   | 'end';
 
 export type MessageType =
@@ -130,13 +133,18 @@ export type DateOperation =
 export type ArrayOperation =
   | 'filter'
   | 'map'
+  | 'mapObject'
   | 'sort'
   | 'first'
   | 'last'
   | 'join'
   | 'unique'
   | 'length'
-  | 'sum';
+  | 'sum'
+  | 'deleteKeys'
+  | 'renameKeys'
+  | 'extractField'
+  | 'flatMap';
 
 export type ObjectOperation =
   | 'extract'
@@ -328,6 +336,51 @@ export interface HttpRequestConfig {
   memoryConfig?: MemoryConfig;
 }
 
+// ==================== LOOP NODE ====================
+
+export interface LoopConfig {
+  // Input data
+  inputData: string; // Variável ou array literal {{data}} ou [1,2,3]
+
+  // Loop settings
+  batchSize: number; // Quantos itens processar por vez (default: 1)
+  mode: 'each' | 'batch'; // 'each' = 1 por vez, 'batch' = n por vez
+
+  // Output settings
+  accumulateResults?: boolean; // Se deve acumular resultados de cada iteração
+  outputVariable?: string; // Nome da variável para armazenar o batch atual
+
+  // Loop control
+  maxIterations?: number; // Limite máximo de iterações (proteção)
+  pauseBetweenIterations?: number; // Delay em ms entre iterações
+
+  // Configuração de memória (opcional)
+  memoryConfig?: MemoryConfig;
+}
+
+// ==================== CODE EXECUTION NODE ====================
+
+export type CodeExecutionLanguage = 'javascript' | 'python' | 'typescript';
+
+export interface CodeExecutionConfig {
+  // Code settings
+  language: CodeExecutionLanguage;
+  code: string; // Código a ser executado
+
+  // Input/Output
+  inputVariables?: string; // JSON com variáveis de entrada ex: {"x": "{{$webhook.body.value}}"}
+  outputVariable?: string; // Nome da variável de saída (default: "codeResult")
+
+  // Execution settings
+  timeout?: number; // Timeout em segundos (default: 5)
+
+  // Judge0 settings (opcional para usar instância customizada)
+  judge0Url?: string; // URL customizada do Judge0 (default: http://localhost:2358)
+
+  // Configuração de memória (opcional)
+  memoryConfig?: MemoryConfig;
+}
+
 export interface NodeData {
   label: string;
   type: NodeType;
@@ -339,6 +392,9 @@ export interface NodeData {
   conditionConfig?: ConditionConfig;
   databaseConfig?: DatabaseConfig;
   httpRequestConfig?: HttpRequestConfig;
+  agentConfig?: AgentConfig;
+  loopConfig?: LoopConfig;
+  codeExecutionConfig?: CodeExecutionConfig;
   conditions?: Array<{
     field: string;
     operator: string;
@@ -357,4 +413,54 @@ export interface FlowData {
   edges: any[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+// ==================== AGENT NODE ====================
+
+export interface AgentTool {
+  id: string;
+  name: string;
+  description: string;
+  parameters?: Record<string, any>;
+  targetNodeId?: string; // ID do node que será executado quando a tool for chamada
+}
+
+export interface AgentConfig {
+  // Provider e Modelo
+  provider: 'openai';
+  model: string;
+  apiKey: string;
+
+  // Prompts
+  systemPrompt: string;
+  userPrompt?: string;
+
+  // Parâmetros do modelo
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+
+  // Contexto
+  contextVariables?: string; // JSON string
+
+  // Tools
+  enableTools?: boolean;
+  tools?: AgentTool[];
+
+  // Histórico
+  enableHistory?: boolean;
+  historyLength?: number;
+
+  // Output
+  saveResponseTo: string;
+
+  // Memory config (opcional)
+  memoryConfig?: {
+    action: 'save' | 'update' | 'delete';
+    name: string;
+    value?: string;
+    ttl?: number;
+  };
 }
