@@ -14,7 +14,6 @@ import { FormSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { NodeConfigLayout } from '../node-config-layout';
 import { MemoryConfigSection } from '../memory-config-section';
-import { Code2, Info, Play } from 'lucide-react';
 
 interface CodeExecutionNodeConfigProps {
   isOpen: boolean;
@@ -37,8 +36,7 @@ function CodeExecutionFormFields({
   setMemoryItems: React.Dispatch<React.SetStateAction<MemoryItem[]>>;
 }) {
   const { form, setValue } = useForm();
-  const language =
-    (form.language as 'javascript' | 'python' | 'typescript') || 'javascript';
+  const language = (form.language as 'javascript' | 'python') || 'javascript';
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -95,9 +93,7 @@ function CodeExecutionFormFields({
   const getCodeExample = () => {
     switch (language) {
       case 'javascript':
-        return `// ⚠️ IMPORTANTE: Use console.log() para ver o resultado!
-// ❌ NÃO use "return" - não funciona em código isolado
-// ✅ Use console.log() para imprimir o resultado
+        return `// ⚠️ IMPORTANTE: Use console.log() para retornar o resultado!
 
 const a = 10;
 const b = 20;
@@ -106,19 +102,8 @@ console.log(result); // ✅ Para números/strings simples
 
 // 💡 Para arrays/objetos, use JSON.stringify para garantir parse automático:
 // console.log(JSON.stringify(result)); // ✅ Melhor para objetos complexos`;
-      case 'typescript':
-        return `// ⚠️ IMPORTANTE: Use console.log() para ver o resultado!
-
-const sum = (a: number, b: number): number => a + b;
-const result = sum(10, 20);
-console.log(result); // ✅ Para números/strings simples
-
-// 💡 Para arrays/objetos, use JSON.stringify para garantir parse automático:
-// console.log(JSON.stringify(result)); // ✅ Melhor para objetos complexos`;
       case 'python':
-        return `# ⚠️ IMPORTANTE: Use print() para ver o resultado!
-# ❌ NÃO use apenas valores - não serão capturados
-# ✅ Use print() para imprimir o resultado
+        return `# ⚠️ IMPORTANTE: Use print() para retornar o resultado!
 
 a = 10
 b = 20
@@ -135,51 +120,14 @@ print(result)  # ✅ Para números/strings simples
 
   return (
     <>
-      {/* Banner informativo */}
-      <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg mb-4">
-        <div className="flex items-start gap-3">
-          <Code2 className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
-          <div className="space-y-2">
-            <Typography
-              variant="span"
-              className="text-sm font-semibold text-purple-900"
-            >
-              💡 Code Execution Node
-            </Typography>
-            <Typography
-              variant="span"
-              className="text-xs text-purple-800 block"
-            >
-              Execute código JavaScript, TypeScript ou Python de forma segura
-              usando Judge0.
-            </Typography>
-            <ul className="text-xs text-purple-800 space-y-1 ml-4">
-              <li>
-                <strong>🔒 Seguro:</strong> Código roda em sandbox isolado
-              </li>
-              <li>
-                <strong>⚡ Rápido:</strong> Timeout configurável (máx 30s)
-              </li>
-              <li>
-                <strong>🔄 Variáveis:</strong> Passe dados via inputVariables
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
       {/* Linguagem */}
       <div className="p-1">
-        <FormControl variant="label">
-          Linguagem *
-          <Info className="w-4 h-4 inline ml-1 text-neutral-500" />
-        </FormControl>
+        <FormControl variant="label">Linguagem *</FormControl>
         <FormSelect
           fieldName="language"
           placeholder="Selecione a linguagem"
           options={[
             { value: 'javascript', label: '🟨 JavaScript (Node.js)' },
-            { value: 'typescript', label: '🔷 TypeScript (Node.js)' },
             { value: 'python', label: '🐍 Python 3' },
           ]}
           className="w-full"
@@ -191,36 +139,22 @@ print(result)  # ✅ Para números/strings simples
 
       {/* Código */}
       <div className="p-1">
-        <FormControl variant="label">
-          Código *
-          <Play className="w-4 h-4 inline ml-1 text-neutral-500" />
-        </FormControl>
-        <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md mb-2">
-          <Typography
-            variant="span"
-            className="text-xs text-yellow-800 font-semibold"
-          >
-            ⚠️ Use console.log() (JS/TS) ou print() (Python) para retornar
-            valores!
-          </Typography>
-          <Typography
-            variant="span"
-            className="text-xs text-yellow-700 block mt-1"
-          >
-            O Judge0 captura apenas o que é impresso no stdout. Usar "return"
-            sozinho não funciona.
-          </Typography>
-        </div>
+        <FormControl variant="label">Código *</FormControl>
+
         <Textarea
           fieldName="code"
           placeholder={getCodeExample()}
           rows={12}
           className="font-mono text-sm"
         />
-        <Typography variant="span" className="text-xs text-neutral-600 mt-1">
-          💡 Dica: O último valor impresso (console.log/print) será o resultado
-          capturado
-        </Typography>
+        <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md mb-2">
+          <Typography
+            variant="span"
+            className="text-xs text-yellow-800 font-semibold"
+          >
+            ⚠️ Use console.log() (JS) ou print() (Python) para retornar valores!
+          </Typography>
+        </div>
       </div>
 
       {/* Variáveis de Entrada (JSON) */}
@@ -242,22 +176,6 @@ print(result)  # ✅ Para números/strings simples
           rows={6}
           className="font-mono text-sm"
         />
-        <div className="space-y-1 mt-2">
-          <Typography variant="span" className="text-xs text-neutral-600 block">
-            JSON com variáveis que estarão disponíveis no código. Suporta
-            variáveis dinâmicas.
-          </Typography>
-          <Typography
-            variant="span"
-            className="text-xs text-blue-600 block font-semibold"
-          >
-            💡 Use variáveis dinâmicas SEM aspas (funciona para qualquer tipo!)
-          </Typography>
-          <Typography variant="span" className="text-xs text-neutral-500 block">
-            Exemplo:{' '}
-            {`{"nome": {{$var}}, "items": {{$array}}, "config": {{$obj}}}`}
-          </Typography>
-        </div>
       </div>
 
       {/* Nome da Variável de Saída */}
@@ -376,7 +294,7 @@ export function CodeExecutionNodeConfig({
 
   const handleSubmit = async (data: FieldValues) => {
     const codeExecutionConfig: CodeExecutionConfig = {
-      language: data.language as 'javascript' | 'python' | 'typescript',
+      language: data.language as 'javascript' | 'python',
       code: data.code,
       inputVariables: data.inputVariables || undefined,
       outputVariable: data.outputVariable || 'codeResult',

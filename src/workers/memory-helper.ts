@@ -1,6 +1,76 @@
 import { prisma } from '../services/prisma';
 
 /**
+ * Parser inteligente para valores de memória
+ * Tenta converter strings JSON ou formato JavaScript para objetos
+ * Parseia recursivamente arrays e objetos
+ */
+function parseMemoryValue(value: unknown): unknown {
+  // Se for null ou undefined, retornar como está
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  // Se for array, parsear cada elemento recursivamente
+  if (Array.isArray(value)) {
+    return value.map((item) => parseMemoryValue(item));
+  }
+
+  // Se for objeto (mas não array), parsear cada propriedade recursivamente
+  if (typeof value === 'object') {
+    const parsed: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      parsed[key] = parseMemoryValue(val);
+    }
+    return parsed;
+  }
+
+  // Se não for string, retornar como está
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const stringValue = value as string;
+
+  // Tentar parsear como JSON puro primeiro
+  try {
+    const parsed = JSON.parse(stringValue);
+    console.log(`✅ [MEMORY-PARSER] Parsed string as JSON`);
+    // Recursivamente parsear o resultado
+    return parseMemoryValue(parsed);
+  } catch {
+    // Se falhar, tentar converter formato JavaScript para JSON
+    console.log(`⚠️ [MEMORY-PARSER] Trying to convert JS format...`);
+    try {
+      let jsFormatted = stringValue.trim();
+
+      // Substituir [Array] por []
+      jsFormatted = jsFormatted.replace(/\[\s*\[Array\]\s*\]/g, '[]');
+
+      // Adicionar aspas em chaves sem aspas
+      jsFormatted = jsFormatted.replace(
+        /(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g,
+        '$1"$2":',
+      );
+
+      // Substituir aspas simples por duplas
+      jsFormatted = jsFormatted.replace(/:\s*'([^']*)'/g, ': "$1"');
+      jsFormatted = jsFormatted.replace(/\[\s*'([^']*)'/g, '["$1"');
+      jsFormatted = jsFormatted.replace(/',\s*'/g, '", "');
+      jsFormatted = jsFormatted.replace(/'\s*\]/g, '"]');
+
+      const parsed = JSON.parse(jsFormatted);
+      console.log(`✅ [MEMORY-PARSER] Converted from JS format successfully`);
+      // Recursivamente parsear o resultado
+      return parseMemoryValue(parsed);
+    } catch {
+      console.log(`✅ [MEMORY-PARSER] Keeping as string`);
+      return stringValue;
+    }
+  }
+}
+
+/**
  * Salva ou atualiza uma memória
  */
 export async function salvarMemoria(
@@ -95,11 +165,11 @@ export async function buscarMemoria(
       };
     }
 
-    // Memória válida
+    // Memória válida - parsear o valor
     console.log(`✅ Memória encontrada: ${userId}/${chave}`);
     return {
       found: true,
-      value: memoria.valor,
+      value: parseMemoryValue(memoria.valor),
       expired: false,
     };
   } catch (error) {
@@ -166,7 +236,8 @@ export async function listarMemorias(
     const memoriasMap: Record<string, unknown> = {};
 
     memorias.forEach((memoria) => {
-      memoriasMap[memoria.chave] = memoria.valor;
+      // Parsear o valor automaticamente
+      memoriasMap[memoria.chave] = parseMemoryValue(memoria.valor);
     });
 
     console.log(

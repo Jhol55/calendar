@@ -82,8 +82,20 @@ export const messageConfigSchema = baseSchema.refine(
       try {
         const choicesStr = data.interactiveMenuChoices || '';
 
-        // Se for modo JSON (valor dummy), considerar válido
-        if (choicesStr === '__JSON_MODE__') return true;
+        // Se for modo JSON (valor dummy ou variável dinâmica), considerar válido
+        if (
+          choicesStr === '__JSON_MODE__' ||
+          /^\{\{.+\}\}$/.test(choicesStr.trim())
+        ) {
+          // Para lista, ainda precisa validar o botão
+          if (
+            data.interactiveMenuType === 'list' &&
+            !data.interactiveMenuListButton
+          ) {
+            return false;
+          }
+          return true;
+        }
 
         const choices = choicesStr ? JSON.parse(choicesStr) : [];
         if (!Array.isArray(choices) || choices.length === 0) return false;
@@ -153,6 +165,26 @@ export const messageConfigSchema = baseSchema.refine(
 
       try {
         const choicesStr = data.interactiveMenuChoices || '';
+
+        // Se for modo JSON (valor dummy ou variável dinâmica), não validar
+        if (
+          choicesStr === '__JSON_MODE__' ||
+          /^\{\{.+\}\}$/.test(choicesStr.trim())
+        ) {
+          // Validar apenas o botão da lista se for tipo list
+          if (
+            data.interactiveMenuType === 'list' &&
+            !data.interactiveMenuListButton
+          ) {
+            return {
+              message: 'Digite o texto do botão da lista',
+              path: ['interactiveMenuListButton'],
+            };
+          }
+          // Para variáveis dinâmicas, não validar mais nada
+          return { message: 'Erro de validação', path: [] };
+        }
+
         const choices = choicesStr ? JSON.parse(choicesStr) : [];
 
         if (data.interactiveMenuType === 'button') {

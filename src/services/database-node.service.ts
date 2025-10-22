@@ -590,19 +590,64 @@ export class DatabaseNodeService {
     const fieldValue = record[rule.field];
     const { operator, value } = rule;
 
+    // Helper: Tenta converter para número se ambos parecem números
+    const tryNumericComparison = (a: any, b: any): [number, number] | null => {
+      const numA = typeof a === 'number' ? a : Number(a);
+      const numB = typeof b === 'number' ? b : Number(b);
+
+      // Se ambos são números válidos, retorna
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return [numA, numB];
+      }
+      return null;
+    };
+
     switch (operator) {
-      case 'equals':
-        return fieldValue === value;
-      case 'notEquals':
-        return fieldValue !== value;
-      case 'greaterThan':
-        return fieldValue > value;
-      case 'greaterThanOrEqual':
-        return fieldValue >= value;
-      case 'lessThan':
-        return fieldValue < value;
-      case 'lessThanOrEqual':
-        return fieldValue <= value;
+      case 'equals': {
+        // Comparação flexível: tenta converter tipos quando possível
+        if (fieldValue === value) return true; // Igualdade estrita primeiro
+
+        // Tenta conversão numérica
+        const numeric = tryNumericComparison(fieldValue, value);
+        if (numeric) {
+          return numeric[0] === numeric[1];
+        }
+
+        // Comparação de strings (case-insensitive como fallback)
+        return String(fieldValue).toLowerCase() === String(value).toLowerCase();
+      }
+
+      case 'notEquals': {
+        // Inverso do equals
+        if (fieldValue === value) return false;
+
+        const numeric = tryNumericComparison(fieldValue, value);
+        if (numeric) {
+          return numeric[0] !== numeric[1];
+        }
+
+        return String(fieldValue).toLowerCase() !== String(value).toLowerCase();
+      }
+
+      case 'greaterThan': {
+        const numeric = tryNumericComparison(fieldValue, value);
+        return numeric ? numeric[0] > numeric[1] : fieldValue > value;
+      }
+
+      case 'greaterThanOrEqual': {
+        const numeric = tryNumericComparison(fieldValue, value);
+        return numeric ? numeric[0] >= numeric[1] : fieldValue >= value;
+      }
+
+      case 'lessThan': {
+        const numeric = tryNumericComparison(fieldValue, value);
+        return numeric ? numeric[0] < numeric[1] : fieldValue < value;
+      }
+
+      case 'lessThanOrEqual': {
+        const numeric = tryNumericComparison(fieldValue, value);
+        return numeric ? numeric[0] <= numeric[1] : fieldValue <= value;
+      }
 
       case 'contains':
         return String(fieldValue).includes(String(value));

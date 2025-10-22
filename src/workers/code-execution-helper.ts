@@ -5,7 +5,6 @@ import { replaceVariables } from './variable-replacer';
 // Ref: https://ce.judge0.com/languages
 const LANGUAGE_IDS = {
   javascript: 63, // Node.js
-  typescript: 74, // TypeScript
   python: 71, // Python 3
 };
 
@@ -368,39 +367,78 @@ function prepareCodeWithVariables(
   code: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   inputVars: Record<string, any>,
-  language: 'javascript' | 'typescript' | 'python',
+  language: 'javascript' | 'python',
 ): string {
-  if (Object.keys(inputVars).length === 0) {
-    return code;
-  }
+  const hasInputVars = Object.keys(inputVars).length > 0;
 
-  if (language === 'javascript' || language === 'typescript') {
-    // Para JS/TS, declarar as variáveis no início
-    const varDeclarations = Object.entries(inputVars)
-      .map(([key, value]) => {
-        const serializedValue = JSON.stringify(value);
-        return `const ${key} = ${serializedValue};`;
-      })
-      .join('\n');
+  if (language === 'javascript') {
+    // Override do console.log para fazer JSON.stringify automático em objetos/arrays
+    const consoleOverride = `
+// Auto JSON.stringify para objetos/arrays
+const _log = console.log;
+console.log = function(...args) {
+  const processed = args.map(arg => {
+    if (typeof arg === 'object' && arg !== null) {
+      try {
+        return JSON.stringify(arg);
+      } catch {
+        return arg;
+      }
+    }
+    return arg;
+  });
+  _log(...processed);
+};
+`.trim();
 
-    return `${varDeclarations}\n\n${code}`;
+    // Para JavaScript, declarar as variáveis no início
+    const varDeclarations = hasInputVars
+      ? Object.entries(inputVars)
+          .map(([key, value]) => {
+            const serializedValue = JSON.stringify(value);
+            return `const ${key} = ${serializedValue};`;
+          })
+          .join('\n')
+      : '';
+
+    const parts = [consoleOverride];
+    if (varDeclarations) parts.push(varDeclarations);
+    parts.push(code);
+
+    return parts.join('\n\n');
   } else if (language === 'python') {
+    // Override do print para fazer json.dumps automático em dicts/lists
+    const printOverride = `
+import json
+_print = print
+def print(*args, **kwargs):
+    processed = []
+    for arg in args:
+        if isinstance(arg, (dict, list, tuple)):
+            try:
+                processed.append(json.dumps(arg, ensure_ascii=False))
+            except:
+                processed.append(str(arg))
+        else:
+            processed.append(arg)
+    _print(*processed, **kwargs)
+`.trim();
+
     // Para Python, declarar as variáveis no início
-    const varDeclarations = Object.entries(inputVars)
-      .map(([key, value]) => {
-        const serializedValue = JSON.stringify(value);
-        // Python não aceita JSON.stringify diretamente, então usar repr ou json.loads
-        return `${key} = ${serializedValue}`;
-      })
-      .join('\n');
+    const varDeclarations = hasInputVars
+      ? Object.entries(inputVars)
+          .map(([key, value]) => {
+            const serializedValue = JSON.stringify(value);
+            return `${key} = ${serializedValue}`;
+          })
+          .join('\n')
+      : '';
 
-    // Adicionar import json se houver objetos/arrays
-    const needsJson = Object.values(inputVars).some(
-      (v) => typeof v === 'object' && v !== null,
-    );
-    const importStatement = needsJson ? 'import json\n' : '';
+    const parts = [printOverride];
+    if (varDeclarations) parts.push(varDeclarations);
+    parts.push(code);
 
-    return `${importStatement}${varDeclarations}\n\n${code}`;
+    return parts.join('\n\n');
   }
 
   return code;

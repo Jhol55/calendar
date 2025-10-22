@@ -665,10 +665,45 @@ async function processMessageNode(
         ) {
           try {
             const parsedValue = JSON.parse(resolvedMenuChoices[0]);
-            if (Array.isArray(parsedValue) && parsedValue.length > 0) {
+
+            // Caso 1: Objeto único com 'category' (LIST de uma categoria)
+            if (
+              !Array.isArray(parsedValue) &&
+              typeof parsedValue === 'object' &&
+              parsedValue.category
+            ) {
+              console.log('📋 Detected single LIST category object');
+              const listChoices: string[] = [];
+
+              // Adicionar categoria
+              if (parsedValue.category && parsedValue.category.trim() !== '') {
+                listChoices.push(`[${parsedValue.category}]`);
+                console.log(`✅ Added category: [${parsedValue.category}]`);
+              }
+
+              // Adicionar items
+              if (parsedValue.items && Array.isArray(parsedValue.items)) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                parsedValue.items.forEach((item: any, itemIndex: number) => {
+                  console.log(`📋 Processing item ${itemIndex}:`, item);
+                  if (item.text && item.text.trim() !== '') {
+                    const choice = `${item.text}|${item.id || ''}|${item.description || ''}`;
+                    listChoices.push(choice);
+                    console.log(`✅ Added item: ${choice}`);
+                  }
+                });
+              }
+
+              resolvedMenuChoices = listChoices;
+              console.log(
+                `📋 Final: Converted single LIST category to ${listChoices.length} choices`,
+              );
+            }
+            // Caso 2: Array de objetos
+            else if (Array.isArray(parsedValue) && parsedValue.length > 0) {
               // Verificar se é um array de objetos (formato carousel)
               if (typeof parsedValue[0] === 'object' && parsedValue[0].title) {
-                // Converter formato carousel para choices
+                // FORMATO CAROUSEL
                 const carouselChoices: string[] = [];
                 parsedValue.forEach((card) => {
                   // Adicionar título e descrição
@@ -711,6 +746,63 @@ async function processMessageNode(
                 console.log(
                   `🎠 Converted carousel variable to ${carouselChoices.length} choices`,
                 );
+              } else if (
+                typeof parsedValue[0] === 'object' &&
+                parsedValue[0].category
+              ) {
+                // FORMATO LIST
+                console.log('📋 Detected LIST format!');
+                console.log(
+                  '📋 Parsed value:',
+                  JSON.stringify(parsedValue, null, 2),
+                );
+
+                const listChoices: string[] = [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                parsedValue.forEach((categoryObj: any, catIndex: number) => {
+                  console.log(
+                    `📋 Processing category ${catIndex}:`,
+                    categoryObj.category,
+                  );
+                  console.log(
+                    `📋 Category has ${categoryObj.items?.length || 0} items`,
+                  );
+
+                  // Adicionar categoria (com [])
+                  if (
+                    categoryObj.category &&
+                    categoryObj.category.trim() !== ''
+                  ) {
+                    listChoices.push(`[${categoryObj.category}]`);
+                    console.log(`✅ Added category: [${categoryObj.category}]`);
+                  }
+
+                  // Adicionar items da categoria
+                  if (categoryObj.items && Array.isArray(categoryObj.items)) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    categoryObj.items.forEach(
+                      (item: any, itemIndex: number) => {
+                        console.log(`📋 Processing item ${itemIndex}:`, item);
+                        if (item.text && item.text.trim() !== '') {
+                          const choice = `${item.text}|${item.id || ''}|${item.description || ''}`;
+                          listChoices.push(choice);
+                          console.log(`✅ Added item: ${choice}`);
+                        } else {
+                          console.log(
+                            `⚠️ Item ${itemIndex} skipped - no text or empty`,
+                          );
+                        }
+                      },
+                    );
+                  } else {
+                    console.log('⚠️ Category has no items array');
+                  }
+                });
+                resolvedMenuChoices = listChoices;
+                console.log(
+                  `📋 Final: Converted list variable to ${listChoices.length} choices`,
+                );
+                console.log('📋 Final choices:', listChoices);
               }
             }
           } catch {
@@ -1058,14 +1150,101 @@ async function processNodeMemory(
         const searchResult = await buscarMemoria(userId, resolvedMemoryName);
 
         let parsedValue = searchResult.value;
+
+        // Se não encontrou, usar valor padrão
         if (!searchResult.found && defaultValue) {
           parsedValue = replaceVariables(defaultValue, variableContext);
         }
+
+        // Parser inteligente para valores de memória
+        if (searchResult.found && typeof searchResult.value === 'string') {
+          const stringValue = searchResult.value as string;
+
+          // Tentar parsear como JSON puro primeiro
+          try {
+            parsedValue = JSON.parse(stringValue);
+            console.log(`✅ [NODE-MEMORY] Parsed as pure JSON`);
+          } catch {
+            // Se falhar, tentar converter formato JavaScript para JSON
+            console.log(`⚠️ [NODE-MEMORY] Trying to convert JS format...`);
+            try {
+              let jsFormatted = stringValue.trim();
+
+              // Substituir [Array] por []
+              jsFormatted = jsFormatted.replace(/\[\s*\[Array\]\s*\]/g, '[]');
+
+              // Adicionar aspas em chaves sem aspas
+              jsFormatted = jsFormatted.replace(
+                /(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g,
+                '$1"$2":',
+              );
+
+              // Substituir aspas simples por duplas
+              jsFormatted = jsFormatted.replace(/:\s*'([^']*)'/g, ': "$1"');
+              jsFormatted = jsFormatted.replace(/\[\s*'([^']*)'/g, '["$1"');
+              jsFormatted = jsFormatted.replace(/',\s*'/g, '", "');
+              jsFormatted = jsFormatted.replace(/'\s*\]/g, '"]');
+
+              parsedValue = JSON.parse(jsFormatted);
+              console.log(
+                `✅ [NODE-MEMORY] Converted from JS format successfully`,
+              );
+            } catch {
+              console.log(`✅ [NODE-MEMORY] Keeping as string`);
+              parsedValue = stringValue;
+            }
+          }
+        }
+
+        // Calcular metadados sobre o valor
+        const valueType = Array.isArray(parsedValue)
+          ? 'array'
+          : parsedValue === null
+            ? 'null'
+            : typeof parsedValue;
+
+        // Calcular itemCount de forma inteligente
+        let itemCount: number | undefined = undefined;
+        if (Array.isArray(parsedValue)) {
+          // Se for array com 1 elemento que tem estrutura {key, value}
+          // onde value é array, contar os items dentro de value
+          if (
+            parsedValue.length === 1 &&
+            typeof parsedValue[0] === 'object' &&
+            parsedValue[0] !== null &&
+            'key' in parsedValue[0] &&
+            'value' in parsedValue[0] &&
+            Array.isArray(parsedValue[0].value)
+          ) {
+            itemCount = parsedValue[0].value.length;
+            console.log(
+              `📊 [NODE-MEMORY] Detected memory structure with nested value array`,
+            );
+          } else {
+            itemCount = parsedValue.length;
+          }
+        }
+
+        const isEmpty =
+          parsedValue === null ||
+          parsedValue === undefined ||
+          (typeof parsedValue === 'string' && parsedValue.trim() === '') ||
+          (Array.isArray(parsedValue) && parsedValue.length === 0) ||
+          (typeof parsedValue === 'object' &&
+            !Array.isArray(parsedValue) &&
+            Object.keys(parsedValue).length === 0);
+
+        console.log(`🔍 [NODE-MEMORY] Parsed value type: ${valueType}`);
+        console.log(`🔍 [NODE-MEMORY] Item count: ${itemCount ?? 'N/A'}`);
+        console.log(`🔍 [NODE-MEMORY] Is empty: ${isEmpty}`);
 
         return {
           action: 'fetch',
           name: resolvedMemoryName,
           value: parsedValue,
+          valueType,
+          itemCount,
+          isEmpty,
           found: searchResult.found,
           expired: searchResult.expired,
           usedDefault: !searchResult.found,
@@ -1246,25 +1425,98 @@ async function processMemoryNode(
           defaultValue,
         );
 
-        // Se encontrou, tentar parsear como JSON
+        // Parser inteligente para valores de memória
         let parsedValue = searchResult.value;
         if (searchResult.found && typeof searchResult.value === 'string') {
+          const stringValue = searchResult.value;
+
+          // Tentar parsear como JSON puro primeiro
           try {
-            parsedValue = JSON.parse(searchResult.value);
+            parsedValue = JSON.parse(stringValue);
+            console.log(`✅ [MEMORY] Parsed as pure JSON`);
           } catch {
-            // Se não for JSON válido, manter como string
+            // Se falhar, tentar converter formato JavaScript para JSON
+            console.log(`⚠️ [MEMORY] Trying to convert JS format...`);
+            try {
+              let jsFormatted = stringValue.trim();
+
+              // Substituir [Array] por []
+              jsFormatted = jsFormatted.replace(/\[\s*\[Array\]\s*\]/g, '[]');
+
+              // Adicionar aspas em chaves sem aspas
+              jsFormatted = jsFormatted.replace(
+                /(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g,
+                '$1"$2":',
+              );
+
+              // Substituir aspas simples por duplas
+              jsFormatted = jsFormatted.replace(/:\s*'([^']*)'/g, ': "$1"');
+              jsFormatted = jsFormatted.replace(/\[\s*'([^']*)'/g, '["$1"');
+              jsFormatted = jsFormatted.replace(/',\s*'/g, '", "');
+              jsFormatted = jsFormatted.replace(/'\s*\]/g, '"]');
+
+              parsedValue = JSON.parse(jsFormatted);
+              console.log(`✅ [MEMORY] Converted from JS format successfully`);
+            } catch {
+              console.log(`✅ [MEMORY] Keeping as string`);
+              parsedValue = stringValue;
+            }
           }
         }
+
+        // Calcular metadados sobre o valor
+        const valueType = Array.isArray(parsedValue)
+          ? 'array'
+          : parsedValue === null
+            ? 'null'
+            : typeof parsedValue;
+
+        // Calcular itemCount de forma inteligente
+        let itemCount: number | undefined = undefined;
+        if (Array.isArray(parsedValue)) {
+          // Se for array com 1 elemento que tem estrutura {key, value}
+          // onde value é array, contar os items dentro de value
+          if (
+            parsedValue.length === 1 &&
+            typeof parsedValue[0] === 'object' &&
+            parsedValue[0] !== null &&
+            'key' in parsedValue[0] &&
+            'value' in parsedValue[0] &&
+            Array.isArray(parsedValue[0].value)
+          ) {
+            itemCount = parsedValue[0].value.length;
+            console.log(
+              `📊 [MEMORY] Detected memory structure with nested value array`,
+            );
+          } else {
+            itemCount = parsedValue.length;
+          }
+        }
+
+        const isEmpty =
+          parsedValue === null ||
+          parsedValue === undefined ||
+          (typeof parsedValue === 'string' && parsedValue.trim() === '') ||
+          (Array.isArray(parsedValue) && parsedValue.length === 0) ||
+          (typeof parsedValue === 'object' &&
+            !Array.isArray(parsedValue) &&
+            Object.keys(parsedValue).length === 0);
 
         console.log(
           `🔍 Memory search: ${resolvedMemoryName}, found: ${searchResult.found}`,
         );
+        console.log(`🔍 Memory parsed value type: ${valueType}`);
+        console.log(`🔍 Memory item count: ${itemCount ?? 'N/A'}`);
+        console.log(`🔍 Memory is empty: ${isEmpty}`);
 
         return {
           type: 'memory',
           action: 'fetch',
           name: resolvedMemoryName,
           value: parsedValue,
+          valueType,
+          itemCount,
+          isEmpty,
           found: searchResult.found,
           expired: searchResult.expired,
           usedDefault: !searchResult.found,

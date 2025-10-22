@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { NodeConfigLayout } from '../node-config-layout';
 import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { MemoryConfigSection } from '../memory-config-section';
+import { cn } from '@/lib/utils';
 
 interface MessageNodeConfigProps {
   isOpen: boolean;
@@ -86,6 +87,46 @@ const JSON_CAROUSEL_TEMPLATE = `[
     ]
   }
   // Adicione mais cartões conforme necessário
+]`;
+
+// Modelo JSON de exemplo para lista com categorias
+const JSON_LIST_TEMPLATE = `[
+  {
+    "category": "Eletrônicos",
+    "items": [
+      {
+        "text": "Smartphones",
+        "id": "phones",
+        "description": "Últimos lançamentos em smartphones"
+      },
+      {
+        "text": "Notebooks",
+        "id": "laptops",
+        "description": "Notebooks de alto desempenho"
+      },
+      {
+        "text": "Tablets",
+        "id": "tablets",
+        "description": "Tablets para trabalho e lazer"
+      }
+    ]
+  },
+  {
+    "category": "Acessórios",
+    "items": [
+      {
+        "text": "Fones de Ouvido",
+        "id": "headphones",
+        "description": "Fones com cancelamento de ruído"
+      },
+      {
+        "text": "Capas e Cases",
+        "id": "cases",
+        "description": "Proteção para seus dispositivos"
+      }
+    ]
+  }
+  // Adicione mais categorias conforme necessário
 ]`;
 
 function MessageFormFields({
@@ -174,18 +215,52 @@ function MessageFormFields({
     });
   };
 
-  // Sincronizar JSON quando o modo mudar para JSON ou quando carouselCards mudar
+  // Sincronizar JSON quando o modo mudar para JSON ou quando carouselCards/listCategories mudar
   useEffect(() => {
-    if (configMode === 'json' && carouselCards.length > 0) {
-      setJsonConfig(JSON.stringify(carouselCards, null, 2));
+    // Verificar se o JSON atual é uma variável dinâmica
+    const isCurrentlyVariable = /^\{\{.+\}\}$/.test(jsonConfig.trim());
+
+    // Não sobrescrever se já for uma variável dinâmica
+    if (isCurrentlyVariable) {
+      return;
     }
-  }, [configMode, carouselCards, setJsonConfig]);
+
+    if (
+      configMode === 'json' &&
+      interactiveMenuType === 'carousel' &&
+      carouselCards.length > 0
+    ) {
+      setJsonConfig(JSON.stringify(carouselCards, null, 2));
+    } else if (
+      configMode === 'json' &&
+      interactiveMenuType === 'list' &&
+      listCategories.length > 0
+    ) {
+      // Converter listCategories para o formato JSON
+      const listJson = listCategories.map((cat) => ({
+        category: cat.name,
+        items: cat.items.map((item) => ({
+          text: item.text,
+          id: item.id,
+          description: item.description,
+        })),
+      }));
+      setJsonConfig(JSON.stringify(listJson, null, 2));
+    }
+  }, [
+    configMode,
+    interactiveMenuType,
+    carouselCards,
+    listCategories,
+    jsonConfig,
+    setJsonConfig,
+  ]);
 
   // Atualizar campo do formulário quando JSON mudar (para passar validação Zod)
   useEffect(() => {
     if (
       configMode === 'json' &&
-      interactiveMenuType === 'carousel' &&
+      (interactiveMenuType === 'carousel' || interactiveMenuType === 'list') &&
       jsonConfig.trim() !== ''
     ) {
       // Setar um valor dummy para passar a validação
@@ -247,161 +322,189 @@ function MessageFormFields({
           // Se for tipo "list", parsear com categorias hierárquicas
           if (config.interactiveMenu.type === 'list') {
             const rawChoices = config.interactiveMenu.choices || [];
-            const categories: ListCategory[] = [];
-            let currentCategory: ListCategory | null = null;
 
-            rawChoices.forEach((choice) => {
-              if (!choice || typeof choice !== 'string') return;
+            // Detectar se é uma variável dinâmica (regex mais abrangente)
+            const isVariable =
+              rawChoices.length === 1 &&
+              typeof rawChoices[0] === 'string' &&
+              /^\{\{.+\}\}$/.test(rawChoices[0].trim());
 
-              // Se começa com [, é uma categoria
-              if (choice.startsWith('[') && choice.endsWith(']')) {
-                const categoryName = choice.slice(1, -1);
-                currentCategory = {
-                  id: crypto.randomUUID(),
-                  name: categoryName,
-                  items: [],
-                };
-                categories.push(currentCategory);
-              } else {
-                // É um item da categoria
-                const parts = choice.split('|');
-                const item = {
-                  text: parts[0] || '',
-                  id: parts[1] || '',
-                  description: parts[2] || '',
-                };
+            if (isVariable) {
+              // Carregar em modo JSON
+              setConfigMode('json');
+              setJsonConfig(rawChoices[0]);
+            } else {
+              // Parsear como categorias hierárquicas
+              const categories: ListCategory[] = [];
+              let currentCategory: ListCategory | null = null;
 
-                if (currentCategory) {
-                  currentCategory.items.push(item);
+              rawChoices.forEach((choice) => {
+                if (!choice || typeof choice !== 'string') return;
+
+                // Se começa com [, é uma categoria
+                if (choice.startsWith('[') && choice.endsWith(']')) {
+                  const categoryName = choice.slice(1, -1);
+                  currentCategory = {
+                    id: crypto.randomUUID(),
+                    name: categoryName,
+                    items: [],
+                  };
+                  categories.push(currentCategory);
                 } else {
-                  // Se não há categoria, criar uma padrão
-                  if (categories.length === 0) {
-                    currentCategory = {
-                      id: crypto.randomUUID(),
-                      name: '',
-                      items: [],
-                    };
-                    categories.push(currentCategory);
-                  }
-                  categories[0].items.push(item);
-                }
-              }
-            });
+                  // É um item da categoria
+                  const parts = choice.split('|');
+                  const item = {
+                    text: parts[0] || '',
+                    id: parts[1] || '',
+                    description: parts[2] || '',
+                  };
 
-            setListCategories(
-              categories.length > 0
-                ? categories
-                : [
-                    {
-                      id: crypto.randomUUID(),
-                      name: '',
-                      items: [{ id: '', text: '', description: '' }],
-                    },
-                  ],
-            );
+                  if (currentCategory) {
+                    currentCategory.items.push(item);
+                  } else {
+                    // Se não há categoria, criar uma padrão
+                    if (categories.length === 0) {
+                      currentCategory = {
+                        id: crypto.randomUUID(),
+                        name: '',
+                        items: [],
+                      };
+                      categories.push(currentCategory);
+                    }
+                    categories[0].items.push(item);
+                  }
+                }
+              });
+
+              setListCategories(
+                categories.length > 0
+                  ? categories
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        name: '',
+                        items: [{ id: '', text: '', description: '' }],
+                      },
+                    ],
+              );
+            }
           } else if (config.interactiveMenu.type === 'carousel') {
             // Parsear carousel cards
             const rawChoices = config.interactiveMenu.choices || [];
-            const cards: CarouselCard[] = [];
-            let currentCard: CarouselCard | null = null;
 
-            rawChoices.forEach((choice) => {
-              if (!choice || typeof choice !== 'string') return;
+            // Detectar se é uma variável dinâmica (regex mais abrangente)
+            const isVariable =
+              rawChoices.length === 1 &&
+              typeof rawChoices[0] === 'string' &&
+              /^\{\{.+\}\}$/.test(rawChoices[0].trim());
 
-              // Se começa com [, é um título de cartão (formato: [Título\nDescrição])
-              if (choice.startsWith('[') && choice.endsWith(']')) {
-                const content = choice.slice(1, -1);
-                const parts = content.split('\n');
-                currentCard = {
-                  id: crypto.randomUUID(),
-                  title: parts[0] || '',
-                  description: parts[1] || '',
-                  imageUrl: '',
-                  buttons: [],
-                };
-                cards.push(currentCard);
-              } else if (choice.startsWith('{') && choice.endsWith('}')) {
-                // É a URL da imagem do cartão
-                if (currentCard) {
-                  currentCard.imageUrl = choice.slice(1, -1);
-                }
-              } else {
-                // É um botão do cartão
-                const parts = choice.split('|');
-                const rawId = parts[1] || '';
+            if (isVariable) {
+              // Carregar em modo JSON
+              setConfigMode('json');
+              setJsonConfig(rawChoices[0]);
+            } else {
+              // Parsear como cartões hierárquicos
+              const cards: CarouselCard[] = [];
+              let currentCard: CarouselCard | null = null;
 
-                // Detectar tipo de ação
-                let actionType:
-                  | 'copy'
-                  | 'link'
-                  | 'call'
-                  | 'return_id'
-                  | undefined = undefined;
-                let cleanId = rawId;
+              rawChoices.forEach((choice) => {
+                if (!choice || typeof choice !== 'string') return;
 
-                if (rawId.startsWith('copy:')) {
-                  actionType = 'copy';
-                  cleanId = rawId.replace('copy:', '');
-                } else if (rawId.startsWith('call:')) {
-                  actionType = 'call';
-                  cleanId = rawId.replace('call:', '');
-                } else if (rawId.startsWith('return_id:')) {
-                  actionType = 'return_id';
-                  cleanId = rawId.replace('return_id:', '');
-                } else if (rawId.startsWith('http')) {
-                  actionType = 'link';
-                  cleanId = rawId;
-                } else if (rawId && rawId.trim() !== '') {
-                  // Se não tem prefixo mas tem valor, assumir que é return_id
-                  actionType = 'return_id';
-                  cleanId = rawId;
-                }
+                // Se começa com [, é um título de cartão (formato: [Título\nDescrição])
+                if (choice.startsWith('[') && choice.endsWith(']')) {
+                  const content = choice.slice(1, -1);
+                  const parts = content.split('\n');
+                  currentCard = {
+                    id: crypto.randomUUID(),
+                    title: parts[0] || '',
+                    description: parts[1] || '',
+                    imageUrl: '',
+                    buttons: [],
+                  };
+                  cards.push(currentCard);
+                } else if (choice.startsWith('{') && choice.endsWith('}')) {
+                  // É a URL da imagem do cartão
+                  if (currentCard) {
+                    currentCard.imageUrl = choice.slice(1, -1);
+                  }
+                } else {
+                  // É um botão do cartão
+                  const parts = choice.split('|');
+                  const rawId = parts[1] || '';
 
-                const button = {
-                  text: parts[0] || '',
-                  id: cleanId,
-                  description: '',
-                  actionType,
-                };
+                  // Detectar tipo de ação
+                  let actionType:
+                    | 'copy'
+                    | 'link'
+                    | 'call'
+                    | 'return_id'
+                    | undefined = undefined;
+                  let cleanId = rawId;
 
-                if (currentCard) {
-                  currentCard.buttons.push(button);
-                }
-              }
-            });
+                  if (rawId.startsWith('copy:')) {
+                    actionType = 'copy';
+                    cleanId = rawId.replace('copy:', '');
+                  } else if (rawId.startsWith('call:')) {
+                    actionType = 'call';
+                    cleanId = rawId.replace('call:', '');
+                  } else if (rawId.startsWith('return_id:')) {
+                    actionType = 'return_id';
+                    cleanId = rawId.replace('return_id:', '');
+                  } else if (rawId.startsWith('http')) {
+                    actionType = 'link';
+                    cleanId = rawId;
+                  } else if (rawId && rawId.trim() !== '') {
+                    // Se não tem prefixo mas tem valor, assumir que é return_id
+                    actionType = 'return_id';
+                    cleanId = rawId;
+                  }
 
-            setCarouselCards(
-              cards.length > 0
-                ? cards
-                : [
-                    {
-                      id: crypto.randomUUID(),
-                      title: '',
-                      description: '',
-                      imageUrl: '',
-                      buttons: [
-                        {
-                          id: '',
-                          text: '',
-                          description: '',
-                          actionType: undefined,
-                        },
-                      ],
-                    },
-                  ],
-            );
+                  const button = {
+                    text: parts[0] || '',
+                    id: cleanId,
+                    description: '',
+                    actionType,
+                  };
 
-            // Definir valores dos FormSelects de actionType para carousel buttons
-            cards.forEach((card) => {
-              card.buttons.forEach((button, buttonIndex) => {
-                if (button.actionType) {
-                  setValue(
-                    `card_${card.id}_button_actionType_${buttonIndex}`,
-                    button.actionType,
-                  );
+                  if (currentCard) {
+                    currentCard.buttons.push(button);
+                  }
                 }
               });
-            });
+
+              setCarouselCards(
+                cards.length > 0
+                  ? cards
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        title: '',
+                        description: '',
+                        imageUrl: '',
+                        buttons: [
+                          {
+                            id: '',
+                            text: '',
+                            description: '',
+                            actionType: undefined,
+                          },
+                        ],
+                      },
+                    ],
+              );
+
+              // Definir valores dos FormSelects de actionType para carousel buttons
+              cards.forEach((card) => {
+                card.buttons.forEach((button, buttonIndex) => {
+                  if (button.actionType) {
+                    setValue(
+                      `card_${card.id}_button_actionType_${buttonIndex}`,
+                      button.actionType,
+                    );
+                  }
+                });
+              });
+            }
           } else {
             // Para outros tipos (button, poll), usar o formato simples
             const parsedChoices = (config.interactiveMenu.choices || []).map(
@@ -518,7 +621,7 @@ function MessageFormFields({
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [config, setValue]);
+  }, [config, setValue, setConfigMode, setJsonConfig, setMemoryItems]);
 
   // Sincronizar actionType dos FormSelects com o estado choices/carouselCards
   useEffect(() => {
@@ -544,6 +647,17 @@ function MessageFormFields({
 
   // Atualizar choices no formulário quando mudar (converter para strings com pipe)
   useEffect(() => {
+    // 🔒 PROTEÇÃO: Não sobrescrever se estiver em modo JSON com variável dinâmica
+    if (
+      configMode === 'json' &&
+      (interactiveMenuType === 'list' || interactiveMenuType === 'carousel')
+    ) {
+      const isVariable = /^\{\{.+\}\}$/.test(jsonConfig.trim());
+      if (isVariable) {
+        return; // Não sobrescrever!
+      }
+    }
+
     if (interactiveMenuType === 'list') {
       // Para tipo "list", serializar categorias e itens em formato hierárquico
       const choicesStrings: string[] = [];
@@ -629,7 +743,15 @@ function MessageFormFields({
 
       setValue('interactiveMenuChoices', JSON.stringify(choicesStrings));
     }
-  }, [choices, listCategories, carouselCards, interactiveMenuType, setValue]);
+  }, [
+    choices,
+    listCategories,
+    carouselCards,
+    interactiveMenuType,
+    configMode,
+    jsonConfig,
+    setValue,
+  ]);
 
   // Funções para gerenciar choices simples (button, poll)
   const addChoice = () => {
@@ -1219,215 +1341,302 @@ function MessageFormFields({
             {/* UI Hierárquica para tipo LIST */}
             {interactiveMenuType === 'list' ? (
               <div className="space-y-4 mt-2">
-                {listCategories.map((category, catIndex) => {
-                  const isExpanded = expandedCategories.has(category.id);
-
-                  return (
-                    <div
-                      key={category.id}
-                      className="border border-neutral-200 rounded-lg bg-white"
-                    >
-                      {/* Header da Categoria - Sempre visível */}
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => toggleCategoryExpansion(category.id)}
-                            className="h-fit w-fit p-1 hover:bg-neutral-100"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="w-5 h-5 text-neutral-400" />
-                            ) : (
-                              <ChevronRight className="w-5 h-5 text-neutral-400" />
-                            )}
-                          </Button>
-                          <div className="flex flex-col flex-1">
-                            <Typography
-                              variant="span"
-                              className="text-sm text-neutral-700"
-                            >
-                              Categoria {catIndex + 1}
-                            </Typography>
-                            {category.name && (
-                              <Typography
-                                variant="span"
-                                className="text-xs text-neutral-500"
-                              >
-                                {category.name}
-                              </Typography>
-                            )}
-                          </div>
-                        </div>
-                        {listCategories?.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => removeCategory(category.id)}
-                            disabled={listCategories.length === 1}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-fit w-fit"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                {/* Toggle entre modo Manual e JSON para Lista */}
+                <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                      <Typography
+                        variant="span"
+                        className="text-sm font-medium"
+                      >
+                        Modo de Configuração das Categorias
+                      </Typography>
+                      <Typography
+                        variant="span"
+                        className="text-xs text-neutral-600"
+                      >
+                        {configMode === 'manual'
+                          ? 'Configure através da interface visual'
+                          : 'Configure através de JSON'}
+                      </Typography>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white rounded-lg p-1 border border-neutral-300">
+                      <Button
+                        type="button"
+                        variant={configMode === 'manual' ? 'gradient' : 'ghost'}
+                        onClick={() => setConfigMode('manual')}
+                        className={cn(
+                          'w-fit px-4 py-2 text-sm',
+                          configMode === 'manual'
+                            ? '!text-white'
+                            : '!text-neutral-600',
                         )}
-                      </div>
+                      >
+                        Manual
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={configMode === 'json' ? 'gradient' : 'ghost'}
+                        onClick={() => setConfigMode('json')}
+                        className={cn(
+                          'w-fit px-4 py-2 text-sm',
+                          configMode !== 'manual'
+                            ? '!text-white'
+                            : '!text-neutral-600',
+                        )}
+                      >
+                        JSON
+                      </Button>
+                    </div>
+                  </div>
+                </div>
 
-                      {/* Conteúdo da Categoria - Colapsável */}
-                      {isExpanded && (
-                        <div className="px-4 pb-4 space-y-3 border-t border-neutral-200 pt-4">
-                          {/* Nome da Categoria */}
-                          <div>
-                            <FormControl variant="label">
-                              <Typography variant="span" className="text-sm">
-                                Nome da Categoria{' '}
+                {configMode === 'json' ? (
+                  // Modo JSON para Lista
+                  <div>
+                    <div className="flex items-center justify-between relative !pt-4">
+                      <FormControl variant="label">
+                        Configuração JSON das Categorias
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setJsonConfig(JSON_LIST_TEMPLATE)}
+                        className="absolute right-0 top-0 w-fit text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        📄 Carregar Modelo de Exemplo
+                      </Button>
+                    </div>
+                    <textarea
+                      value={jsonConfig}
+                      onChange={(e) => setJsonConfig(e.target.value)}
+                      placeholder="Cole ou edite o JSON de configuração aqui..."
+                      rows={15}
+                      className="w-full rounded-md border border-gray-300 bg-white p-3 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"
+                    />
+                  </div>
+                ) : (
+                  // Modo Manual para Lista
+                  <div className="space-y-4">
+                    {listCategories.map((category, catIndex) => {
+                      const isExpanded = expandedCategories.has(category.id);
+
+                      return (
+                        <div
+                          key={category.id}
+                          className="border border-neutral-200 rounded-lg bg-white"
+                        >
+                          {/* Header da Categoria - Sempre visível */}
+                          <div className="p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() =>
+                                  toggleCategoryExpansion(category.id)
+                                }
+                                className="h-fit w-fit p-1 hover:bg-neutral-100"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-5 h-5 text-neutral-400" />
+                                ) : (
+                                  <ChevronRight className="w-5 h-5 text-neutral-400" />
+                                )}
+                              </Button>
+                              <div className="flex flex-col flex-1">
                                 <Typography
                                   variant="span"
-                                  className="text-xs text-gray-500 font-normal"
+                                  className="text-sm text-neutral-700"
                                 >
-                                  (opcional)
+                                  Categoria {catIndex + 1}
                                 </Typography>
-                              </Typography>
-                            </FormControl>
-                            <Input
-                              type="text"
-                              fieldName={`category_name_${category.id}`}
-                              value={category.name}
-                              onChange={(e) =>
-                                updateCategoryName(category.id, e.target.value)
-                              }
-                              placeholder="Ex: Eletrônicos, Acessórios, etc"
-                            />
-                          </div>
-
-                          {/* Itens da Categoria */}
-                          <div className="space-y-2 ml-4 pl-4 border-l-2 border-neutral-300">
-                            <Typography
-                              variant="span"
-                              className="text-sm font-medium text-gray-700"
-                            >
-                              Opções da categoria:
-                            </Typography>
-                            {category.items.map((item, itemIndex) => (
-                              <div
-                                key={itemIndex}
-                                className="p-3 border border-gray-300 rounded-lg bg-white space-y-2"
-                              >
-                                <div className="flex items-center justify-between mb-2">
+                                {category.name && (
                                   <Typography
                                     variant="span"
-                                    className="text-sm font-semibold text-neutral-600"
+                                    className="text-xs text-neutral-500"
                                   >
-                                    Opção {itemIndex + 1}
+                                    {category.name}
                                   </Typography>
-                                  {category.items.length > 1 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      onClick={() =>
-                                        removeItemFromCategory(
-                                          category.id,
-                                          itemIndex,
-                                        )
-                                      }
-                                      disabled={category.items.length === 1}
-                                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  )}
-                                </div>
-
-                                <div>
-                                  <FormControl variant="label">
-                                    <Typography
-                                      variant="span"
-                                      className="text-sm"
-                                    >
-                                      Texto *
-                                    </Typography>
-                                  </FormControl>
-                                  <Input
-                                    type="text"
-                                    fieldName={`category_${category.id}_item_text_${itemIndex}`}
-                                    value={item.text}
-                                    onChange={(e) =>
-                                      updateCategoryItem(
-                                        category.id,
-                                        itemIndex,
-                                        'text',
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Ex: Smartphones"
-                                  />
-                                </div>
-
-                                <div>
-                                  <FormControl variant="label">
-                                    <Typography
-                                      variant="span"
-                                      className="text-sm"
-                                    >
-                                      ID
-                                    </Typography>
-                                  </FormControl>
-                                  <Input
-                                    type="text"
-                                    fieldName={`category_${category.id}_item_id_${itemIndex}`}
-                                    value={item.id}
-                                    onChange={(e) =>
-                                      updateCategoryItem(
-                                        category.id,
-                                        itemIndex,
-                                        'id',
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Ex: phones"
-                                  />
-                                </div>
-
-                                <div>
-                                  <FormControl variant="label">
-                                    <Typography
-                                      variant="span"
-                                      className="text-sm"
-                                    >
-                                      Descrição
-                                    </Typography>
-                                  </FormControl>
-                                  <Input
-                                    type="text"
-                                    fieldName={`category_${category.id}_item_desc_${itemIndex}`}
-                                    value={item.description}
-                                    onChange={(e) =>
-                                      updateCategoryItem(
-                                        category.id,
-                                        itemIndex,
-                                        'description',
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Ex: Últimos lançamentos"
-                                  />
-                                </div>
+                                )}
                               </div>
-                            ))}
-                            <Button
-                              type="button"
-                              variant="default"
-                              onClick={() => addItemToCategory(category.id)}
-                              className="w-full gap-2 text-sm"
-                            >
-                              <Plus className="w-3 h-3" />
-                              Adicionar Item nesta Categoria
-                            </Button>
+                            </div>
+                            {listCategories?.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => removeCategory(category.id)}
+                                disabled={listCategories.length === 1}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-fit w-fit"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
+
+                          {/* Conteúdo da Categoria - Colapsável */}
+                          {isExpanded && (
+                            <div className="px-4 pb-4 space-y-3 border-t border-neutral-200 pt-4">
+                              {/* Nome da Categoria */}
+                              <div>
+                                <FormControl variant="label">
+                                  <Typography
+                                    variant="span"
+                                    className="text-sm"
+                                  >
+                                    Nome da Categoria{' '}
+                                    <Typography
+                                      variant="span"
+                                      className="text-xs text-gray-500 font-normal"
+                                    >
+                                      (opcional)
+                                    </Typography>
+                                  </Typography>
+                                </FormControl>
+                                <Input
+                                  type="text"
+                                  fieldName={`category_name_${category.id}`}
+                                  value={category.name}
+                                  onChange={(e) =>
+                                    updateCategoryName(
+                                      category.id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Ex: Eletrônicos, Acessórios, etc"
+                                />
+                              </div>
+
+                              {/* Itens da Categoria */}
+                              <div className="space-y-2 ml-4 pl-4 border-l-2 border-neutral-300">
+                                <Typography
+                                  variant="span"
+                                  className="text-sm font-medium text-gray-700"
+                                >
+                                  Opções da categoria:
+                                </Typography>
+                                {category.items.map((item, itemIndex) => (
+                                  <div
+                                    key={itemIndex}
+                                    className="p-3 border border-gray-300 rounded-lg bg-white space-y-2"
+                                  >
+                                    <div className="flex items-center justify-between mb-2">
+                                      <Typography
+                                        variant="span"
+                                        className="text-sm font-semibold text-neutral-600"
+                                      >
+                                        Opção {itemIndex + 1}
+                                      </Typography>
+                                      {category.items.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            removeItemFromCategory(
+                                              category.id,
+                                              itemIndex,
+                                            )
+                                          }
+                                          disabled={category.items.length === 1}
+                                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+
+                                    <div>
+                                      <FormControl variant="label">
+                                        <Typography
+                                          variant="span"
+                                          className="text-sm"
+                                        >
+                                          Texto *
+                                        </Typography>
+                                      </FormControl>
+                                      <Input
+                                        type="text"
+                                        fieldName={`category_${category.id}_item_text_${itemIndex}`}
+                                        value={item.text}
+                                        onChange={(e) =>
+                                          updateCategoryItem(
+                                            category.id,
+                                            itemIndex,
+                                            'text',
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder="Ex: Smartphones"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <FormControl variant="label">
+                                        <Typography
+                                          variant="span"
+                                          className="text-sm"
+                                        >
+                                          ID
+                                        </Typography>
+                                      </FormControl>
+                                      <Input
+                                        type="text"
+                                        fieldName={`category_${category.id}_item_id_${itemIndex}`}
+                                        value={item.id}
+                                        onChange={(e) =>
+                                          updateCategoryItem(
+                                            category.id,
+                                            itemIndex,
+                                            'id',
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder="Ex: phones"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <FormControl variant="label">
+                                        <Typography
+                                          variant="span"
+                                          className="text-sm"
+                                        >
+                                          Descrição
+                                        </Typography>
+                                      </FormControl>
+                                      <Input
+                                        type="text"
+                                        fieldName={`category_${category.id}_item_desc_${itemIndex}`}
+                                        value={item.description}
+                                        onChange={(e) =>
+                                          updateCategoryItem(
+                                            category.id,
+                                            itemIndex,
+                                            'description',
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder="Ex: Últimos lançamentos"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="default"
+                                  onClick={() => addItemToCategory(category.id)}
+                                  className="w-full gap-2 text-sm"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Adicionar Item nesta Categoria
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ) : interactiveMenuType === 'carousel' ? (
               // UI Hierárquica para tipo CAROUSEL
@@ -1456,17 +1665,27 @@ function MessageFormFields({
                         type="button"
                         variant={configMode === 'manual' ? 'gradient' : 'ghost'}
                         onClick={() => setConfigMode('manual')}
-                        className="w-fit px-4 py-2 text-sm"
+                        className={cn(
+                          'w-fit px-4 py-2 text-sm',
+                          configMode === 'manual'
+                            ? '!text-white'
+                            : '!text-neutral-600',
+                        )}
                       >
-                        📝 Manual
+                        Manual
                       </Button>
                       <Button
                         type="button"
                         variant={configMode === 'json' ? 'gradient' : 'ghost'}
                         onClick={() => setConfigMode('json')}
-                        className="w-fit px-4 py-2 text-sm"
+                        className={cn(
+                          'w-fit px-4 py-2 text-sm',
+                          configMode !== 'manual'
+                            ? '!text-white'
+                            : '!text-neutral-600',
+                        )}
                       >
-                        {} JSON
+                        JSON
                       </Button>
                     </div>
                   </div>
@@ -1475,7 +1694,7 @@ function MessageFormFields({
                 {configMode === 'json' ? (
                   // Modo JSON para Carrossel
                   <div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between relative pt-4">
                       <FormControl variant="label">
                         Configuração JSON dos Cartões
                       </FormControl>
@@ -1483,7 +1702,7 @@ function MessageFormFields({
                         type="button"
                         variant="ghost"
                         onClick={() => setJsonConfig(JSON_CAROUSEL_TEMPLATE)}
-                        className="w-fit text-sm text-blue-600 hover:text-blue-700"
+                        className="w-fit text-sm text-blue-600 hover:text-blue-700 absolute top-0 right-0"
                       >
                         📄 Carregar Modelo de Exemplo
                       </Button>
@@ -1495,21 +1714,6 @@ function MessageFormFields({
                       rows={15}
                       className="w-full rounded-md border border-gray-300 bg-white p-3 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"
                     />
-                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <Typography
-                        variant="span"
-                        className="text-xs text-blue-800"
-                      >
-                        <strong>💡 Dica:</strong> Você pode usar:
-                        <br />• <strong>Variável dinâmica:</strong>{' '}
-                        <code className="text-xs">{`{{carousel_produtos}}`}</code>{' '}
-                        (resultado de transformation node)
-                        <br />• <strong>JSON literal:</strong>{' '}
-                        <code className="text-xs">{`[{ "title": "...", "imageUrl": "...", "buttons": [...] }]`}</code>
-                        <br />• <strong>Comentários:</strong> Use // no JSON
-                        para documentar (serão removidos ao salvar)
-                      </Typography>
-                    </div>
                   </div>
                 ) : (
                   // Modo Manual para Carrossel
@@ -2417,15 +2621,80 @@ export function MessageNodeConfig({
   }, [config]);
 
   const handleSubmit = async (data: FieldValues) => {
-    // Se estiver no modo JSON e for interactive_menu do tipo carousel, processar o JSON dos cartões
+    // Se estiver no modo JSON e for interactive_menu do tipo list, processar o JSON das categorias
     if (
+      currentConfigMode === 'json' &&
+      data.messageType === 'interactive_menu' &&
+      data.interactiveMenuType === 'list'
+    ) {
+      // Se o JSON for apenas uma variável (ex: {{list_categories}}), salvar diretamente
+      const trimmedJson = currentJsonConfig.trim();
+      const isVariable = /^\{\{.+\}\}$/.test(trimmedJson);
+
+      if (isVariable) {
+        // Se for uma variável dinâmica, salvar como string para ser processada no worker
+        data.interactiveMenuChoices = trimmedJson;
+      } else {
+        // Se for JSON literal, processar normalmente
+        try {
+          // Remover comentários do JSON antes de parsear
+          const jsonWithoutComments = currentJsonConfig.replace(
+            /\/\/.*$/gm,
+            '',
+          );
+          const parsedCategories = JSON.parse(jsonWithoutComments);
+
+          // Validar se é um array
+          if (!Array.isArray(parsedCategories)) {
+            alert(
+              'O JSON deve ser um array de categorias. Exemplo:\\n[{ "category": "...", "items": [{ "text": "...", "id": "...", "description": "..." }] }]',
+            );
+            return;
+          }
+
+          // Converter as categorias parseadas para o formato do choices
+          const choicesStrings: string[] = [];
+
+          parsedCategories.forEach((cat) => {
+            // Adicionar categoria se tiver nome
+            if (cat.category && cat.category.trim() !== '') {
+              choicesStrings.push(`[${cat.category}]`);
+            }
+
+            // Adicionar itens da categoria
+            if (cat.items && Array.isArray(cat.items)) {
+              cat.items.forEach(
+                (item: { text: string; id: string; description?: string }) => {
+                  if (item.text && item.text.trim() !== '') {
+                    choicesStrings.push(
+                      `${item.text}|${item.id || ''}|${item.description || ''}`,
+                    );
+                  }
+                },
+              );
+            }
+          });
+
+          // Atualizar data com os choices convertidos
+          data.interactiveMenuChoices = JSON.stringify(choicesStrings);
+        } catch (error) {
+          alert(
+            'Erro ao parsear JSON das categorias. Verifique se o formato está correto.\\n\\n' +
+              (error instanceof Error ? error.message : String(error)),
+          );
+          return;
+        }
+      }
+    }
+    // Se estiver no modo JSON e for interactive_menu do tipo carousel, processar o JSON dos cartões
+    else if (
       currentConfigMode === 'json' &&
       data.messageType === 'interactive_menu' &&
       data.interactiveMenuType === 'carousel'
     ) {
       // Se o JSON for apenas uma variável (ex: {{carousel_produtos}}), salvar diretamente
       const trimmedJson = currentJsonConfig.trim();
-      const isVariable = /^\{\{[^}]+\}\}$/.test(trimmedJson);
+      const isVariable = /^\{\{.+\}\}$/.test(trimmedJson);
 
       if (isVariable) {
         // Se for uma variável dinâmica, salvar como string para ser processada no worker
@@ -2535,7 +2804,7 @@ export function MessageNodeConfig({
       if (data.interactiveMenuChoices) {
         const choicesStr = data.interactiveMenuChoices;
         // Verificar se é uma variável dinâmica (ex: {{carousel_produtos}})
-        const isVariable = /^\{\{[^}]+\}\}$/.test(choicesStr.trim());
+        const isVariable = /^\{\{.+\}\}$/.test(choicesStr.trim());
 
         if (isVariable) {
           // Se for variável, salvar como array com a variável

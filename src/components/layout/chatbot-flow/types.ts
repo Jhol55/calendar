@@ -360,7 +360,7 @@ export interface LoopConfig {
 
 // ==================== CODE EXECUTION NODE ====================
 
-export type CodeExecutionLanguage = 'javascript' | 'python' | 'typescript';
+export type CodeExecutionLanguage = 'javascript' | 'python';
 
 export interface CodeExecutionConfig {
   // Code settings
