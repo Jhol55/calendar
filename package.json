@@ -21,6 +21,7 @@
     "clear-all": "node ./scripts/clear-all-jobs.js"
   },
   "dependencies": {
+    "@codeium/react-code-editor": "^1.0.12",
     "@hookform/resolvers": "^3.9.0",
     "@prisma/client": "^6.13.0",
     "@radix-ui/react-dropdown-menu": "^2.1.16",

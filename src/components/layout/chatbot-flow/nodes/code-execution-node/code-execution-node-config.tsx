@@ -11,9 +11,9 @@ import { codeExecutionConfigSchema } from './code-execution-node-config.schema';
 import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { NodeConfigLayout } from '../node-config-layout';
 import { MemoryConfigSection } from '../memory-config-section';
+import { CodeiumEditorField } from '@/components/ui/codeium-editor-field';
 
 interface CodeExecutionNodeConfigProps {
   isOpen: boolean;
@@ -141,13 +141,15 @@ print(result)  # ✅ Para números/strings simples
       <div className="p-1">
         <FormControl variant="label">Código *</FormControl>
 
-        <Textarea
+        <CodeiumEditorField
           fieldName="code"
+          language={language}
           placeholder={getCodeExample()}
-          rows={12}
-          className="font-mono text-sm"
+          height="350px"
+          theme="light"
+          backgroundColor="#fbfbfb"
         />
-        <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md mb-2">
+        <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md mb-2 mt-2">
           <Typography
             variant="span"
             className="text-xs text-yellow-800 font-semibold"
@@ -168,13 +170,15 @@ print(result)  # ✅ Para números/strings simples
             (opcional)
           </Typography>
         </FormControl>
-        <Textarea
+        <CodeiumEditorField
           fieldName="inputVariables"
+          language="json"
           placeholder={
             '{\n  "x": {{$webhook.body.value1}},\n  "y": 20,\n  "items": {{$nodes.xxx.output.records}},\n  "name": {{$memory.userName}}\n}'
           }
-          rows={6}
-          className="font-mono text-sm"
+          height="200px"
+          theme="light"
+          backgroundColor="#fbfbfb"
         />
       </div>
 
