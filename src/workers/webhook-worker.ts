@@ -315,11 +315,16 @@ async function processNodeChain(
     JSON.stringify(nextEdges, null, 2),
   );
 
-  // Se o nó for de condição e tiver selectedHandle, filtrar edges
+  // Se o nó for de condição ou loop e tiver selectedHandle, filtrar edges
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const selectedHandle = (result as any)?.selectedHandle;
-  if (currentNode.type === 'condition' && selectedHandle) {
-    console.log(`🔀 Condition node selected handle: ${selectedHandle}`);
+  if (
+    (currentNode.type === 'condition' || currentNode.type === 'loop') &&
+    selectedHandle
+  ) {
+    console.log(
+      `🔀 ${currentNode.type} node selected handle: ${selectedHandle}`,
+    );
     // Filtrar edges baseado no sourceHandle (ReactFlow usa sourceHandle para identificar handles)
     nextEdges = nextEdges.filter(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

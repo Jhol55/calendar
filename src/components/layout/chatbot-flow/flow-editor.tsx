@@ -258,25 +258,32 @@ function FlowEditorContent() {
     setIsSaving(true);
 
     try {
-      const flowData = {
-        name: flowName,
-        description: '',
-        nodes: nodes,
-        edges: edges,
-        token: currentFlowId || `flow-${Date.now()}`,
-        userId: user?.id,
-        isActive: false,
-      };
-
       if (currentFlowId) {
-        // Atualizar flow existente usando mutation
+        // Atualizar flow existente usando mutation (sem token)
+        const flowData = {
+          name: flowName,
+          description: '',
+          nodes: nodes,
+          edges: edges,
+          isActive: true,
+        };
+
         await updateWorkflowMutation.mutateAsync({
           id: currentFlowId,
           data: flowData,
         });
         console.log('✅ Flow atualizado com sucesso!');
       } else {
-        // Criar novo flow usando mutation
+        // Criar novo flow usando mutation (sem token - será null)
+        const flowData = {
+          name: flowName,
+          description: '',
+          nodes: nodes,
+          edges: edges,
+          userId: user?.id,
+          isActive: true,
+        };
+
         const newFlow = await createWorkflowMutation.mutateAsync(flowData);
         console.log('✅ Flow criado com sucesso!');
         setCurrentFlowId(newFlow.id);
