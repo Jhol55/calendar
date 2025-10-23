@@ -34,6 +34,7 @@ import {
 } from './nodes';
 import { HttpRequestNode } from './nodes/http-request-node/http-request-node';
 import AgentNode from './nodes/agent-node/agent-node';
+import CustomBezierEdge from './custom-bezier-edge';
 import {
   NodeType,
   NodeData,
@@ -79,6 +80,10 @@ const nodeTypes = {
   agent: AgentNode,
   loop: LoopNode,
   code_execution: CodeExecutionNode,
+};
+
+const edgeTypes = {
+  default: CustomBezierEdge,
 };
 
 // Função para gerar IDs únicos
@@ -723,6 +728,7 @@ function FlowEditorContent() {
           onDragOver={onDragOver}
           onNodeDoubleClick={onNodeDoubleClick}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           fitViewOptions={{
             padding: 0.2,
