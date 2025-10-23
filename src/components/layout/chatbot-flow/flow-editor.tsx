@@ -15,6 +15,7 @@ import ReactFlow, {
   MiniMap,
   Panel,
   ReactFlowInstance,
+  SelectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -740,6 +741,9 @@ function FlowEditorContent() {
           defaultViewport={{ x: 0, y: 0, zoom: 0.1 }}
           proOptions={{ hideAttribution: true }}
           className="bg-gray-50"
+          selectionOnDrag
+          panOnDrag={[1, 2]}
+          selectionMode={SelectionMode.Partial}
         >
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
           <Controls />
