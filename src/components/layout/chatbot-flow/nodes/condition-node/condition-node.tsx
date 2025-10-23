@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Typography } from '@/components/ui/typography';
 import type { NodeData } from '../../types';
@@ -30,7 +30,7 @@ const getOperatorSymbol = (operator: string): string => {
   return operators[operator] || operator;
 };
 
-export function ConditionNode({ data }: ConditionNodeProps) {
+function ConditionNodeComponent({ data }: ConditionNodeProps) {
   const config = data.conditionConfig;
   const isIfType = config?.conditionType === 'if';
   const isSwitchType = config?.conditionType === 'switch';
@@ -39,12 +39,6 @@ export function ConditionNode({ data }: ConditionNodeProps) {
   // Para SWITCH: 1 entrada, N saídas (casos + default)
   const switchCases = config?.cases || [];
   const hasDefaultCase = config?.useDefaultCase ?? true;
-
-  // Debug: Log dos casos
-  if (isSwitchType) {
-    console.log('🔍 SWITCH Node - Casos recebidos:', switchCases);
-    console.log('🔍 Quantidade de casos:', switchCases.length);
-  }
 
   return (
     <div className="relative">
@@ -267,3 +261,5 @@ export function ConditionNode({ data }: ConditionNodeProps) {
     </div>
   );
 }
+
+export const ConditionNode = memo(ConditionNodeComponent);

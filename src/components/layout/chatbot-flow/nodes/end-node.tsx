@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Square } from 'lucide-react';
 import { NodeData } from '../../../../features/forms/chatbot-flow/types';
 
-export function EndNode({ data, selected }: NodeProps<NodeData>) {
+function EndNodeComponent({ data, selected }: NodeProps<NodeData>) {
   return (
     <div
       className={`bg-red-500 rounded-full p-4 shadow-lg ${
@@ -19,3 +19,5 @@ export function EndNode({ data, selected }: NodeProps<NodeData>) {
     </div>
   );
 }
+
+export const EndNode = memo(EndNodeComponent);

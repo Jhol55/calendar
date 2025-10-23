@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Database, Settings } from 'lucide-react';
 import { NodeData } from '../../types';
 import { Typography } from '@/components/ui/typography';
 
-export function DatabaseNode({ data, selected }: NodeProps<NodeData>) {
+function DatabaseNodeComponent({ data, selected }: NodeProps<NodeData>) {
   const databaseConfig = data.databaseConfig;
 
   const getOperationLabel = () => {
@@ -99,3 +99,5 @@ export function DatabaseNode({ data, selected }: NodeProps<NodeData>) {
     </div>
   );
 }
+
+export const DatabaseNode = memo(DatabaseNodeComponent);

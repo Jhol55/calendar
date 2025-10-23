@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { MessageSquare, Settings } from 'lucide-react';
 import { NodeData } from '../../types';
 import { Typography } from '@/components/ui/typography';
 
-export function MessageNode({ data, selected }: NodeProps<NodeData>) {
+function MessageNodeComponent({ data, selected }: NodeProps<NodeData>) {
   const messageConfig = data.messageConfig;
 
   const getMessageTypeLabel = () => {
@@ -77,3 +77,5 @@ export function MessageNode({ data, selected }: NodeProps<NodeData>) {
     </div>
   );
 }
+
+export const MessageNode = memo(MessageNodeComponent);

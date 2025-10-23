@@ -689,7 +689,7 @@ function FlowEditorContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCopyNode, handlePasteNode]);
 
-  const nodeColor = (node: Node) => {
+  const nodeColor = useCallback((node: Node) => {
     switch (node.type) {
       case 'start':
         return '#10b981';
@@ -706,7 +706,7 @@ function FlowEditorContent() {
       default:
         return '#6b7280';
     }
-  };
+  }, []);
 
   return (
     <div className="flex h-full">
@@ -743,7 +743,7 @@ function FlowEditorContent() {
         >
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
           <Controls />
-          <MiniMap nodeColor={nodeColor} />
+          {nodes.length < 50 && <MiniMap nodeColor={nodeColor} />}
 
           <Panel position="top-left">
             <div className="flex gap-4">
@@ -873,161 +873,181 @@ function FlowEditorContent() {
         onClose={() => setIsSpreadsheetOpen(false)}
       />
 
-      <MessageNodeConfig
-        isOpen={configDialogOpen}
-        onClose={() => {
-          setConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.messageConfig}
-        onSave={handleSaveMessageConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-        nodeLabel={nodeToConfig?.data.label}
-        onNodeLabelChange={(label) => {
-          if (nodeToConfig) {
-            handleNodeUpdate(nodeToConfig.id, { label });
-          }
-        }}
-      />
+      {configDialogOpen && (
+        <MessageNodeConfig
+          isOpen={configDialogOpen}
+          onClose={() => {
+            setConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.messageConfig}
+          onSave={handleSaveMessageConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+          nodeLabel={nodeToConfig?.data.label}
+          onNodeLabelChange={(label) => {
+            if (nodeToConfig) {
+              handleNodeUpdate(nodeToConfig.id, { label });
+            }
+          }}
+        />
+      )}
 
-      <WebhookNodeConfig
-        isOpen={webhookConfigDialogOpen}
-        onClose={() => {
-          setWebhookConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.webhookConfig}
-        onSave={handleSaveWebhookConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-      />
+      {webhookConfigDialogOpen && (
+        <WebhookNodeConfig
+          isOpen={webhookConfigDialogOpen}
+          onClose={() => {
+            setWebhookConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.webhookConfig}
+          onSave={handleSaveWebhookConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+        />
+      )}
 
-      <MemoryNodeConfig
-        isOpen={memoryConfigDialogOpen}
-        onClose={() => {
-          setMemoryConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.memoryConfig}
-        onSave={handleSaveMemoryConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-        nodeLabel={nodeToConfig?.data.label}
-        onNodeLabelChange={(label: string) => {
-          if (nodeToConfig) {
-            handleNodeUpdate(nodeToConfig.id, { label });
-          }
-        }}
-      />
+      {memoryConfigDialogOpen && (
+        <MemoryNodeConfig
+          isOpen={memoryConfigDialogOpen}
+          onClose={() => {
+            setMemoryConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.memoryConfig}
+          onSave={handleSaveMemoryConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+          nodeLabel={nodeToConfig?.data.label}
+          onNodeLabelChange={(label: string) => {
+            if (nodeToConfig) {
+              handleNodeUpdate(nodeToConfig.id, { label });
+            }
+          }}
+        />
+      )}
 
-      <TransformationNodeConfig
-        isOpen={transformationConfigDialogOpen}
-        onClose={() => {
-          setTransformationConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.transformationConfig}
-        onSave={handleSaveTransformationConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-      />
+      {transformationConfigDialogOpen && (
+        <TransformationNodeConfig
+          isOpen={transformationConfigDialogOpen}
+          onClose={() => {
+            setTransformationConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.transformationConfig}
+          onSave={handleSaveTransformationConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+        />
+      )}
 
-      <ConditionNodeConfig
-        isOpen={conditionConfigDialogOpen}
-        onClose={() => {
-          setConditionConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.conditionConfig}
-        onSave={handleSaveConditionConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-      />
+      {conditionConfigDialogOpen && (
+        <ConditionNodeConfig
+          isOpen={conditionConfigDialogOpen}
+          onClose={() => {
+            setConditionConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.conditionConfig}
+          onSave={handleSaveConditionConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+        />
+      )}
 
-      <DatabaseNodeConfig
-        isOpen={databaseConfigDialogOpen}
-        onClose={() => {
-          setDatabaseConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.databaseConfig}
-        onSave={handleSaveDatabaseConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-      />
+      {databaseConfigDialogOpen && (
+        <DatabaseNodeConfig
+          isOpen={databaseConfigDialogOpen}
+          onClose={() => {
+            setDatabaseConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.databaseConfig}
+          onSave={handleSaveDatabaseConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+        />
+      )}
 
-      <HttpRequestNodeConfig
-        isOpen={httpRequestConfigDialogOpen}
-        onClose={() => {
-          setHttpRequestConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.httpRequestConfig}
-        onSave={handleSaveHttpRequestConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-        nodeLabel={nodeToConfig?.data.label}
-        onNodeLabelChange={(label) => {
-          if (nodeToConfig) {
-            handleNodeUpdate(nodeToConfig.id, { label });
-          }
-        }}
-      />
+      {httpRequestConfigDialogOpen && (
+        <HttpRequestNodeConfig
+          isOpen={httpRequestConfigDialogOpen}
+          onClose={() => {
+            setHttpRequestConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.httpRequestConfig}
+          onSave={handleSaveHttpRequestConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+          nodeLabel={nodeToConfig?.data.label}
+          onNodeLabelChange={(label) => {
+            if (nodeToConfig) {
+              handleNodeUpdate(nodeToConfig.id, { label });
+            }
+          }}
+        />
+      )}
 
-      <AgentNodeConfig
-        isOpen={agentConfigDialogOpen}
-        onClose={() => {
-          setAgentConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.agentConfig}
-        onSave={handleSaveAgentConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-        nodeLabel={nodeToConfig?.data.label}
-        onNodeLabelChange={(label) => {
-          if (nodeToConfig) {
-            handleNodeUpdate(nodeToConfig.id, { label });
-          }
-        }}
-      />
+      {agentConfigDialogOpen && (
+        <AgentNodeConfig
+          isOpen={agentConfigDialogOpen}
+          onClose={() => {
+            setAgentConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.agentConfig}
+          onSave={handleSaveAgentConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+          nodeLabel={nodeToConfig?.data.label}
+          onNodeLabelChange={(label) => {
+            if (nodeToConfig) {
+              handleNodeUpdate(nodeToConfig.id, { label });
+            }
+          }}
+        />
+      )}
 
-      <LoopNodeConfig
-        isOpen={loopConfigDialogOpen}
-        onClose={() => {
-          setLoopConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.loopConfig}
-        onSave={handleSaveLoopConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-        nodeLabel={nodeToConfig?.data.label}
-        onNodeLabelChange={(label) => {
-          if (nodeToConfig) {
-            handleNodeUpdate(nodeToConfig.id, { label });
-          }
-        }}
-      />
+      {loopConfigDialogOpen && (
+        <LoopNodeConfig
+          isOpen={loopConfigDialogOpen}
+          onClose={() => {
+            setLoopConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.loopConfig}
+          onSave={handleSaveLoopConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+          nodeLabel={nodeToConfig?.data.label}
+          onNodeLabelChange={(label) => {
+            if (nodeToConfig) {
+              handleNodeUpdate(nodeToConfig.id, { label });
+            }
+          }}
+        />
+      )}
 
-      <CodeExecutionNodeConfig
-        isOpen={codeExecutionConfigDialogOpen}
-        onClose={() => {
-          setCodeExecutionConfigDialogOpen(false);
-          setNodeToConfig(null);
-        }}
-        config={nodeToConfig?.data.codeExecutionConfig}
-        onSave={handleSaveCodeExecutionConfig}
-        nodeId={nodeToConfig?.id}
-        flowId={currentFlowId || undefined}
-        nodeLabel={nodeToConfig?.data.label}
-        onNodeLabelChange={(label) => {
-          if (nodeToConfig) {
-            handleNodeUpdate(nodeToConfig.id, { label });
-          }
-        }}
-      />
+      {codeExecutionConfigDialogOpen && (
+        <CodeExecutionNodeConfig
+          isOpen={codeExecutionConfigDialogOpen}
+          onClose={() => {
+            setCodeExecutionConfigDialogOpen(false);
+            setNodeToConfig(null);
+          }}
+          config={nodeToConfig?.data.codeExecutionConfig}
+          onSave={handleSaveCodeExecutionConfig}
+          nodeId={nodeToConfig?.id}
+          flowId={currentFlowId || undefined}
+          nodeLabel={nodeToConfig?.data.label}
+          onNodeLabelChange={(label) => {
+            if (nodeToConfig) {
+              handleNodeUpdate(nodeToConfig.id, { label });
+            }
+          }}
+        />
+      )}
 
       <ExecutionsPanel
         flowId={currentFlowId || ''}

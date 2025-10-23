@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Globe, Settings } from 'lucide-react';
 import { NodeData } from '../../types';
 import { Typography } from '@/components/ui/typography';
 
-export function HttpRequestNode({ data, selected }: NodeProps<NodeData>) {
+function HttpRequestNodeComponent({ data, selected }: NodeProps<NodeData>) {
   const httpConfig = data.httpRequestConfig;
 
   const getMethodColor = (method?: string) => {
@@ -78,3 +78,5 @@ export function HttpRequestNode({ data, selected }: NodeProps<NodeData>) {
     </div>
   );
 }
+
+export const HttpRequestNode = memo(HttpRequestNodeComponent);

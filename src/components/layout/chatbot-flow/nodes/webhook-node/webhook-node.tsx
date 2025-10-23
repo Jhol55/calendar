@@ -1,12 +1,11 @@
-import React from 'react';
+import React, { memo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Webhook, Settings, Copy, CheckCircle } from 'lucide-react';
 import { NodeData } from '../../types';
-import { useState } from 'react';
 import { Typography } from '@/components/ui/typography/typography';
 import { cn } from '@/lib/utils';
 
-export function WebhookNode({ data, selected }: NodeProps<NodeData>) {
+function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
   const [copied, setCopied] = useState(false);
   const webhookConfig = data.webhookConfig;
 
@@ -134,3 +133,5 @@ export function WebhookNode({ data, selected }: NodeProps<NodeData>) {
     </div>
   );
 }
+
+export const WebhookNode = memo(WebhookNodeComponent);
