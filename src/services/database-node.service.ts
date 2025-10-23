@@ -26,6 +26,80 @@ export class DatabaseNodeService {
   private readonly MAX_TABLES = DATABASE_NODE_CONFIG.MAX_TABLES_PER_USER;
 
   // ============================================
+  // VALIDAÇÃO DE PERMISSÕES
+  // ============================================
+
+  /**
+   * Verifica se o usuário é o dono da tabela
+   * @throws Error se tabela não existe ou usuário não é o dono
+   */
+  private async verifyTableOwnership(
+    userId: string,
+    tableName: string,
+  ): Promise<void> {
+    const table = await prisma.dataTable.findFirst({
+      where: {
+        userId,
+        tableName,
+        partition: 0, // Partição 0 sempre existe se tabela existe
+      },
+      select: { userId: true },
+    });
+
+    if (!table) {
+      // Tabela não existe - permitir (será criada pelo usuário)
+      return;
+    }
+
+    if (table.userId !== userId) {
+      console.error(
+        `🚨 Tentativa não autorizada: userId ${userId} tentou acessar tabela ${tableName} de outro usuário`,
+      );
+      throw this.createError(
+        'UNAUTHORIZED',
+        `Acesso negado: você não tem permissão para acessar a tabela "${tableName}"`,
+      );
+    }
+  }
+
+  // ============================================
+  // RATE LIMITING (Simples)
+  // ============================================
+
+  private operationCounts = new Map<
+    string,
+    { count: number; resetAt: number }
+  >();
+
+  private async checkRateLimit(userId: string): Promise<void> {
+    const key = `user:${userId}`;
+    const now = Date.now();
+    const windowMs = 60 * 60 * 1000; // 1 hora
+    const maxOperations = 1000000; // 1M operações por hora
+
+    const current = this.operationCounts.get(key);
+
+    if (!current || now > current.resetAt) {
+      // Nova janela de tempo
+      this.operationCounts.set(key, {
+        count: 1,
+        resetAt: now + windowMs,
+      });
+      return;
+    }
+
+    if (current.count >= maxOperations) {
+      const retryAfterMs = current.resetAt - now;
+      throw this.createError(
+        'RATE_LIMIT_EXCEEDED',
+        `Rate limit excedido. Tente novamente em ${Math.ceil(retryAfterMs / 1000)}s`,
+      );
+    }
+
+    current.count++;
+  }
+
+  // ============================================
   // ADICIONAR COLUNAS
   // ============================================
   async addColumns(
@@ -36,6 +110,10 @@ export class DatabaseNodeService {
     // Valida entrada
     this.validateTableName(tableName);
     this.validateColumns(columns);
+
+    // Validação de permissões
+    await this.verifyTableOwnership(userId, tableName);
+    await this.checkRateLimit(userId);
 
     // Busca partição 0 (schema principal)
     let table = await prisma.dataTable.findUnique({
@@ -104,44 +182,53 @@ export class DatabaseNodeService {
   ): Promise<TableSchema> {
     this.validateTableName(tableName);
 
-    // Busca todas as partições
-    const partitions = await prisma.dataTable.findMany({
-      where: { userId, tableName },
-      orderBy: { partition: 'asc' },
+    // Validação de permissões
+    await this.verifyTableOwnership(userId, tableName);
+    await this.checkRateLimit(userId);
+
+    // USAR TRANSACTION para garantir atomicidade
+    const updatedSchema = await prisma.$transaction(async (tx) => {
+      // Busca todas as partições
+      const partitions = await tx.dataTable.findMany({
+        where: { userId, tableName },
+        orderBy: { partition: 'asc' },
+      });
+
+      if (partitions.length === 0) {
+        throw this.createError(
+          'TABLE_NOT_FOUND',
+          `Tabela "${tableName}" não existe`,
+        );
+      }
+
+      // Atualiza schema
+      const currentSchema = partitions[0].schema as unknown as TableSchema;
+      const newSchema = {
+        columns: currentSchema.columns.filter(
+          (col) => !columnNames.includes(col.name),
+        ),
+      };
+
+      // Atualiza cada partição (remove coluna dos dados também)
+      for (const partition of partitions) {
+        const records = partition.data as DatabaseRecord[];
+        const cleanedRecords = records.map((record) => {
+          const newRecord = { ...record };
+          columnNames.forEach((colName) => delete newRecord[colName]);
+          return newRecord;
+        });
+
+        await tx.dataTable.update({
+          where: { id: partition.id },
+          data: {
+            schema: newSchema as any,
+            data: cleanedRecords as any,
+          },
+        });
+      }
+
+      return newSchema;
     });
-
-    if (partitions.length === 0) {
-      throw this.createError(
-        'TABLE_NOT_FOUND',
-        `Tabela "${tableName}" não existe`,
-      );
-    }
-
-    // Atualiza schema
-    const currentSchema = partitions[0].schema as unknown as TableSchema;
-    const updatedSchema = {
-      columns: currentSchema.columns.filter(
-        (col) => !columnNames.includes(col.name),
-      ),
-    };
-
-    // Atualiza cada partição (remove coluna dos dados também)
-    for (const partition of partitions) {
-      const records = partition.data as DatabaseRecord[];
-      const cleanedRecords = records.map((record) => {
-        const newRecord = { ...record };
-        columnNames.forEach((colName) => delete newRecord[colName]);
-        return newRecord;
-      });
-
-      await prisma.dataTable.update({
-        where: { id: partition.id },
-        data: {
-          schema: updatedSchema as any,
-          data: cleanedRecords as any,
-        },
-      });
-    }
 
     return updatedSchema;
   }
@@ -164,61 +251,104 @@ export class DatabaseNodeService {
 
     this.validateTableName(tableName);
 
+    // Validação de permissões
+    await this.verifyTableOwnership(userId, tableName);
+    await this.checkRateLimit(userId);
+
     // 1. Busca partição ativa (não cheia)
-    let activePartition = await prisma.dataTable.findFirst({
-      where: {
-        userId,
-        tableName,
-        isFull: false,
-      },
-      orderBy: { partition: 'desc' },
-    });
-
-    console.log(
-      `📊 [DB-SERVICE] Active partition found:`,
-      activePartition
-        ? `ID ${activePartition.id}, partition ${activePartition.partition}`
-        : 'NONE',
-    );
-
-    // 2. Se não existe nenhuma partição, erro (precisa criar schema primeiro)
-    if (!activePartition) {
-      const hasTable = await prisma.dataTable.findFirst({
-        where: { userId, tableName },
-      });
-
-      if (!hasTable) {
-        throw this.createError(
-          'TABLE_NOT_FOUND',
-          `Tabela "${tableName}" não existe. Use addColumns primeiro para criar o schema.`,
-        );
-      }
-
-      // Existe mas todas estão cheias - precisa criar nova
-      const lastPartition = await prisma.dataTable.findFirst({
-        where: { userId, tableName },
+    // USAR TRANSACTION para evitar race condition
+    const activePartition = await prisma.$transaction(async (tx) => {
+      let partition = await tx.dataTable.findFirst({
+        where: {
+          userId,
+          tableName,
+          isFull: false,
+        },
         orderBy: { partition: 'desc' },
       });
 
-      if (lastPartition!.partition >= this.MAX_PARTITIONS - 1) {
-        throw this.createError(
-          'PARTITION_LIMIT',
-          `Limite de partições atingido (${this.MAX_PARTITIONS})`,
-        );
+      console.log(
+        `📊 [DB-SERVICE] Active partition found:`,
+        partition
+          ? `ID ${partition.id}, partition ${partition.partition}`
+          : 'NONE',
+      );
+
+      // 2. Se não existe nenhuma partição, erro (precisa criar schema primeiro)
+      if (!partition) {
+        const hasTable = await tx.dataTable.findFirst({
+          where: { userId, tableName },
+        });
+
+        if (!hasTable) {
+          throw this.createError(
+            'TABLE_NOT_FOUND',
+            `Tabela "${tableName}" não existe. Use addColumns primeiro para criar o schema.`,
+          );
+        }
+
+        // Existe mas todas estão cheias - precisa criar nova
+        const lastPartition = await tx.dataTable.findFirst({
+          where: { userId, tableName },
+          orderBy: { partition: 'desc' },
+        });
+
+        if (lastPartition!.partition >= this.MAX_PARTITIONS - 1) {
+          throw this.createError(
+            'PARTITION_LIMIT',
+            `Limite de partições atingido (${this.MAX_PARTITIONS})`,
+          );
+        }
+
+        // Cria nova partição (dentro da transaction)
+        try {
+          partition = await tx.dataTable.create({
+            data: {
+              userId,
+              tableName,
+              partition: lastPartition!.partition + 1,
+              schema: lastPartition!.schema as any,
+              data: [] as any,
+              recordCount: 0,
+              isFull: false,
+            },
+          });
+        } catch (error: any) {
+          // Se der erro de unique constraint, outra requisição criou a partição
+          // Tentar buscar novamente
+          if (error.code === 'P2002') {
+            console.log(
+              `⚠️ Race condition detectada, tentando buscar partição criada por outra requisição...`,
+            );
+            partition = await tx.dataTable.findFirst({
+              where: {
+                userId,
+                tableName,
+                isFull: false,
+              },
+              orderBy: { partition: 'desc' },
+            });
+
+            if (!partition) {
+              throw this.createError(
+                'PARTITION_CREATION_FAILED',
+                'Falha ao criar ou encontrar partição disponível',
+              );
+            }
+          } else {
+            throw error;
+          }
+        }
       }
 
-      // Cria nova partição
-      activePartition = await prisma.dataTable.create({
-        data: {
-          userId,
-          tableName,
-          partition: lastPartition!.partition + 1,
-          schema: lastPartition!.schema as any,
-          data: [] as any,
-          recordCount: 0,
-          isFull: false,
-        },
-      });
+      return partition;
+    });
+
+    if (!activePartition) {
+      throw this.createError(
+        'NO_ACTIVE_PARTITION',
+        'Não foi possível encontrar ou criar uma partição ativa',
+      );
     }
 
     // 3. Valida registro contra schema
@@ -264,10 +394,23 @@ export class DatabaseNodeService {
   ): Promise<DatabaseRecord[]> {
     this.validateTableName(tableName);
 
-    // 1. Busca TODAS as partições desta tabela
+    // Validação de permissões
+    await this.verifyTableOwnership(userId, tableName);
+    await this.checkRateLimit(userId);
+
+    // Limites de paginação
+    const limit = Math.min(
+      options.pagination?.limit || DATABASE_NODE_CONFIG.DEFAULT_QUERY_LIMIT,
+      DATABASE_NODE_CONFIG.MAX_QUERY_LIMIT,
+    );
+    const offset = options.pagination?.offset || 0;
+
+    // 1. Busca partições com LIMITE (evitar DoS)
+    const maxPartitions = DATABASE_NODE_CONFIG.MAX_PARTITIONS_TO_SCAN;
     const partitions = await prisma.dataTable.findMany({
       where: { userId, tableName },
       orderBy: { partition: 'asc' },
+      take: maxPartitions,
     });
 
     if (partitions.length === 0) {
@@ -277,16 +420,32 @@ export class DatabaseNodeService {
       );
     }
 
-    // 2. Agrega dados de todas as partições
-    let allRecords: DatabaseRecord[] = [];
-    for (const partition of partitions) {
-      const records = partition.data as DatabaseRecord[];
-      allRecords = allRecords.concat(records);
+    if (partitions.length >= maxPartitions) {
+      console.warn(
+        `⚠️ Query limitada a ${maxPartitions} partições. Considere usar filtros mais específicos.`,
+      );
     }
 
-    // 3. Aplica filtros
-    if (options.filters) {
-      allRecords = this.applyFilters(allRecords, options.filters);
+    // 2. Processa partições incrementalmente (não carregar tudo)
+    let allRecords: DatabaseRecord[] = [];
+    let recordsFound = 0;
+
+    for (const partition of partitions) {
+      // Se já temos registros suficientes, parar
+      if (recordsFound >= offset + limit) {
+        break;
+      }
+
+      const records = partition.data as DatabaseRecord[];
+      let partitionRecords = records;
+
+      // 3. Aplica filtros ANTES de concatenar
+      if (options.filters) {
+        partitionRecords = this.applyFilters(partitionRecords, options.filters);
+      }
+
+      allRecords = allRecords.concat(partitionRecords);
+      recordsFound = allRecords.length;
     }
 
     // 4. Ordenação
@@ -299,12 +458,6 @@ export class DatabaseNodeService {
     }
 
     // 5. Paginação
-    const limit = Math.min(
-      options.pagination?.limit || DATABASE_NODE_CONFIG.DEFAULT_QUERY_LIMIT,
-      DATABASE_NODE_CONFIG.MAX_QUERY_LIMIT,
-    );
-    const offset = options.pagination?.offset || 0;
-
     return allRecords.slice(offset, offset + limit);
   }
 
@@ -319,57 +472,66 @@ export class DatabaseNodeService {
   ): Promise<WriteResult> {
     this.validateTableName(tableName);
 
-    // Busca todas as partições
-    const partitions = await prisma.dataTable.findMany({
-      where: { userId, tableName },
-      orderBy: { partition: 'asc' },
-    });
+    // Validação de permissões
+    await this.verifyTableOwnership(userId, tableName);
+    await this.checkRateLimit(userId);
 
-    if (partitions.length === 0) {
-      throw this.createError(
-        'TABLE_NOT_FOUND',
-        `Tabela "${tableName}" não existe`,
-      );
-    }
-
-    let totalUpdated = 0;
-    const updatedRecords: DatabaseRecord[] = [];
-
-    // Atualiza em cada partição
-    for (const partition of partitions) {
-      let records = partition.data as DatabaseRecord[];
-      let modified = false;
-
-      // Filtra e atualiza registros que atendem condições
-      records = records.map((record) => {
-        if (this.matchesFilters(record, filters)) {
-          modified = true;
-          totalUpdated++;
-          const updatedRecord = {
-            ...record,
-            ...updates,
-            _updatedAt: new Date().toISOString(),
-          };
-          updatedRecords.push(updatedRecord);
-          return updatedRecord;
-        }
-        return record;
+    // USAR TRANSACTION para garantir atomicidade
+    const result = await prisma.$transaction(async (tx) => {
+      // Busca todas as partições
+      const partitions = await tx.dataTable.findMany({
+        where: { userId, tableName },
+        orderBy: { partition: 'asc' },
       });
 
-      // Salva apenas se houve mudança
-      if (modified) {
-        await prisma.dataTable.update({
-          where: { id: partition.id },
-          data: { data: records as any },
-        });
+      if (partitions.length === 0) {
+        throw this.createError(
+          'TABLE_NOT_FOUND',
+          `Tabela "${tableName}" não existe`,
+        );
       }
-    }
 
-    return {
-      success: true,
-      affected: totalUpdated,
-      records: updatedRecords,
-    };
+      let totalUpdated = 0;
+      const updatedRecords: DatabaseRecord[] = [];
+
+      // Atualiza em cada partição
+      for (const partition of partitions) {
+        let records = partition.data as DatabaseRecord[];
+        let modified = false;
+
+        // Filtra e atualiza registros que atendem condições
+        records = records.map((record) => {
+          if (this.matchesFilters(record, filters)) {
+            modified = true;
+            totalUpdated++;
+            const updatedRecord = {
+              ...record,
+              ...updates,
+              _updatedAt: new Date().toISOString(),
+            };
+            updatedRecords.push(updatedRecord);
+            return updatedRecord;
+          }
+          return record;
+        });
+
+        // Salva apenas se houve mudança
+        if (modified) {
+          await tx.dataTable.update({
+            where: { id: partition.id },
+            data: { data: records as any },
+          });
+        }
+      }
+
+      return {
+        success: true,
+        affected: totalUpdated,
+        records: updatedRecords,
+      };
+    });
+
+    return result;
   }
 
   // ============================================
@@ -382,48 +544,57 @@ export class DatabaseNodeService {
   ): Promise<WriteResult> {
     this.validateTableName(tableName);
 
-    const partitions = await prisma.dataTable.findMany({
-      where: { userId, tableName },
-      orderBy: { partition: 'asc' },
-    });
+    // Validação de permissões
+    await this.verifyTableOwnership(userId, tableName);
+    await this.checkRateLimit(userId);
 
-    if (partitions.length === 0) {
-      throw this.createError(
-        'TABLE_NOT_FOUND',
-        `Tabela "${tableName}" não existe`,
-      );
-    }
-
-    let totalDeleted = 0;
-
-    for (const partition of partitions) {
-      let records = partition.data as DatabaseRecord[];
-      const initialCount = records.length;
-
-      // Remove registros que atendem filtros
-      records = records.filter((record) => {
-        const shouldDelete = this.matchesFilters(record, filters);
-        if (shouldDelete) totalDeleted++;
-        return !shouldDelete;
+    // USAR TRANSACTION para garantir atomicidade
+    const result = await prisma.$transaction(async (tx) => {
+      const partitions = await tx.dataTable.findMany({
+        where: { userId, tableName },
+        orderBy: { partition: 'asc' },
       });
 
-      // Atualiza se houve remoção
-      if (records.length !== initialCount) {
-        await prisma.dataTable.update({
-          where: { id: partition.id },
-          data: {
-            data: records as any,
-            recordCount: records.length,
-            isFull: false, // Não está mais cheia após deletar
-          },
-        });
+      if (partitions.length === 0) {
+        throw this.createError(
+          'TABLE_NOT_FOUND',
+          `Tabela "${tableName}" não existe`,
+        );
       }
-    }
 
-    return {
-      success: true,
-      affected: totalDeleted,
-    };
+      let totalDeleted = 0;
+
+      for (const partition of partitions) {
+        let records = partition.data as DatabaseRecord[];
+        const initialCount = records.length;
+
+        // Remove registros que atendem filtros
+        records = records.filter((record) => {
+          const shouldDelete = this.matchesFilters(record, filters);
+          if (shouldDelete) totalDeleted++;
+          return !shouldDelete;
+        });
+
+        // Atualiza se houve remoção
+        if (records.length !== initialCount) {
+          await tx.dataTable.update({
+            where: { id: partition.id },
+            data: {
+              data: records as any,
+              recordCount: records.length,
+              isFull: records.length < this.MAX_PARTITION_SIZE, // Recalcula isFull
+            },
+          });
+        }
+      }
+
+      return {
+        success: true,
+        affected: totalDeleted,
+      };
+    });
+
+    return result;
   }
 
   // ============================================
@@ -515,8 +686,7 @@ export class DatabaseNodeService {
     record: Record<string, any>,
     schema: TableSchema,
   ): void {
-    if (!DATABASE_NODE_CONFIG.STRICT_TYPE_VALIDATION) return;
-
+    // SEMPRE validar tipos (remover a condição STRICT_TYPE_VALIDATION)
     for (const column of schema.columns) {
       const value = record[column.name];
 
@@ -534,13 +704,13 @@ export class DatabaseNodeService {
         continue;
       }
 
-      // Valida tipo
+      // Valida tipo (sempre, mesmo se não required)
       if (value !== undefined && value !== null) {
         const isValid = this.validateFieldType(value, column.type);
         if (!isValid) {
           throw this.createError(
             'INVALID_FIELD_TYPE',
-            `Campo "${column.name}" deve ser do tipo "${column.type}"`,
+            `Campo "${column.name}" deve ser do tipo "${column.type}". Valor recebido: "${value}" (tipo: ${typeof value})`,
           );
         }
       }
@@ -548,19 +718,56 @@ export class DatabaseNodeService {
   }
 
   private validateFieldType(value: any, type: string): boolean {
+    // Se valor é null/undefined, só é válido se não for required
+    if (value === null || value === undefined) {
+      return true; // Será tratado pelo validateRecord
+    }
+
     switch (type) {
       case 'string':
         return typeof value === 'string';
+
       case 'number':
-        return typeof value === 'number' && !isNaN(value);
+        // Validação mais rigorosa para number
+        if (typeof value === 'number') {
+          return !isNaN(value) && isFinite(value);
+        }
+        // Tentar converter string para number
+        if (typeof value === 'string') {
+          const num = Number(value);
+          return !isNaN(num) && isFinite(num);
+        }
+        return false;
+
       case 'boolean':
         return typeof value === 'boolean';
+
       case 'date':
-        return typeof value === 'string' && !isNaN(Date.parse(value));
+        // Validação mais rigorosa para date
+        if (typeof value !== 'string') return false;
+
+        // Rejeitar timestamps Unix puros (apenas números)
+        if (/^\d+$/.test(value)) return false;
+
+        // Aceitar apenas formatos ISO 8601 ou DD/MM/YYYY
+        const isoDate = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/;
+        const brDate = /^\d{2}\/\d{2}\/\d{4}$/;
+
+        if (isoDate.test(value) || brDate.test(value)) {
+          const parsed = new Date(value);
+          return !isNaN(parsed.getTime());
+        }
+
+        return false;
+
       case 'array':
         return Array.isArray(value);
+
       case 'object':
-        return typeof value === 'object' && !Array.isArray(value);
+        return (
+          typeof value === 'object' && !Array.isArray(value) && value !== null
+        );
+
       default:
         return true;
     }

@@ -296,6 +296,59 @@ async function handleGet(
 // ============================================
 
 /**
+ * Sanitiza valores resolvidos para prevenir injeção
+ */
+function sanitizeValue(value: any): any {
+  // Se for string, escapar caracteres perigosos
+  if (typeof value === 'string') {
+    // Remover caracteres de controle
+    return value.replace(/[\x00-\x1F\x7F]/g, '');
+  }
+
+  // Se for objeto, validar profundidade
+  if (typeof value === 'object' && value !== null) {
+    const validateDepth = (obj: any, depth: number = 0): void => {
+      const MAX_DEPTH = 5;
+      const MAX_PROPERTIES = 100;
+
+      if (depth > MAX_DEPTH) {
+        throw new Error(`Objeto muito profundo: máximo ${MAX_DEPTH} níveis`);
+      }
+
+      if (Array.isArray(obj)) {
+        obj.forEach((item) => {
+          if (typeof item === 'object' && item !== null) {
+            validateDepth(item, depth + 1);
+          }
+        });
+      } else {
+        const keys = Object.keys(obj);
+        if (keys.length > MAX_PROPERTIES) {
+          throw new Error(
+            `Objeto com muitas propriedades: máximo ${MAX_PROPERTIES}`,
+          );
+        }
+
+        keys.forEach((key) => {
+          if (BLOCKED_PROPERTIES.has(key)) {
+            throw new Error(`Propriedade bloqueada detectada: ${key}`);
+          }
+
+          const val = obj[key];
+          if (typeof val === 'object' && val !== null) {
+            validateDepth(val, depth + 1);
+          }
+        });
+      }
+    };
+
+    validateDepth(value);
+  }
+
+  return value;
+}
+
+/**
  * Resolve variáveis no formato {{variavel}} em um objeto
  */
 function resolveVariables(
@@ -314,6 +367,11 @@ function resolveVariables(
   if (obj && typeof obj === 'object') {
     const resolved: any = {};
     for (const [key, value] of Object.entries(obj)) {
+      // Bloquear chaves perigosas
+      if (BLOCKED_PROPERTIES.has(key)) {
+        console.error(`🚨 Tentativa de criar propriedade bloqueada: ${key}`);
+        continue; // Pula a propriedade
+      }
       resolved[key] = resolveVariables(value, input, context);
     }
     return resolved;
@@ -340,29 +398,68 @@ function resolveString(
     hasVariables = true;
     const trimmedPath = path.trim();
 
-    // Tenta resolver de múltiplas fontes
-    const value = resolveValue(trimmedPath, { input, ...context.variables });
+    try {
+      // Tenta resolver de múltiplas fontes
+      const value = resolveValue(trimmedPath, { input, ...context.variables });
 
-    if (value === undefined) {
-      console.warn(`⚠️  Variável não encontrada: {{${trimmedPath}}}`);
+      if (value === undefined) {
+        console.warn(`⚠️  Variável não encontrada: {{${trimmedPath}}}`);
+        return match;
+      }
+
+      // Sanitizar o valor resolvido
+      const sanitized = sanitizeValue(value);
+
+      return sanitized !== undefined ? String(sanitized) : match;
+    } catch (error: any) {
+      console.error(
+        `🚨 Erro ao resolver variável {{${trimmedPath}}}:`,
+        error.message,
+      );
+      throw error; // Propagar erro de segurança
     }
-
-    return value !== undefined ? String(value) : match;
   });
 
   // Se a string inteira era uma variável, retorna o valor original (não string)
   if (hasVariables && str.match(/^\{\{[^}]+\}\}$/)) {
     const path = str.slice(2, -2).trim();
-    return resolveValue(path, { input, ...context.variables });
+    try {
+      const value = resolveValue(path, { input, ...context.variables });
+      return sanitizeValue(value);
+    } catch (error: any) {
+      console.error(`🚨 Erro ao resolver variável {{${path}}}:`, error.message);
+      throw error; // Propagar erro de segurança
+    }
   }
 
   return resolved;
 }
 
 /**
- * Resolve um caminho de propriedade (ex: "input.body.name" ou "$nodes.xxx.output")
+ * Lista de propriedades bloqueadas por segurança (prototype pollution)
  */
-function resolveValue(path: string, data: any): any {
+const BLOCKED_PROPERTIES = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__',
+]);
+
+/**
+ * Resolve um caminho de propriedade (ex: "input.body.name" ou "$nodes.xxx.output")
+ * @throws Error se tentar acessar propriedades perigosas
+ */
+function resolveValue(path: string, data: any, depth: number = 0): any {
+  // Proteção contra recursão infinita
+  const MAX_DEPTH = 10;
+  if (depth > MAX_DEPTH) {
+    console.warn(`⚠️  Profundidade máxima atingida ao resolver: ${path}`);
+    return undefined;
+  }
+
   // Remove o $ inicial se existir (ex: $nodes -> nodes, $memory -> memory)
   const cleanPath = path.startsWith('$') ? path.substring(1) : path;
 
@@ -370,9 +467,26 @@ function resolveValue(path: string, data: any): any {
   let current = data;
 
   for (const part of parts) {
+    // Bloquear acesso a propriedades perigosas
+    if (BLOCKED_PROPERTIES.has(part)) {
+      console.error(`🚨 Tentativa de acesso a propriedade bloqueada: ${part}`);
+      throw new Error(
+        `Acesso negado: propriedade "${part}" não pode ser acessada por segurança`,
+      );
+    }
+
     if (current === null || current === undefined) {
       return undefined;
     }
+
+    // Validar que current é um objeto antes de acessar
+    if (typeof current !== 'object') {
+      console.warn(
+        `⚠️  Tentativa de acessar propriedade "${part}" em tipo ${typeof current}`,
+      );
+      return undefined;
+    }
+
     current = current[part];
   }
 

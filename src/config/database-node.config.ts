@@ -50,6 +50,11 @@ export const DATABASE_NODE_CONFIG = {
    * Limite máximo para queries (evita sobrecarga)
    */
   MAX_QUERY_LIMIT: 10000,
+
+  /**
+   * Máximo de partições a escanear por query (evita DoS)
+   */
+  MAX_PARTITIONS_TO_SCAN: 100,
 } as const;
 
 export type DatabaseNodeConfigType = typeof DATABASE_NODE_CONFIG;

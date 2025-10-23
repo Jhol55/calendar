@@ -6,8 +6,7 @@ import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, RefreshCw, Save } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ColumnFilter, type FilterCondition } from './column-filter';
-import { ColumnActions } from './column-actions';
+import { type FilterCondition } from './column-filter';
 import { DraggableColumnHeader } from './draggable-column-header';
 import { EditColumnDialog } from '@/components/features/forms/database-spreadsheet/edit-table-column/edit-table-column';
 import { DeleteColumnDialog } from './delete-column';
@@ -70,6 +69,7 @@ export function DatabaseSpreadsheet({
     column: string;
   } | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<
     { index: number; id: string }[]
   >([]);
@@ -323,6 +323,7 @@ export function DatabaseSpreadsheet({
 
     setHasUnsavedChanges(true);
     setEditingCell(null);
+    setValidationError(null);
   };
 
   const handleAddRow = () => {
@@ -607,6 +608,84 @@ export function DatabaseSpreadsheet({
     }
   };
 
+  // Função para validar valor em tempo real
+  const validateCellValue = (
+    value: string,
+    columnType: string,
+  ): string | null => {
+    if (!value || value.trim() === '') {
+      return null; // Valores vazios são permitidos
+    }
+
+    switch (columnType) {
+      case 'string':
+        return null; // Strings sempre são válidas
+
+      case 'number':
+        const num = Number(value);
+        if (isNaN(num) || !isFinite(num)) {
+          return `"${value}" não é um número válido`;
+        }
+        return null;
+
+      case 'boolean':
+        const lowerValue = value.toLowerCase();
+        if (
+          !['true', 'false', '1', '0', 'sim', 'não', 'yes', 'no'].includes(
+            lowerValue,
+          )
+        ) {
+          return `"${value}" não é um booleano válido (true/false)`;
+        }
+        return null;
+
+      case 'date':
+        // Rejeitar timestamps Unix puros
+        if (/^\d+$/.test(value)) {
+          return `"${value}" não é uma data válida (use DD/MM/AAAA ou AAAA-MM-DD)`;
+        }
+
+        // Aceitar formatos ISO 8601 ou DD/MM/YYYY
+        const isoDate = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/;
+        const brDate = /^\d{2}\/\d{2}\/\d{4}$/;
+
+        if (isoDate.test(value) || brDate.test(value)) {
+          const parsed = new Date(value);
+          if (isNaN(parsed.getTime())) {
+            return `"${value}" não é uma data válida`;
+          }
+          return null;
+        }
+
+        return `"${value}" não é uma data válida (use DD/MM/AAAA ou AAAA-MM-DD)`;
+
+      case 'array':
+        try {
+          const parsed = JSON.parse(value);
+          if (!Array.isArray(parsed)) {
+            return `"${value}" não é um array válido`;
+          }
+          return null;
+        } catch {
+          return `"${value}" não é um array JSON válido`;
+        }
+
+      case 'object':
+        try {
+          const parsed = JSON.parse(value);
+          if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return `"${value}" não é um objeto válido`;
+          }
+          return null;
+        } catch {
+          return `"${value}" não é um objeto JSON válido`;
+        }
+
+      default:
+        return null;
+    }
+  };
+
   const handleEditCell = (
     rowId: string,
     column: string,
@@ -690,6 +769,7 @@ export function DatabaseSpreadsheet({
         column,
       });
       setEditingValue(String(currentValue || ''));
+      setValidationError(null);
     }
   };
 
@@ -1439,37 +1519,62 @@ export function DatabaseSpreadsheet({
                               >
                                 {editingCell?.rowId === row._id &&
                                 editingCell?.column === col.name ? (
-                                  <input
-                                    type="text"
-                                    value={editingValue}
-                                    onChange={(e) =>
-                                      setEditingValue(e.target.value)
-                                    }
-                                    onBlur={() => {
-                                      handleUpdateCell(
-                                        row._id,
-                                        col.name,
-                                        editingValue,
-                                        String(row[col.name] || ''),
-                                      );
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        handleUpdateCell(
-                                          row._id,
-                                          col.name,
-                                          editingValue,
-                                          String(row[col.name] || ''),
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      value={editingValue}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setEditingValue(value);
+
+                                        // Validar em tempo real
+                                        const error = validateCellValue(
+                                          value,
+                                          col.type,
                                         );
-                                      }
-                                      if (e.key === 'Escape') {
-                                        setEditingCell(null);
-                                      }
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    autoFocus
-                                    className="!text-sm w-full rounded-md border border-gray-300 bg-white p-2.5 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d]"
-                                  />
+                                        setValidationError(error);
+                                      }}
+                                      onBlur={() => {
+                                        if (!validationError) {
+                                          handleUpdateCell(
+                                            row._id,
+                                            col.name,
+                                            editingValue,
+                                            String(row[col.name] || ''),
+                                          );
+                                        }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (
+                                          e.key === 'Enter' &&
+                                          !validationError
+                                        ) {
+                                          handleUpdateCell(
+                                            row._id,
+                                            col.name,
+                                            editingValue,
+                                            String(row[col.name] || ''),
+                                          );
+                                        }
+                                        if (e.key === 'Escape') {
+                                          setEditingCell(null);
+                                          setValidationError(null);
+                                        }
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      autoFocus
+                                      className={`!text-sm w-full rounded-md border p-2.5 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 ${
+                                        validationError
+                                          ? 'border-red-500 bg-red-50 focus:ring-red-500'
+                                          : 'border-gray-300 bg-white focus:ring-[#5c5e5d]'
+                                      }`}
+                                    />
+                                    {validationError && (
+                                      <div className="absolute top-full left-0 mt-1 px-2 py-1 bg-red-100 border border-red-300 rounded text-xs text-red-700 whitespace-nowrap z-10">
+                                        ⚠️ {validationError}
+                                      </div>
+                                    )}
+                                  </div>
                                 ) : (
                                   <div
                                     className="cursor-pointer hover:bg-transparent p-1.5 rounded min-h-[28px] transition-colors"

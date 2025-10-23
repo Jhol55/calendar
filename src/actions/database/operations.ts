@@ -184,6 +184,41 @@ export async function updateCell(
       },
     });
 
+    if (dataRecords.length === 0) {
+      return {
+        success: false,
+        message: 'Table not found',
+        code: 404,
+      };
+    }
+
+    // Buscar schema da tabela (partição 0)
+    const schemaPartition = dataRecords.find((r) => r.partition === 0);
+    if (!schemaPartition) {
+      return {
+        success: false,
+        message: 'Table schema not found',
+        code: 404,
+      };
+    }
+
+    const schema = schemaPartition.schema as {
+      columns: Array<{ name: string; type: string }>;
+    };
+    const columnDef = schema.columns.find((col) => col.name === column);
+
+    if (columnDef) {
+      // VALIDAÇÃO DE TIPO ANTES DE ATUALIZAR
+      const validationError = validateCellValue(value, columnDef.type);
+      if (validationError) {
+        return {
+          success: false,
+          message: validationError,
+          code: 400,
+        };
+      }
+    }
+
     // Encontrar a partição que contém o registro
     for (const record of dataRecords) {
       const data = record.data as Array<Record<string, unknown>>;
@@ -226,6 +261,84 @@ export async function updateCell(
   }
 }
 
+/**
+ * Valida se um valor é compatível com o tipo da coluna
+ */
+function validateCellValue(value: string, columnType: string): string | null {
+  if (!value || value.trim() === '') {
+    return null; // Valores vazios são permitidos
+  }
+
+  switch (columnType) {
+    case 'string':
+      return null; // Strings sempre são válidas
+
+    case 'number':
+      // Tentar converter para number
+      const num = Number(value);
+      if (isNaN(num) || !isFinite(num)) {
+        return `Valor "${value}" não é um número válido`;
+      }
+      return null;
+
+    case 'boolean':
+      const lowerValue = value.toLowerCase();
+      if (
+        !['true', 'false', '1', '0', 'sim', 'não', 'yes', 'no'].includes(
+          lowerValue,
+        )
+      ) {
+        return `Valor "${value}" não é um booleano válido (true/false)`;
+      }
+      return null;
+
+    case 'date':
+      // Rejeitar timestamps Unix puros
+      if (/^\d+$/.test(value)) {
+        return `Valor "${value}" não é uma data válida (use formato DD/MM/AAAA ou AAAA-MM-DD)`;
+      }
+
+      // Aceitar formatos ISO 8601 ou DD/MM/YYYY
+      const isoDate = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/;
+      const brDate = /^\d{2}\/\d{2}\/\d{4}$/;
+
+      if (isoDate.test(value) || brDate.test(value)) {
+        const parsed = new Date(value);
+        if (isNaN(parsed.getTime())) {
+          return `Valor "${value}" não é uma data válida`;
+        }
+        return null;
+      }
+
+      return `Valor "${value}" não é uma data válida (use formato DD/MM/AAAA ou AAAA-MM-DD)`;
+
+    case 'array':
+      try {
+        const parsed = JSON.parse(value);
+        if (!Array.isArray(parsed)) {
+          return `Valor "${value}" não é um array válido`;
+        }
+        return null;
+      } catch {
+        return `Valor "${value}" não é um array JSON válido`;
+      }
+
+    case 'object':
+      try {
+        const parsed = JSON.parse(value);
+        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return `Valor "${value}" não é um objeto válido`;
+        }
+        return null;
+      } catch {
+        return `Valor "${value}" não é um objeto JSON válido`;
+      }
+
+    default:
+      return null;
+  }
+}
+
 export async function addRow(
   tableName: string,
   data: Record<string, unknown>,
@@ -249,17 +362,54 @@ export async function addRow(
       };
     }
 
-    // Buscar a partição ativa (não cheia)
-    const activePartition = await prisma.dataTable.findFirst({
+    // Buscar todas as partições da tabela para obter schema
+    const dataRecords = await prisma.dataTable.findMany({
       where: {
         userId,
         tableName,
-        isFull: false,
-      },
-      orderBy: {
-        partition: 'desc',
       },
     });
+
+    if (dataRecords.length === 0) {
+      return {
+        success: false,
+        message: 'Table not found',
+        code: 404,
+      };
+    }
+
+    // Buscar schema da tabela (partição 0)
+    const schemaPartition = dataRecords.find((r) => r.partition === 0);
+    if (!schemaPartition) {
+      return {
+        success: false,
+        message: 'Table schema not found',
+        code: 404,
+      };
+    }
+
+    const schema = schemaPartition.schema as {
+      columns: Array<{ name: string; type: string }>;
+    };
+
+    // VALIDAÇÃO DE TIPOS PARA CADA CAMPO
+    for (const column of schema.columns) {
+      const value = data[column.name];
+
+      if (value !== undefined && value !== null) {
+        const validationError = validateCellValue(String(value), column.type);
+        if (validationError) {
+          return {
+            success: false,
+            message: `Campo "${column.name}": ${validationError}`,
+            code: 400,
+          };
+        }
+      }
+    }
+
+    // Buscar a partição ativa (não cheia)
+    const activePartition = dataRecords.find((record) => !record.isFull);
 
     if (!activePartition) {
       return {
