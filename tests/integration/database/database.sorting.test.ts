@@ -2,7 +2,7 @@
 // TESTES DE ORDENAÇÃO - DatabaseNodeService
 // ============================================
 
-import { createTestService, generateTestUserId } from '../setup';
+import { createTestService, generateTestUserId } from './setup';
 import { DatabaseNodeService } from '@/services/database/database.service';
 
 describe('DatabaseNodeService - Ordenação', () => {

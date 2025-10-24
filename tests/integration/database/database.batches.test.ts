@@ -21,19 +21,19 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
   });
 
   // ============================================
-  // 9.1. Update em Lotes (BATCH_SIZE = 2)
+  // 9.1. Update em Lotes (BATCH_SIZE = 10)
   // ============================================
   describe('Update em Lotes', () => {
     it('deve processar update em lotes quando > BATCH_SIZE', async () => {
-      // Inserir 5 registros (maior que BATCH_SIZE = 2)
-      for (let i = 0; i < 5; i++) {
+      // Inserir 15 registros (maior que BATCH_SIZE = 10)
+      for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'batch_test', {
           title: `Task ${i}`,
           status: 'pending',
         });
       }
 
-      // Atualizar todos → deve processar em 3 lotes (2+2+1)
+      // Atualizar todos → deve processar em 2 lotes (10+5)
       const result = await service.updateRecords(
         userId,
         'batch_test',
@@ -41,15 +41,15 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
         { status: 'done' },
       );
 
-      expect(result.affected).toBe(5);
+      expect(result.affected).toBe(15);
       expect(result.batchInfo).toBeDefined();
-      expect(result.batchInfo?.totalBatches).toBe(3); // 2 + 2 + 1
+      expect(result.batchInfo?.totalBatches).toBe(2); // 10 + 5
       expect(result.batchInfo?.executionTimeMs).toBeGreaterThan(0);
     });
 
     it('update em lote deve atualizar todos os registros', async () => {
-      // Inserir 5 registros
-      for (let i = 0; i < 5; i++) {
+      // Inserir 15 registros
+      for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'batch_test', {
           title: `Task ${i}`,
           status: 'pending',
@@ -67,7 +67,7 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
       // Verificar que todos foram atualizados
       const records = await service.getRecords(userId, 'batch_test', {});
 
-      expect(records).toHaveLength(5);
+      expect(records).toHaveLength(15);
       expect(records.every((r) => r.status === 'completed')).toBe(true);
     });
 
@@ -101,22 +101,22 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
   // ============================================
   describe('Delete em Lotes', () => {
     it('deve processar delete em lotes quando > BATCH_SIZE', async () => {
-      // Inserir 5 registros
-      for (let i = 0; i < 5; i++) {
+      // Inserir 15 registros (maior que BATCH_SIZE = 10)
+      for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'batch_test', {
           title: `Task ${i}`,
         });
       }
 
-      // Deletar todos → deve processar em 3 lotes (2+2+1)
+      // Deletar todos → deve processar em 2 lotes (10+5)
       const result = await service.deleteRecords(userId, 'batch_test', {
         condition: 'AND',
         rules: [],
       });
 
-      expect(result.affected).toBe(5);
+      expect(result.affected).toBe(15);
       expect(result.batchInfo).toBeDefined();
-      expect(result.batchInfo?.totalBatches).toBe(3);
+      expect(result.batchInfo?.totalBatches).toBe(2);
     });
 
     it('delete em lote deve remover todos os registros', async () => {
@@ -169,8 +169,8 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
   // ============================================
   describe('Atualização de isFull após deleção', () => {
     it('partição cheia deve virar isFull=false após deleção', async () => {
-      // Inserir 5 registros para encher a primeira partição
-      for (let i = 0; i < 5; i++) {
+      // Inserir 50 registros para encher a primeira partição (MAX_PARTITION_SIZE = 50)
+      for (let i = 0; i < 50; i++) {
         await service.insertRecord(userId, 'batch_test', {
           title: `Task ${i}`,
         });
@@ -179,22 +179,24 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
       // Verificar que a partição está cheia
       let stats = await service.getTableStats(userId, 'batch_test');
       expect(stats.fullPartitions).toBe(1);
+      expect(stats.totalPartitions).toBe(1);
 
-      // Deletar 2 registros
+      // Deletar 1 registro
       await service.deleteRecords(userId, 'batch_test', {
         condition: 'AND',
-        rules: [{ field: 'title', operator: 'contains', value: 'Task 0' }],
+        rules: [{ field: 'title', operator: 'equals', value: 'Task 0' }],
       });
 
       // Verificar que a partição não está mais cheia
       stats = await service.getTableStats(userId, 'batch_test');
       expect(stats.fullPartitions).toBe(0);
+      expect(stats.totalRecords).toBe(49);
       expect(stats.activePartition).toBe(0); // Partição 0 agora está ativa
     });
 
     it('múltiplas deleções devem atualizar isFull corretamente', async () => {
-      // Inserir 10 registros (2 partições: 5 + 5)
-      for (let i = 0; i < 10; i++) {
+      // Inserir 100 registros (2 partições cheias: 50 + 50)
+      for (let i = 0; i < 100; i++) {
         await service.insertRecord(userId, 'batch_test', {
           title: `Task ${i}`,
         });
@@ -205,22 +207,22 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
       expect(stats.totalPartitions).toBe(2);
       expect(stats.fullPartitions).toBe(2); // Ambas cheias
 
-      // Deletar 3 registros
+      // Deletar 3 registros (2 da partição 0, 1 da partição 1)
       await service.deleteRecords(userId, 'batch_test', {
         condition: 'AND',
         rules: [
           {
             field: 'title',
             operator: 'in',
-            value: ['Task 0', 'Task 1', 'Task 5'],
+            value: ['Task 0', 'Task 1', 'Task 50'],
           },
         ],
       });
 
-      // Verificar que pelo menos uma partição não está mais cheia
+      // Verificar que ambas as partições não estão mais cheias
       stats = await service.getTableStats(userId, 'batch_test');
-      expect(stats.fullPartitions).toBeLessThan(2);
-      expect(stats.totalRecords).toBe(7);
+      expect(stats.fullPartitions).toBe(0); // Ambas têm < 50 registros
+      expect(stats.totalRecords).toBe(97);
     });
   });
 
@@ -229,8 +231,8 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
   // ============================================
   describe('Performance de Lotes', () => {
     it('processamento em lotes deve incluir métricas de tempo', async () => {
-      // Inserir 5 registros
-      for (let i = 0; i < 5; i++) {
+      // Inserir 15 registros (> BATCH_SIZE = 10)
+      for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'batch_test', {
           title: `Task ${i}`,
         });
@@ -246,13 +248,13 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
 
       expect(result.batchInfo).toBeDefined();
       expect(result.batchInfo?.executionTimeMs).toBeGreaterThan(0);
-      expect(result.batchInfo?.totalBatches).toBeGreaterThan(0);
+      expect(result.batchInfo?.totalBatches).toBe(2); // 10 + 5
       expect(result.batchInfo?.averageTimePerBatch).toBeGreaterThan(0);
     });
 
     it('lotes grandes devem ter tempo de execução proporcional', async () => {
-      // Inserir 10 registros
-      for (let i = 0; i < 10; i++) {
+      // Inserir 25 registros (> BATCH_SIZE = 10, força 3 batches)
+      for (let i = 0; i < 25; i++) {
         await service.insertRecord(userId, 'batch_test', {
           title: `Task ${i}`,
         });
@@ -260,7 +262,7 @@ describe('DatabaseNodeService - Processamento em Lotes', () => {
 
       const start = Date.now();
 
-      // Executar update em lotes
+      // Executar update em lotes (3 batches: 10+10+5)
       await service.updateRecords(
         userId,
         'batch_test',

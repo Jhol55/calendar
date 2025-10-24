@@ -213,10 +213,13 @@ async function handleUpdate(
   const resolvedFilters = resolveVariables(config.filters, input, context);
   const resolvedUpdates = resolveVariables(config.updates, input, context);
 
+  // Converter para FilterConfig se necessário
+  const filterConfig = normalizeFilterConfig(resolvedFilters);
+
   const result = await databaseNodeService.updateRecords(
     userId,
     config.tableName,
-    resolvedFilters,
+    filterConfig,
     resolvedUpdates,
   );
 
@@ -251,10 +254,13 @@ async function handleDelete(
   // Resolve variáveis nos filtros
   const resolvedFilters = resolveVariables(config.filters, input, context);
 
+  // Converter para FilterConfig se necessário
+  const filterConfig = normalizeFilterConfig(resolvedFilters);
+
   const result = await databaseNodeService.deleteRecords(
     userId,
     config.tableName,
-    resolvedFilters,
+    filterConfig,
   );
 
   return {
@@ -275,20 +281,54 @@ async function handleGet(
   input: any,
   context: ExecutionContext,
 ): Promise<any> {
-  // Resolve variáveis nas opções de query
-  const options = {
-    filters: config.filters
-      ? resolveVariables(config.filters, input, context)
-      : undefined,
-    sort: config.sort,
-    pagination: config.pagination,
+  // Resolve variáveis nos filtros
+  let filterConfig = undefined;
+  if (config.filters) {
+    const resolvedFilters = resolveVariables(config.filters, input, context);
+    filterConfig = normalizeFilterConfig(resolvedFilters);
+  }
+
+  // Montar opções de query com paginação
+  const options: any = {
+    filters: filterConfig,
   };
+
+  // Adicionar sort se fornecido
+  if (config.sort) {
+    options.sort = config.sort;
+  }
+
+  // Adicionar paginação (limit/offset ou pagination)
+  if (config.limit !== undefined || config.offset !== undefined) {
+    options.pagination = {
+      limit: config.limit,
+      offset: config.offset || 0,
+    };
+  } else if (config.pagination) {
+    options.pagination = config.pagination;
+  }
 
   const records = await databaseNodeService.getRecords(
     userId,
     config.tableName,
     options,
   );
+
+  // Para obter o count total (sem paginação), fazer outra query
+  let totalCount = records.length;
+  if (options.pagination) {
+    // Buscar o total sem limit/offset
+    const optionsWithoutPagination = {
+      filters: options.filters,
+      sort: options.sort,
+    };
+    const allRecords = await databaseNodeService.getRecords(
+      userId,
+      config.tableName,
+      optionsWithoutPagination,
+    );
+    totalCount = allRecords.length;
+  }
 
   // Parsear recursivamente strings JSON nos records
   const parsedRecords = parseJSONRecursively(records);
@@ -297,8 +337,8 @@ async function handleGet(
     success: true,
     operation: 'get',
     tableName: config.tableName,
-    count: parsedRecords.length,
-    records: parsedRecords,
+    count: totalCount, // Total de registros (sem paginação)
+    records: parsedRecords, // Registros paginados
     message: `${parsedRecords.length} registro(s) encontrado(s)`,
   };
 }
@@ -306,6 +346,32 @@ async function handleGet(
 // ============================================
 // HELPERS
 // ============================================
+
+/**
+ * Normaliza filtros para o formato FilterConfig
+ */
+function normalizeFilterConfig(filters: any): any {
+  // Se já é FilterConfig (tem condition e rules), retorna como está
+  if (
+    filters &&
+    typeof filters === 'object' &&
+    'condition' in filters &&
+    'rules' in filters
+  ) {
+    return filters;
+  }
+
+  // Se é array, converte para FilterConfig com AND
+  if (Array.isArray(filters)) {
+    return {
+      condition: 'AND' as const,
+      rules: filters,
+    };
+  }
+
+  // Se não é nenhum dos dois, retorna como está (pode ser undefined)
+  return filters;
+}
 
 /**
  * Sanitiza valores resolvidos para prevenir injeção

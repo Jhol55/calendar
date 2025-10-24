@@ -26,8 +26,8 @@ export async function getOrCreateConversation(
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: flowId || null,
-        nodeId: nodeId || null,
+        flowId: (flowId || null) as any,
+        nodeId: (nodeId || null) as any,
       },
     },
   });
@@ -40,8 +40,8 @@ export async function getOrCreateConversation(
   return prisma.agent_conversations.create({
     data: {
       userId,
-      flowId: flowId || null,
-      nodeId: nodeId || null,
+      flowId: (flowId || null) as any,
+      nodeId: (nodeId || null) as any,
       messages: [],
       maxLength,
       lastMessageAt: new Date(),
@@ -81,7 +81,7 @@ export async function addMessagesToHistory(
 
   // Pegar mensagens existentes
   const existingMessages =
-    (conversation.messages as ConversationMessage[]) || [];
+    (conversation.messages as unknown as ConversationMessage[]) || [];
 
   // Adicionar novas mensagens
   const allMessages = [...existingMessages, ...newMessages];
@@ -100,8 +100,8 @@ export async function addMessagesToHistory(
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: flowId || null,
-        nodeId: nodeId || null,
+        flowId: (flowId || null) as any,
+        nodeId: (nodeId || null) as any,
       },
     },
     data: {
@@ -123,8 +123,8 @@ export async function getConversationHistory(
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: flowId || null,
-        nodeId: nodeId || null,
+        flowId: (flowId || null) as any,
+        nodeId: (nodeId || null) as any,
       },
     },
   });
@@ -133,7 +133,8 @@ export async function getConversationHistory(
     return [];
   }
 
-  const messages = (conversation.messages as ConversationMessage[]) || [];
+  const messages =
+    (conversation.messages as unknown as ConversationMessage[]) || [];
 
   // Converter de volta para ChatMessage
   return messages.map((msg) => ({

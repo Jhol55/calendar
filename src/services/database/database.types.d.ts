@@ -140,11 +140,13 @@ export interface DatabaseNodeConfig {
   updates?: Record<string, any>;
 
   // Para update, delete, get
-  filters?: FilterConfig;
+  filters?: FilterConfig | FilterRule[]; // Suporta array ou FilterConfig
 
   // Para get
   sort?: SortConfig;
   pagination?: PaginationConfig;
+  limit?: number; // Paginação simplificada
+  offset?: number; // Paginação simplificada
 }
 
 /**

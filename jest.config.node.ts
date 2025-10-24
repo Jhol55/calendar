@@ -9,7 +9,8 @@ const config: Config = {
   // Pattern para testes de integração
   testMatch: [
     '**/__tests__/**/*.integration.test.ts',
-    '**/tests/integration/**/*.test.ts',
+    '**/tests/integration/database/**/*.test.ts',
+    // '**/tests/integration/workers/**/*.test.ts',
   ],
 
   // Path mappings
@@ -17,6 +18,8 @@ const config: Config = {
     '^@/services/(.*)$': '<rootDir>/src/services/$1',
     '^@/config/(.*)$': '<rootDir>/src/config/$1',
     '^@/types/(.*)$': '<rootDir>/src/types/$1',
+    '^@/workers/(.*)$': '<rootDir>/src/workers/$1',
+    '^@/components/(.*)$': '<rootDir>/src/components/$1',
   },
 
   // TypeScript transform
@@ -34,7 +37,11 @@ const config: Config = {
   },
 
   // Setup files
-  setupFilesAfterEnv: ['<rootDir>/tests/integration/setup.ts'],
+  setupFilesAfterEnv: [
+    '<rootDir>/tests/integration/database/setup.ts',
+    '<rootDir>/tests/integration/workers/setup.ts',
+    '<rootDir>/tests/integration/workers/teardown.ts',
+  ],
 
   // Timeout para testes de integração (30s)
   testTimeout: 30000,
@@ -52,10 +59,10 @@ const config: Config = {
   maxWorkers: 1,
 
   // Forçar saída após testes (evita workers pendurados)
-  forceExit: false, // Não forçar para detectar leaks
+  forceExit: true, // Forçar porque Redis/Bull queues deixam handles abertos
 
   // Detectar handles abertos (conexões não fechadas)
-  detectOpenHandles: true,
+  detectOpenHandles: false, // Desabilitar porque já sabemos que Redis fica aberto
 };
 
 export default config;

@@ -317,7 +317,12 @@ async function processNode(
         );
         break;
       case 'memory':
-        result = await processMemoryNode(executionId, node, webhookData);
+        result = await processMemoryNode(
+          executionId,
+          node,
+          webhookData,
+          variableContext,
+        );
         break;
       case 'database':
         result = await processDatabaseNode(executionId, node, webhookData);
@@ -475,7 +480,7 @@ async function processTransformationNode(
 
   if (typeof transformationFn === 'function') {
     // Tentar chamar com config e context (a maioria dos helpers espera isso)
-    result = await transformationFn(
+    result = await (transformationFn as any)(
       transformationConfig,
       variableContext,
       executionId,

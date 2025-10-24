@@ -7,7 +7,7 @@ import {
   createTestServiceWithConfig,
   generateTestUserId,
   expectErrorCode,
-} from '../setup';
+} from './setup';
 import { DatabaseNodeService } from '@/services/database/database.service';
 
 describe('DatabaseNodeService - Segurança e Limites', () => {
@@ -22,40 +22,36 @@ describe('DatabaseNodeService - Segurança e Limites', () => {
   });
 
   // ============================================
-  // 10.1. checkTableLimit (MAX_TABLES = 2)
+  // 10.1. checkTableLimit (MAX_TABLES = 10)
   // ============================================
   describe('Limite de Tabelas', () => {
     it('deve permitir criar até MAX_TABLES tabelas', async () => {
-      // Criar 2 tabelas (MAX_TABLES = 2)
-      await service.addColumns(userId1, 'table1', [
-        { name: 'field', type: 'string' },
-      ]);
+      // Criar 10 tabelas (MAX_TABLES = 10)
+      for (let i = 1; i <= 10; i++) {
+        await service.addColumns(userId1, `table${i}`, [
+          { name: 'field', type: 'string' },
+        ]);
+      }
 
-      await service.addColumns(userId1, 'table2', [
-        { name: 'field', type: 'string' },
-      ]);
-
-      // Verificar que ambas foram criadas
+      // Verificar que todas foram criadas
       const stats1 = await service.getTableStats(userId1, 'table1');
-      const stats2 = await service.getTableStats(userId1, 'table2');
+      const stats10 = await service.getTableStats(userId1, 'table10');
 
       expect(stats1).toBeDefined();
-      expect(stats2).toBeDefined();
+      expect(stats10).toBeDefined();
     });
 
-    it('deve lançar erro TABLE_LIMIT ao tentar criar 3ª tabela', async () => {
-      // Criar 2 tabelas
-      await service.addColumns(userId1, 'table1', [
-        { name: 'field', type: 'string' },
-      ]);
+    it('deve lançar erro TABLE_LIMIT ao tentar criar 11ª tabela', async () => {
+      // Criar 10 tabelas
+      for (let i = 1; i <= 10; i++) {
+        await service.addColumns(userId1, `table${i}`, [
+          { name: 'field', type: 'string' },
+        ]);
+      }
 
-      await service.addColumns(userId1, 'table2', [
-        { name: 'field', type: 'string' },
-      ]);
-
-      // Tentar criar 3ª tabela → deve falhar
+      // Tentar criar 11ª tabela → deve falhar
       await expectErrorCode(
-        service.addColumns(userId1, 'table3', [
+        service.addColumns(userId1, 'table11', [
           { name: 'field', type: 'string' },
         ]),
         'TABLE_LIMIT',
@@ -63,27 +59,21 @@ describe('DatabaseNodeService - Segurança e Limites', () => {
     });
 
     it('limite de tabelas deve ser por usuário', async () => {
-      // User 1 cria 2 tabelas
-      await service.addColumns(userId1, 'table1', [
-        { name: 'field', type: 'string' },
-      ]);
-
-      await service.addColumns(userId1, 'table2', [
-        { name: 'field', type: 'string' },
-      ]);
-
-      // User 2 deve conseguir criar suas próprias tabelas
-      await expect(
-        service.addColumns(userId2, 'table1', [
+      // User 1 cria 10 tabelas
+      for (let i = 1; i <= 10; i++) {
+        await service.addColumns(userId1, `table${i}`, [
           { name: 'field', type: 'string' },
-        ]),
-      ).resolves.toBeDefined();
+        ]);
+      }
 
-      await expect(
-        service.addColumns(userId2, 'table2', [
-          { name: 'field', type: 'string' },
-        ]),
-      ).resolves.toBeDefined();
+      // User 2 deve conseguir criar suas próprias 10 tabelas
+      for (let i = 1; i <= 10; i++) {
+        await expect(
+          service.addColumns(userId2, `table${i}`, [
+            { name: 'field', type: 'string' },
+          ]),
+        ).resolves.toBeDefined();
+      }
     });
   });
 
@@ -299,7 +289,7 @@ describe('DatabaseNodeService - Segurança e Limites', () => {
     it('deve rejeitar nome de coluna vazio ou inválido', async () => {
       await expectErrorCode(
         service.addColumns(userId1, 'test_table', [
-          { name: '', type: 'string' } as any,
+          { name: '', type: 'string' },
         ]),
         'INVALID_COLUMN',
       );

@@ -303,8 +303,8 @@ export function sumArray(input: any): number {
         numericValues,
       );
       if (numericValues.length > 0) {
-        const objSum = numericValues.reduce(
-          (objSum, v) => objSum + Number(v),
+        const objSum = numericValues.reduce<number>(
+          (acc, v) => acc + Number(v),
           0,
         );
         console.log(

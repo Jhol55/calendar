@@ -620,6 +620,7 @@ export async function processMemoryNode(
   executionId: string,
   node: FlowNode,
   webhookData: WebhookJobData,
+  variableContext?: Record<string, unknown>,
 ): Promise<unknown> {
   console.log('🧠 Processing memory node');
 
@@ -651,35 +652,39 @@ export async function processMemoryNode(
 
     const userId = String(execution.flow.userId);
 
-    // Buscar dados de todos os nodes anteriores
-    const nodeExecutions =
-      (execution.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+    // Usar variableContext passado ou construir um novo
+    let context = variableContext;
+    if (!context) {
+      // Buscar dados de todos os nodes anteriores
+      const nodeExecutions =
+        (execution.nodeExecutions as unknown as NodeExecutionsRecord) || {};
 
-    // Criar objeto $nodes com saídas de todos os nodes anteriores
-    const $nodes: Record<string, { output: unknown }> = {};
-    Object.keys(nodeExecutions).forEach((nodeId) => {
-      const nodeExec = nodeExecutions[nodeId];
-      if (nodeExec?.result) {
-        $nodes[nodeId] = {
-          output: nodeExec.result,
-        };
-      }
-    });
+      // Criar objeto $nodes com saídas de todos os nodes anteriores
+      const $nodes: Record<string, { output: unknown }> = {};
+      Object.keys(nodeExecutions).forEach((nodeId) => {
+        const nodeExec = nodeExecutions[nodeId];
+        if (nodeExec?.result) {
+          $nodes[nodeId] = {
+            output: nodeExec.result,
+          };
+        }
+      });
 
-    // Buscar todas as memórias do usuário para o contexto
-    const $memory = await listarMemorias(userId);
+      // Buscar todas as memórias do usuário para o contexto
+      const $memory = await listarMemorias(userId);
 
-    // Preparar contexto para substituição de variáveis
-    const variableContext = {
-      $node: {
-        input: webhookData.body,
-      },
-      $nodes,
-      $memory,
-    };
+      // Preparar contexto para substituição de variáveis
+      context = {
+        $node: {
+          input: webhookData.body,
+        },
+        $nodes,
+        $memory,
+      };
+    }
 
     // Resolver variáveis no nome da memória
-    const resolvedMemoryName = replaceVariables(memoryName, variableContext);
+    const resolvedMemoryName = replaceVariables(memoryName, context);
 
     console.log(`🧠 Memory action: ${action} - name: ${resolvedMemoryName}`);
 
@@ -692,8 +697,8 @@ export async function processMemoryNode(
 
         // Processar cada item e substituir variáveis
         const resolvedItems = items.map((item) => {
-          const resolvedKey = replaceVariables(item.key, variableContext);
-          const resolvedValue = replaceVariables(item.value, variableContext);
+          const resolvedKey = replaceVariables(item.key, context);
+          const resolvedValue = replaceVariables(item.value, context);
 
           console.log('✅ [MEMORY-NODE] Resolved item:', {
             resolvedKey,
@@ -711,8 +716,8 @@ export async function processMemoryNode(
             );
             console.error(
               '   Available $nodes:',
-              variableContext.$nodes
-                ? Object.keys(variableContext.$nodes)
+              (context as any).$nodes
+                ? Object.keys((context as any).$nodes)
                 : 'undefined',
             );
 

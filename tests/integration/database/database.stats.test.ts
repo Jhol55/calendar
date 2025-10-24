@@ -6,7 +6,7 @@ import {
   createTestService,
   generateTestUserId,
   expectErrorCode,
-} from '../setup';
+} from './setup';
 import { DatabaseNodeService } from '@/services/database/database.service';
 
 describe('DatabaseNodeService - Estatísticas', () => {
@@ -68,13 +68,13 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       expect(stats.totalRecords).toBe(3);
       expect(stats.totalPartitions).toBe(1);
-      expect(stats.fullPartitions).toBe(0); // Ainda não está cheia (MAX = 5)
+      expect(stats.fullPartitions).toBe(0); // Ainda não está cheia (MAX = 50)
       expect(stats.activePartition).toBe(0);
     });
 
     it('stats devem mostrar partição cheia corretamente', async () => {
-      // Inserir 5 registros (encher primeira partição)
-      for (let i = 0; i < 5; i++) {
+      // Inserir 50 registros (encher primeira partição)
+      for (let i = 0; i < 50; i++) {
         await service.insertRecord(userId, 'stats_test', {
           title: `Task ${i}`,
           priority: i,
@@ -83,15 +83,15 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       const stats = await service.getTableStats(userId, 'stats_test');
 
-      expect(stats.totalRecords).toBe(5);
+      expect(stats.totalRecords).toBe(50);
       expect(stats.totalPartitions).toBe(1);
       expect(stats.fullPartitions).toBe(1); // Primeira partição cheia
       expect(stats.activePartition).toBeNull(); // Nenhuma partição ativa (todas cheias)
     });
 
     it('stats devem refletir múltiplas partições', async () => {
-      // Inserir 8 registros (2 partições: 5 + 3)
-      for (let i = 0; i < 8; i++) {
+      // Inserir 75 registros (2 partições: 50 + 25)
+      for (let i = 0; i < 75; i++) {
         await service.insertRecord(userId, 'stats_test', {
           title: `Task ${i}`,
           priority: i,
@@ -100,15 +100,15 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       const stats = await service.getTableStats(userId, 'stats_test');
 
-      expect(stats.totalRecords).toBe(8);
+      expect(stats.totalRecords).toBe(75);
       expect(stats.totalPartitions).toBe(2);
       expect(stats.fullPartitions).toBe(1); // Primeira partição cheia
       expect(stats.activePartition).toBe(1); // Segunda partição ativa
     });
 
     it('stats devem atualizar após deleções', async () => {
-      // Inserir 5 registros
-      for (let i = 0; i < 5; i++) {
+      // Inserir 50 registros
+      for (let i = 0; i < 50; i++) {
         await service.insertRecord(userId, 'stats_test', {
           title: `Task ${i}`,
           priority: i,
@@ -117,7 +117,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       // Verificar estado inicial
       let stats = await service.getTableStats(userId, 'stats_test');
-      expect(stats.totalRecords).toBe(5);
+      expect(stats.totalRecords).toBe(50);
       expect(stats.fullPartitions).toBe(1);
 
       // Deletar 2 registros
@@ -128,7 +128,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       // Verificar estado atualizado
       stats = await service.getTableStats(userId, 'stats_test');
-      expect(stats.totalRecords).toBe(3);
+      expect(stats.totalRecords).toBe(48);
       expect(stats.fullPartitions).toBe(0); // Partição não está mais cheia
       expect(stats.activePartition).toBe(0); // Partição 0 está ativa novamente
     });
@@ -172,8 +172,8 @@ describe('DatabaseNodeService - Estatísticas', () => {
   // ============================================
   describe('Stats em Cenários Diversos', () => {
     it('stats com 3 partições (todas cheias)', async () => {
-      // Inserir 15 registros (3 partições cheias)
-      for (let i = 0; i < 15; i++) {
+      // Inserir 150 registros (3 partições cheias: 50 + 50 + 50)
+      for (let i = 0; i < 150; i++) {
         await service.insertRecord(userId, 'stats_test', {
           title: `Task ${i}`,
           priority: i,
@@ -182,7 +182,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       const stats = await service.getTableStats(userId, 'stats_test');
 
-      expect(stats.totalRecords).toBe(15);
+      expect(stats.totalRecords).toBe(150);
       expect(stats.totalPartitions).toBe(3);
       expect(stats.fullPartitions).toBe(3); // Todas cheias
       expect(stats.activePartition).toBeNull(); // Nenhuma ativa
@@ -190,7 +190,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
     it('stats após updates não devem mudar contagens', async () => {
       // Inserir registros
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'stats_test', {
           title: `Task ${i}`,
           priority: i,
@@ -198,7 +198,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
       }
 
       // Stats antes do update
-      let statsBefore = await service.getTableStats(userId, 'stats_test');
+      const statsBefore = await service.getTableStats(userId, 'stats_test');
 
       // Atualizar todos
       await service.updateRecords(
@@ -209,7 +209,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
       );
 
       // Stats depois do update
-      let statsAfter = await service.getTableStats(userId, 'stats_test');
+      const statsAfter = await service.getTableStats(userId, 'stats_test');
 
       // Contagens devem permanecer iguais
       expect(statsAfter.totalRecords).toBe(statsBefore.totalRecords);
@@ -247,7 +247,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
     it('stats devem mostrar activePartition corretamente após atingir limite', async () => {
       // Inserir até encher a primeira partição
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 50; i++) {
         await service.insertRecord(userId, 'stats_test', {
           title: `Task ${i}`,
         });
@@ -259,7 +259,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       // Inserir mais um (criar partição 1)
       await service.insertRecord(userId, 'stats_test', {
-        title: 'Task 5',
+        title: 'Task 50',
       });
 
       // Partição 1 está ativa
@@ -273,8 +273,8 @@ describe('DatabaseNodeService - Estatísticas', () => {
   // ============================================
   describe('Consistência de Stats', () => {
     it('soma de registros em todas as partições deve igualar totalRecords', async () => {
-      // Inserir 12 registros (3 partições: 5 + 5 + 2)
-      for (let i = 0; i < 12; i++) {
+      // Inserir 120 registros (3 partições: 50 + 50 + 20)
+      for (let i = 0; i < 120; i++) {
         await service.insertRecord(userId, 'stats_test', {
           title: `Task ${i}`,
         });
@@ -287,12 +287,12 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       // Total em stats deve bater com registros reais
       expect(stats.totalRecords).toBe(allRecords.length);
-      expect(stats.totalRecords).toBe(12);
+      expect(stats.totalRecords).toBe(120);
     });
 
     it('fullPartitions deve ser consistente com tamanho das partições', async () => {
-      // Inserir 10 registros (2 partições: 5 + 5)
-      for (let i = 0; i < 10; i++) {
+      // Inserir 100 registros (2 partições cheias: 50 + 50)
+      for (let i = 0; i < 100; i++) {
         await service.insertRecord(userId, 'stats_test', {
           title: `Task ${i}`,
         });
@@ -302,7 +302,7 @@ describe('DatabaseNodeService - Estatísticas', () => {
 
       expect(stats.totalPartitions).toBe(2);
       expect(stats.fullPartitions).toBe(2); // Ambas cheias
-      expect(stats.totalRecords).toBe(10); // 5 + 5
+      expect(stats.totalRecords).toBe(100); // 50 + 50
     });
   });
 });

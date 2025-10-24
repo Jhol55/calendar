@@ -87,7 +87,6 @@ describe('DatabaseNodeService - Performance', () => {
 
       // Capturar métricas inicial
       const initialStats = service.getPerformanceStats();
-      const initialCacheMisses = initialStats.cacheMisses;
 
       // Modificar schema (invalida cache e re-popula com novo schema)
       await service.addColumns(userId, 'perf_test', [

@@ -6,7 +6,7 @@ import {
   createTestService,
   generateTestUserId,
   expectErrorCode,
-} from '../setup';
+} from './setup';
 import { DatabaseNodeService } from '@/services/database/database.service';
 
 describe('DatabaseNodeService - Validação', () => {
@@ -84,7 +84,7 @@ describe('DatabaseNodeService - Validação', () => {
     it('❌ deve rejeitar coluna sem nome', async () => {
       await expectErrorCode(
         service.addColumns(userId, 'test_table', [
-          { name: '', type: 'string' } as any,
+          { name: '', type: 'string' },
         ]),
         'INVALID_COLUMN',
       );
@@ -93,7 +93,7 @@ describe('DatabaseNodeService - Validação', () => {
     it('❌ deve rejeitar tipo inválido: "invalid"', async () => {
       await expectErrorCode(
         service.addColumns(userId, 'test_table', [
-          { name: 'field', type: 'invalid' as any },
+          { name: 'field', type: 'invalid' as 'string' },
         ]),
         'INVALID_COLUMN_TYPE',
       );
