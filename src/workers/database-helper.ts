@@ -5,8 +5,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { databaseNodeService } from '@/services/database-node.service';
-import type { DatabaseNodeConfig } from '@/types/database-node.types';
+import { databaseNodeService } from '@/services/database/database.service';
+import type { DatabaseNodeConfig } from '@/services/database/database.types';
 
 /**
  * Interface do contexto de execução

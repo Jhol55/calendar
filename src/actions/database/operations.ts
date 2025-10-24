@@ -2,7 +2,7 @@
 
 import { prisma } from '@/services/prisma';
 import { getSession } from '@/utils/security/session';
-import { DATABASE_NODE_CONFIG } from '@/config/database-node.config';
+import { DATABASE_CONFIG } from '@/config/database.config';
 import { Prisma } from '../../../generated/prisma';
 
 interface SessionUser {
@@ -427,8 +427,7 @@ export async function addRow(
     currentData.push(data);
 
     // Verificar se atingiu o limite
-    const isFull =
-      currentData.length >= DATABASE_NODE_CONFIG.MAX_PARTITION_SIZE;
+    const isFull = currentData.length >= DATABASE_CONFIG.MAX_PARTITION_SIZE;
 
     // Atualizar a partição
     await prisma.dataTable.update({
@@ -507,7 +506,7 @@ export async function createTable(
       where: { userId },
     });
 
-    if (tableCount >= DATABASE_NODE_CONFIG.MAX_TABLES_PER_USER) {
+    if (tableCount >= DATABASE_CONFIG.MAX_TABLES_PER_USER) {
       return {
         success: false,
         message: `Maximum number of tables reached (${DATABASE_NODE_CONFIG.MAX_TABLES_PER_USER})`,

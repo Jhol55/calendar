@@ -7,7 +7,10 @@
 
 import { v4 as uuid } from 'uuid';
 import { prisma } from '@/services/prisma';
-import { DATABASE_NODE_CONFIG } from '@/config/database-node.config';
+import {
+  DATABASE_CONFIG,
+  type DatabaseNodeConfigType,
+} from '@/config/database.config';
 import type {
   ColumnDefinition,
   TableSchema,
@@ -17,13 +20,403 @@ import type {
   DatabaseRecord,
   WriteResult,
   TableStats,
-} from '@/types/database-node.types';
+} from '@/services/database/database.types';
 
 export class DatabaseNodeService {
-  private readonly MAX_PARTITION_SIZE = DATABASE_NODE_CONFIG.MAX_PARTITION_SIZE;
-  private readonly MAX_PARTITIONS =
-    DATABASE_NODE_CONFIG.MAX_PARTITIONS_PER_TABLE;
-  private readonly MAX_TABLES = DATABASE_NODE_CONFIG.MAX_TABLES_PER_USER;
+  private readonly config: DatabaseNodeConfigType;
+  private readonly MAX_PARTITION_SIZE: number;
+  private readonly MAX_PARTITIONS: number;
+  private readonly MAX_TABLES: number;
+
+  constructor(config: Partial<DatabaseNodeConfigType> = {}) {
+    // Merge configuração customizada com padrão
+    this.config = { ...DATABASE_CONFIG, ...config };
+    this.MAX_PARTITION_SIZE = this.config.MAX_PARTITION_SIZE;
+    this.MAX_PARTITIONS = this.config.MAX_PARTITIONS_PER_TABLE;
+    this.MAX_TABLES = this.config.MAX_TABLES_PER_USER;
+  }
+
+  // ============================================
+  // CACHE DE SCHEMAS
+  // ============================================
+
+  private schemaCache = new Map<
+    string,
+    { schema: TableSchema; timestamp: number }
+  >();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+  // ============================================
+  // MÉTRICAS DE PERFORMANCE
+  // ============================================
+
+  private performanceMetrics = {
+    queryTimes: [] as number[],
+    cacheHits: 0,
+    cacheMisses: 0,
+  };
+
+  /**
+   * Registra tempo de query
+   */
+  private recordQueryTime(startTime: number): void {
+    const queryTime = Date.now() - startTime;
+    this.performanceMetrics.queryTimes.push(queryTime);
+
+    // Manter apenas últimos 100 tempos
+    if (this.performanceMetrics.queryTimes.length > 100) {
+      this.performanceMetrics.queryTimes.shift();
+    }
+
+    // Log queries lentas (> 1s)
+    if (queryTime > 1000) {
+      console.warn(`🐌 Query lenta detectada: ${queryTime}ms`);
+    }
+  }
+
+  /**
+   * Obtém estatísticas de performance
+   */
+  public getPerformanceStats() {
+    const times = this.performanceMetrics.queryTimes;
+    const avgTime =
+      times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 0;
+    const maxTime = times.length > 0 ? Math.max(...times) : 0;
+    const minTime = times.length > 0 ? Math.min(...times) : 0;
+
+    return {
+      averageQueryTime: Math.round(avgTime),
+      maxQueryTime: maxTime,
+      minQueryTime: minTime,
+      totalQueries: times.length,
+      cacheHitRate:
+        this.performanceMetrics.cacheHits /
+          (this.performanceMetrics.cacheHits +
+            this.performanceMetrics.cacheMisses) || 0,
+      cacheHits: this.performanceMetrics.cacheHits,
+      cacheMisses: this.performanceMetrics.cacheMisses,
+    };
+  }
+
+  /**
+   * Busca schema com cache
+   */
+  private async getCachedSchema(
+    userId: string,
+    tableName: string,
+  ): Promise<TableSchema | null> {
+    const cacheKey = `${userId}:${tableName}`;
+    const cached = this.schemaCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      this.performanceMetrics.cacheHits++;
+      return cached.schema;
+    }
+
+    this.performanceMetrics.cacheMisses++;
+
+    // Buscar do banco
+    const partition = await prisma.dataTable.findFirst({
+      where: { userId, tableName, partition: 0 },
+      select: { schema: true },
+    });
+
+    if (!partition) {
+      return null;
+    }
+
+    const schema = partition.schema as unknown as TableSchema;
+
+    // Atualizar cache
+    this.schemaCache.set(cacheKey, {
+      schema,
+      timestamp: Date.now(),
+    });
+
+    return schema;
+  }
+
+  /**
+   * Invalida cache de schema
+   */
+  private invalidateSchemaCache(userId: string, tableName: string): void {
+    const cacheKey = `${userId}:${tableName}`;
+    this.schemaCache.delete(cacheKey);
+  }
+
+  /**
+   * Popular cache de schema (chamado quando já temos o schema de uma partição)
+   */
+  private populateCacheFromPartition(
+    userId: string,
+    tableName: string,
+    schema: TableSchema,
+  ): void {
+    const cacheKey = `${userId}:${tableName}`;
+    this.schemaCache.set(cacheKey, {
+      schema,
+      timestamp: Date.now(),
+    });
+  }
+
+  // ============================================
+  // PROCESSAMENTO EM LOTES
+  // ============================================
+
+  /**
+   * Estima quantos registros serão afetados por uma operação
+   */
+  private async estimateAffectedRecords(
+    userId: string,
+    tableName: string,
+    filters: FilterConfig,
+  ): Promise<number> {
+    const partitions = await prisma.dataTable.findMany({
+      where: { userId, tableName },
+      orderBy: { partition: 'asc' },
+      take: this.config.MAX_PARTITIONS_TO_SCAN,
+    });
+
+    let count = 0;
+    for (const partition of partitions) {
+      const records = partition.data as DatabaseRecord[];
+      const matchingRecords = records.filter((record) =>
+        this.matchesFilters(record, filters),
+      );
+      count += matchingRecords.length;
+    }
+
+    return count;
+  }
+
+  /**
+   * Atualiza registros em lotes para operações grandes
+   */
+  private async updateRecordsInBatches(
+    userId: string,
+    tableName: string,
+    filters: FilterConfig,
+    updates: Record<string, any>,
+  ): Promise<WriteResult> {
+    const startTime = Date.now();
+    const batchSize = this.config.BATCH_SIZE;
+    const maxExecutionTime = this.config.MAX_EXECUTION_TIME;
+
+    let totalUpdated = 0;
+    let batchNumber = 0;
+
+    console.log(`🔄 Iniciando processamento em lotes para ${tableName}...`);
+
+    try {
+      // Buscar todas as partições
+      const partitions = await prisma.dataTable.findMany({
+        where: { userId, tableName },
+        orderBy: { partition: 'asc' },
+      });
+
+      if (partitions.length === 0) {
+        throw this.createError(
+          'TABLE_NOT_FOUND',
+          `Tabela "${tableName}" não existe`,
+        );
+      }
+
+      // Processar cada partição
+      for (const partition of partitions) {
+        // Verificar timeout
+        if (Date.now() - startTime > maxExecutionTime) {
+          throw this.createError(
+            'TIMEOUT',
+            `Timeout: operação muito longa (${Math.round((Date.now() - startTime) / 1000)}s)`,
+          );
+        }
+
+        let records = partition.data as DatabaseRecord[];
+        const matchingRecords = records.filter((record) =>
+          this.matchesFilters(record, filters),
+        );
+
+        if (matchingRecords.length === 0) continue;
+
+        // Processar em lotes dentro da partição
+        for (let i = 0; i < matchingRecords.length; i += batchSize) {
+          const batch = matchingRecords.slice(i, i + batchSize);
+          batchNumber++;
+
+          // Verificar timeout novamente
+          if (Date.now() - startTime > maxExecutionTime) {
+            throw this.createError(
+              'TIMEOUT',
+              `Timeout: operação muito longa (${Math.round((Date.now() - startTime) / 1000)}s)`,
+            );
+          }
+
+          // Atualizar registros do lote MANTENDO atualizações anteriores
+          records = records.map((record) => {
+            const matchInBatch = batch.find((b) => b._id === record._id);
+            if (matchInBatch) {
+              return {
+                ...record,
+                ...updates,
+                _updatedAt: new Date().toISOString(),
+              };
+            }
+            return record;
+          });
+
+          // Salvar após cada lote
+          await prisma.dataTable.update({
+            where: { id: partition.id },
+            data: { data: records as any },
+          });
+
+          totalUpdated += batch.length;
+
+          // Log de progresso
+          console.log(
+            `📊 Lote ${batchNumber}: ${batch.length} registros atualizados (total: ${totalUpdated})`,
+          );
+
+          // Pequena pausa entre lotes
+          if (this.config.BATCH_DELAY > 0) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, this.config.BATCH_DELAY),
+            );
+          }
+        }
+      }
+
+      const executionTime = Date.now() - startTime;
+      console.log(
+        `✅ Processamento em lotes concluído: ${totalUpdated} registros em ${Math.round(executionTime / 1000)}s`,
+      );
+
+      return {
+        success: true,
+        affected: totalUpdated,
+        records: [], // Não retornamos todos os registros para operações grandes
+        batchInfo: {
+          totalBatches: batchNumber,
+          executionTimeMs: executionTime,
+          averageTimePerBatch: Math.round(executionTime / batchNumber),
+        },
+      };
+    } catch (error: any) {
+      console.error(`❌ Erro no processamento em lotes:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Deleta registros em lotes para operações grandes
+   */
+  private async deleteRecordsInBatches(
+    userId: string,
+    tableName: string,
+    filters: FilterConfig,
+  ): Promise<WriteResult> {
+    const startTime = Date.now();
+    const batchSize = this.config.BATCH_SIZE;
+    const maxExecutionTime = this.config.MAX_EXECUTION_TIME;
+
+    let totalDeleted = 0;
+    let batchNumber = 0;
+
+    console.log(`🗑️ Iniciando deleção em lotes para ${tableName}...`);
+
+    try {
+      // Buscar todas as partições
+      const partitions = await prisma.dataTable.findMany({
+        where: { userId, tableName },
+        orderBy: { partition: 'asc' },
+      });
+
+      if (partitions.length === 0) {
+        throw this.createError(
+          'TABLE_NOT_FOUND',
+          `Tabela "${tableName}" não existe`,
+        );
+      }
+
+      // Processar cada partição
+      for (const partition of partitions) {
+        // Verificar timeout
+        if (Date.now() - startTime > maxExecutionTime) {
+          throw this.createError(
+            'TIMEOUT',
+            `Timeout: operação muito longa (${Math.round((Date.now() - startTime) / 1000)}s)`,
+          );
+        }
+
+        let records = partition.data as DatabaseRecord[];
+        const matchingRecords = records.filter((record) =>
+          this.matchesFilters(record, filters),
+        );
+
+        if (matchingRecords.length === 0) continue;
+
+        // Processar em lotes dentro da partição
+        for (let i = 0; i < matchingRecords.length; i += batchSize) {
+          const batch = matchingRecords.slice(i, i + batchSize);
+          batchNumber++;
+
+          // Verificar timeout novamente
+          if (Date.now() - startTime > maxExecutionTime) {
+            throw this.createError(
+              'TIMEOUT',
+              `Timeout: operação muito longa (${Math.round((Date.now() - startTime) / 1000)}s)`,
+            );
+          }
+
+          // Remover registros do lote
+          const batchIds = batch.map((r) => r._id);
+          records = records.filter((record) => !batchIds.includes(record._id));
+
+          // Salvar partição atualizada
+          await prisma.dataTable.update({
+            where: { id: partition.id },
+            data: {
+              data: records as any,
+              recordCount: records.length,
+              isFull: records.length >= this.MAX_PARTITION_SIZE,
+            },
+          });
+
+          totalDeleted += batch.length;
+
+          // Log de progresso
+          console.log(
+            `🗑️ Lote ${batchNumber}: ${batch.length} registros deletados (total: ${totalDeleted})`,
+          );
+
+          // Pequena pausa entre lotes
+          if (this.config.BATCH_DELAY > 0) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, this.config.BATCH_DELAY),
+            );
+          }
+        }
+      }
+
+      const executionTime = Date.now() - startTime;
+      console.log(
+        `✅ Deleção em lotes concluída: ${totalDeleted} registros em ${Math.round(executionTime / 1000)}s`,
+      );
+
+      return {
+        success: true,
+        affected: totalDeleted,
+        batchInfo: {
+          totalBatches: batchNumber,
+          executionTimeMs: executionTime,
+          averageTimePerBatch: Math.round(executionTime / batchNumber),
+        },
+      };
+    } catch (error: any) {
+      console.error(`❌ Erro na deleção em lotes:`, error.message);
+      throw error;
+    }
+  }
 
   // ============================================
   // VALIDAÇÃO DE PERMISSÕES
@@ -32,6 +425,8 @@ export class DatabaseNodeService {
   /**
    * Verifica se o usuário é o dono da tabela
    * @throws Error se tabela não existe ou usuário não é o dono
+   * IMPORTANTE: Cada usuário tem seu próprio namespace de tabelas
+   * User1 pode ter tabela "tasks" e User2 também pode ter tabela "tasks" (isoladas)
    */
   private async verifyTableOwnership(
     userId: string,
@@ -47,19 +442,12 @@ export class DatabaseNodeService {
     });
 
     if (!table) {
-      // Tabela não existe - permitir (será criada pelo usuário)
+      // Tabela não existe para este usuário - permitir (será criada)
       return;
     }
 
-    if (table.userId !== userId) {
-      console.error(
-        `🚨 Tentativa não autorizada: userId ${userId} tentou acessar tabela ${tableName} de outro usuário`,
-      );
-      throw this.createError(
-        'UNAUTHORIZED',
-        `Acesso negado: você não tem permissão para acessar a tabela "${tableName}"`,
-      );
-    }
+    // Tabela existe para este usuário - OK
+    // Não precisamos verificar outros usuários (namespace isolado)
   }
 
   // ============================================
@@ -74,8 +462,8 @@ export class DatabaseNodeService {
   private async checkRateLimit(userId: string): Promise<void> {
     const key = `user:${userId}`;
     const now = Date.now();
-    const windowMs = 60 * 60 * 1000; // 1 hora
-    const maxOperations = 1000000; // 1M operações por hora
+    const windowMs = this.config.RATE_LIMIT_WINDOW_MS;
+    const maxOperations = this.config.RATE_LIMIT_MAX_OPS;
 
     const current = this.operationCounts.get(key);
 
@@ -143,6 +531,10 @@ export class DatabaseNodeService {
         },
       });
 
+      // Invalidar e popular cache com novo schema
+      this.invalidateSchemaCache(userId, tableName);
+      this.populateCacheFromPartition(userId, tableName, { columns });
+
       return { columns };
     }
 
@@ -168,6 +560,10 @@ export class DatabaseNodeService {
       where: { userId, tableName },
       data: { schema: updatedSchema as any },
     });
+
+    // Invalidar e popular cache com schema atualizado
+    this.invalidateSchemaCache(userId, tableName);
+    this.populateCacheFromPartition(userId, tableName, updatedSchema);
 
     return updatedSchema;
   }
@@ -209,6 +605,9 @@ export class DatabaseNodeService {
         ),
       };
 
+      // Invalidar cache após mudança de schema
+      this.invalidateSchemaCache(userId, tableName);
+
       // Atualiza cada partição (remove coluna dos dados também)
       for (const partition of partitions) {
         const records = partition.data as DatabaseRecord[];
@@ -229,6 +628,9 @@ export class DatabaseNodeService {
 
       return newSchema;
     });
+
+    // Popular cache com schema atualizado após transaction
+    this.populateCacheFromPartition(userId, tableName, updatedSchema);
 
     return updatedSchema;
   }
@@ -255,9 +657,16 @@ export class DatabaseNodeService {
     await this.verifyTableOwnership(userId, tableName);
     await this.checkRateLimit(userId);
 
-    // 1. Busca partição ativa (não cheia)
+    // Tentar validar com schema em cache primeiro (otimização)
+    const cachedSchema = await this.getCachedSchema(userId, tableName);
+    if (cachedSchema) {
+      // Validação prévia com cache - se falhar, não precisa nem abrir transaction
+      this.validateRecord(record, cachedSchema);
+    }
+
+    // 1. Busca partição ativa e insere registro (dentro de transaction)
     // USAR TRANSACTION para evitar race condition
-    const activePartition = await prisma.$transaction(async (tx) => {
+    const newRecord = await prisma.$transaction(async (tx) => {
       let partition = await tx.dataTable.findFirst({
         where: {
           userId,
@@ -341,45 +750,52 @@ export class DatabaseNodeService {
         }
       }
 
-      return partition;
-    });
+      if (!partition) {
+        throw this.createError(
+          'NO_ACTIVE_PARTITION',
+          'Não foi possível encontrar ou criar uma partição ativa',
+        );
+      }
 
-    if (!activePartition) {
-      throw this.createError(
-        'NO_ACTIVE_PARTITION',
-        'Não foi possível encontrar ou criar uma partição ativa',
+      // 3. Valida registro contra schema e popular cache
+      const schema = partition.schema as unknown as TableSchema;
+
+      // Popular cache oportunisticamente (já temos o schema da partição)
+      this.populateCacheFromPartition(userId, tableName, schema);
+
+      // Validar apenas se não validou com cache antes (cache miss)
+      if (!cachedSchema) {
+        this.validateRecord(record, schema);
+      }
+
+      // 4. Adiciona campos automáticos
+      const newRecordData: DatabaseRecord = {
+        _id: uuid(),
+        _createdAt: new Date().toISOString(),
+        _updatedAt: new Date().toISOString(),
+        ...record,
+      };
+
+      // 5. Adiciona na partição (ainda dentro da transaction)
+      const currentData = partition.data as DatabaseRecord[];
+      const updatedData = [...currentData, newRecordData];
+      const newCount = updatedData.length;
+
+      await tx.dataTable.update({
+        where: { id: partition.id },
+        data: {
+          data: updatedData as any,
+          recordCount: newCount,
+          isFull: newCount >= this.MAX_PARTITION_SIZE,
+        },
+      });
+
+      console.log(
+        `✅ [DB-SERVICE] Record inserted successfully! ID: ${newRecordData._id}, Total records in partition: ${newCount}`,
       );
-    }
 
-    // 3. Valida registro contra schema
-    const schema = activePartition.schema as unknown as TableSchema;
-    this.validateRecord(record, schema);
-
-    // 4. Adiciona campos automáticos
-    const newRecord: DatabaseRecord = {
-      _id: uuid(),
-      _createdAt: new Date().toISOString(),
-      _updatedAt: new Date().toISOString(),
-      ...record,
-    };
-
-    // 5. Adiciona na partição
-    const currentData = activePartition.data as DatabaseRecord[];
-    const updatedData = [...currentData, newRecord];
-    const newCount = updatedData.length;
-
-    await prisma.dataTable.update({
-      where: { id: activePartition.id },
-      data: {
-        data: updatedData as any,
-        recordCount: newCount,
-        isFull: newCount >= this.MAX_PARTITION_SIZE,
-      },
+      return newRecordData;
     });
-
-    console.log(
-      `✅ [DB-SERVICE] Record inserted successfully! ID: ${newRecord._id}, Total records in partition: ${newCount}`,
-    );
 
     return newRecord;
   }
@@ -392,6 +808,8 @@ export class DatabaseNodeService {
     tableName: string,
     options: QueryOptions = {},
   ): Promise<DatabaseRecord[]> {
+    const startTime = Date.now();
+
     this.validateTableName(tableName);
 
     // Validação de permissões
@@ -400,13 +818,13 @@ export class DatabaseNodeService {
 
     // Limites de paginação
     const limit = Math.min(
-      options.pagination?.limit || DATABASE_NODE_CONFIG.DEFAULT_QUERY_LIMIT,
-      DATABASE_NODE_CONFIG.MAX_QUERY_LIMIT,
+      options.pagination?.limit || this.config.DEFAULT_QUERY_LIMIT,
+      this.config.MAX_QUERY_LIMIT,
     );
     const offset = options.pagination?.offset || 0;
 
     // 1. Busca partições com LIMITE (evitar DoS)
-    const maxPartitions = DATABASE_NODE_CONFIG.MAX_PARTITIONS_TO_SCAN;
+    const maxPartitions = this.config.MAX_PARTITIONS_TO_SCAN;
     const partitions = await prisma.dataTable.findMany({
       where: { userId, tableName },
       orderBy: { partition: 'asc' },
@@ -424,6 +842,12 @@ export class DatabaseNodeService {
       console.warn(
         `⚠️ Query limitada a ${maxPartitions} partições. Considere usar filtros mais específicos.`,
       );
+    }
+
+    // Popular cache com schema da primeira partição (oportunista)
+    if (partitions.length > 0 && partitions[0].schema) {
+      const schema = partitions[0].schema as unknown as TableSchema;
+      this.populateCacheFromPartition(userId, tableName, schema);
     }
 
     // 2. Processa partições incrementalmente (não carregar tudo)
@@ -458,7 +882,12 @@ export class DatabaseNodeService {
     }
 
     // 5. Paginação
-    return allRecords.slice(offset, offset + limit);
+    const result = allRecords.slice(offset, offset + limit);
+
+    // Registrar tempo de query
+    this.recordQueryTime(startTime);
+
+    return result;
   }
 
   // ============================================
@@ -476,7 +905,23 @@ export class DatabaseNodeService {
     await this.verifyTableOwnership(userId, tableName);
     await this.checkRateLimit(userId);
 
-    // USAR TRANSACTION para garantir atomicidade
+    // Verificar se operação é muito grande para processamento em lotes
+    const estimatedCount = await this.estimateAffectedRecords(
+      userId,
+      tableName,
+      filters,
+    );
+
+    if (estimatedCount > this.config.BATCH_SIZE) {
+      return await this.updateRecordsInBatches(
+        userId,
+        tableName,
+        filters,
+        updates,
+      );
+    }
+
+    // Operação pequena - usar transaction normal
     const result = await prisma.$transaction(async (tx) => {
       // Busca todas as partições
       const partitions = await tx.dataTable.findMany({
@@ -489,6 +934,12 @@ export class DatabaseNodeService {
           'TABLE_NOT_FOUND',
           `Tabela "${tableName}" não existe`,
         );
+      }
+
+      // Popular cache com schema da primeira partição (oportunista)
+      if (partitions.length > 0 && partitions[0].schema) {
+        const schema = partitions[0].schema as unknown as TableSchema;
+        this.populateCacheFromPartition(userId, tableName, schema);
       }
 
       let totalUpdated = 0;
@@ -548,7 +999,18 @@ export class DatabaseNodeService {
     await this.verifyTableOwnership(userId, tableName);
     await this.checkRateLimit(userId);
 
-    // USAR TRANSACTION para garantir atomicidade
+    // Verificar se operação é muito grande para processamento em lotes
+    const estimatedCount = await this.estimateAffectedRecords(
+      userId,
+      tableName,
+      filters,
+    );
+
+    if (estimatedCount > this.config.BATCH_SIZE) {
+      return await this.deleteRecordsInBatches(userId, tableName, filters);
+    }
+
+    // Operação pequena - usar transaction normal
     const result = await prisma.$transaction(async (tx) => {
       const partitions = await tx.dataTable.findMany({
         where: { userId, tableName },
@@ -560,6 +1022,12 @@ export class DatabaseNodeService {
           'TABLE_NOT_FOUND',
           `Tabela "${tableName}" não existe`,
         );
+      }
+
+      // Popular cache com schema da primeira partição (oportunista)
+      if (partitions.length > 0 && partitions[0].schema) {
+        const schema = partitions[0].schema as unknown as TableSchema;
+        this.populateCacheFromPartition(userId, tableName, schema);
       }
 
       let totalDeleted = 0;
@@ -582,7 +1050,7 @@ export class DatabaseNodeService {
             data: {
               data: records as any,
               recordCount: records.length,
-              isFull: records.length < this.MAX_PARTITION_SIZE, // Recalcula isFull
+              isFull: records.length >= this.MAX_PARTITION_SIZE, // Partição cheia = tem MAX registros ou mais
             },
           });
         }
@@ -629,7 +1097,7 @@ export class DatabaseNodeService {
       fullPartitions: partitions.filter((p: { isFull: boolean }) => p.isFull)
         .length,
       activePartition:
-        partitions.find((p: { isFull: boolean }) => !p.isFull)?.partition ||
+        partitions.find((p: { isFull: boolean }) => !p.isFull)?.partition ??
         null,
       schema: partitions[0].schema as unknown as TableSchema,
     };
@@ -704,7 +1172,8 @@ export class DatabaseNodeService {
         continue;
       }
 
-      // Valida tipo (sempre, mesmo se não required)
+      // Valida tipo (apenas se não for null/undefined)
+      // null e undefined são permitidos para campos opcionais (já validado acima)
       if (value !== undefined && value !== null) {
         const isValid = this.validateFieldType(value, column.type);
         if (!isValid) {
@@ -718,9 +1187,10 @@ export class DatabaseNodeService {
   }
 
   private validateFieldType(value: any, type: string): boolean {
-    // Se valor é null/undefined, só é válido se não for required
-    if (value === null || value === undefined) {
-      return true; // Será tratado pelo validateRecord
+    // undefined é sempre válido (campo não fornecido)
+    // null é validado normalmente (usuário passou explicitamente null)
+    if (value === undefined) {
+      return true;
     }
 
     switch (type) {
@@ -753,8 +1223,15 @@ export class DatabaseNodeService {
         const isoDate = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/;
         const brDate = /^\d{2}\/\d{2}\/\d{4}$/;
 
-        if (isoDate.test(value) || brDate.test(value)) {
+        if (isoDate.test(value)) {
           const parsed = new Date(value);
+          return !isNaN(parsed.getTime());
+        }
+
+        if (brDate.test(value)) {
+          // Converter DD/MM/YYYY para YYYY-MM-DD
+          const [day, month, year] = value.split('/');
+          const parsed = new Date(`${year}-${month}-${day}`);
           return !isNaN(parsed.getTime());
         }
 
@@ -797,8 +1274,32 @@ export class DatabaseNodeService {
     const fieldValue = record[rule.field];
     const { operator, value } = rule;
 
+    // Early return para operadores que não precisam de valor
+    if (
+      [
+        'isNull',
+        'isNotNull',
+        'isTrue',
+        'isFalse',
+        'isEmpty',
+        'isNotEmpty',
+      ].includes(operator)
+    ) {
+      // Não precisa verificar value para estes operadores
+    } else if (value === null || value === undefined) {
+      // Para outros operadores, se value é null/undefined, só alguns são válidos
+      if (!['equals', 'notEquals'].includes(operator)) {
+        return false; // Operadores numéricos/string não funcionam com null
+      }
+    }
+
     // Helper: Tenta converter para número se ambos parecem números
     const tryNumericComparison = (a: any, b: any): [number, number] | null => {
+      // Se qualquer valor é null/undefined, não tenta conversão numérica
+      if (a === null || a === undefined || b === null || b === undefined) {
+        return null;
+      }
+
       const numA = typeof a === 'number' ? a : Number(a);
       const numB = typeof b === 'number' ? b : Number(b);
 
@@ -885,6 +1386,11 @@ export class DatabaseNodeService {
           (Array.isArray(fieldValue) && fieldValue.length === 0)
         );
 
+      case 'isNull':
+        return fieldValue === null;
+      case 'isNotNull':
+        return fieldValue !== null;
+
       case 'isTrue':
         return fieldValue === true;
       case 'isFalse':
@@ -934,5 +1440,6 @@ export class DatabaseNodeService {
   }
 }
 
-// Singleton instance
+// Export apenas a classe (não mais singleton)
+// Para manter compatibilidade com código existente, criamos instância padrão
 export const databaseNodeService = new DatabaseNodeService();

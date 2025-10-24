@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
-import { DATABASE_NODE_CONFIG } from '@/config/database-node.config';
+import { DATABASE_CONFIG } from '@/config/database.config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,8 +40,7 @@ export async function POST(request: NextRequest) {
     currentData.push(data);
 
     // Verificar se atingiu o limite
-    const isFull =
-      currentData.length >= DATABASE_NODE_CONFIG.MAX_PARTITION_SIZE;
+    const isFull = currentData.length >= DATABASE_CONFIG.MAX_PARTITION_SIZE;
 
     // Atualizar a partição
     await prisma.dataTable.update({

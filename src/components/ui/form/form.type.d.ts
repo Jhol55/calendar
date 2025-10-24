@@ -16,4 +16,5 @@ export interface FormProps
     | Record<string, (e: React.ChangeEvent<HTMLInputElement>) => void>
     | undefined;
   className?: string;
+  delay?: number;
 }

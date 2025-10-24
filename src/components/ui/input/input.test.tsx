@@ -8,21 +8,26 @@ jest.mock('@/hooks/use-form', () => ({
 }));
 
 describe('Input Component', () => {
-  const setUp = (props = {}) => {
+  const setUp = (props = {}, maskSchema = {}, formValue = '') => {
+    const setValueMock = jest.fn();
+
     (useForm as jest.Mock).mockReturnValue({
       register: jest.fn().mockReturnValue({
         ref: jest.fn(),
         onChange: jest.fn(),
+        name: 'test',
       }),
-      setValue: jest.fn(),
+      setValue: setValueMock,
+      maskSchema,
+      form: { test: formValue },
     });
 
-    return render(<Input fieldName="test" {...props} />);
+    const utils = render(<Input fieldName="test" {...props} />);
+    return { ...utils, setValueMock };
   };
 
   it('should render the input element correctly', () => {
     setUp();
-
     const input = screen.getByRole('textbox');
     expect(input).toBeInTheDocument();
   });
@@ -52,21 +57,24 @@ describe('Input Component', () => {
         e.target.value.toUpperCase(),
     };
 
-    const setValue = jest.fn();
+    const { container, setValueMock } = setUp({}, maskSchema);
 
-    const onChangeMock = jest.fn((e: React.ChangeEvent<HTMLInputElement>) => {
-      const type = e.target.type;
-      if (!['checkbox', 'radio'].includes(type)) {
-        const maskedValue = maskSchema.test(e) ?? e.target.value;
-        setValue('test', maskedValue);
-      }
-    });
-
-    const { container } = setUp({ onChange: onChangeMock });
     const input = container.querySelector('input') as HTMLInputElement;
-
     fireEvent.change(input, { target: { value: 'test value' } });
 
-    expect(setValue).toHaveBeenCalledWith('test', 'TEST VALUE');
+    expect(setValueMock).toHaveBeenCalledWith('test', 'TEST VALUE');
+  });
+
+  it('should render variables in overlay if value has {{variable}}', () => {
+    const formValue = 'Hello {{name}}';
+    const { container } = setUp({}, {}, formValue);
+
+    const overlayText = screen.getByText('{{name}}');
+    expect(overlayText).toBeInTheDocument();
+
+    // Clicar na variável deve ativar modo de edição
+    fireEvent.click(overlayText);
+    const input = container.querySelector('input') as HTMLInputElement;
+    expect(input).toHaveFocus();
   });
 });
