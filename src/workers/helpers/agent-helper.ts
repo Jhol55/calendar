@@ -8,12 +8,12 @@ import {
   injectContext,
   truncateHistory,
   ChatMessage,
-} from '../services/openai.service';
+} from '../../services/openai.service';
 import {
   getConversationHistory,
   addMessagesToHistory,
-} from '../services/agent-conversation.service';
-import { AgentConfig } from '../components/layout/chatbot-flow/types';
+} from '../../services/agent-conversation.service';
+import { AgentConfig } from '../../components/layout/chatbot-flow/types';
 
 interface ProcessAgentNodeParams {
   config: AgentConfig;

@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { limparMemoriasExpiradas } from './memory-helper';
+import { limparMemoriasExpiradas } from './helpers/memory-helper';
 
 /**
  * Job de limpeza automática de memórias expiradas

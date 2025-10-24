@@ -1,6 +1,43 @@
 import { CodeExecutionConfig } from '@/components/layout/chatbot-flow/types';
 import { replaceVariables } from './variable-replacer';
 
+/**
+ * Substitui variáveis em um JSON template garantindo formato válido
+ * Adiciona aspas automaticamente em strings quando necessário
+ */
+function replaceVariablesInJSON(jsonTemplate: string, context: any): any {
+  // Substituir variáveis usando uma regex que detecta o contexto
+  const replaced = jsonTemplate.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+    try {
+      const cleanPath = path.trim();
+      const parts = cleanPath.split('.');
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let value: any = context;
+      for (const part of parts) {
+        if (value && typeof value === 'object' && part in value) {
+          value = value[part];
+        } else {
+          return match; // Variável não encontrada
+        }
+      }
+
+      if (value === null || value === undefined) {
+        return match;
+      }
+
+      // SEMPRE usar JSON.stringify para garantir formato válido
+      // Isso adiciona aspas em strings, formata objetos/arrays corretamente
+      return JSON.stringify(value);
+    } catch {
+      return match;
+    }
+  });
+
+  // Agora parsear o JSON resultante
+  return JSON.parse(replaced);
+}
+
 // Mapeamento de linguagens para IDs do Judge0
 // Ref: https://ce.judge0.com/languages
 const LANGUAGE_IDS = {
@@ -39,20 +76,24 @@ interface Judge0Result {
 
 /**
  * Processa o Code Execution Node
+ *
+ * Retorna diretamente o resultado com a estrutura:
+ * {
+ *   [outputVariable]: parsedOutput, // Ex: codeResult: [...]
+ *   success: boolean,
+ *   error: string | null,
+ *   executionTime?: string,
+ *   memory?: number,
+ *   language: string,
+ *   status?: string
+ * }
  */
 export async function processCodeExecutionNode(
   config: CodeExecutionConfig,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   variableContext: any,
-): Promise<{
-  success: boolean;
-  output: string | null;
-  error: string | null;
-  executionTime?: string;
-  memory?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  result: any;
-}> {
+): Promise<any> {
   try {
     console.log('🔷 [CODE-EXECUTION] Processando Code Execution Node');
     console.log('🔷 [CODE-EXECUTION] Config:', JSON.stringify(config, null, 2));
@@ -69,84 +110,31 @@ export async function processCodeExecutionNode(
     // 2. Resolver variáveis de entrada
     let inputVars: Record<string, any> = {};
     if (config.inputVariables) {
-      const resolvedInputVars = replaceVariables(
-        config.inputVariables,
-        variableContext,
-      );
       console.log(
         '🔷 [CODE-EXECUTION] Original input vars:',
         config.inputVariables,
       );
-      console.log(
-        '🔷 [CODE-EXECUTION] Resolved input vars:',
-        resolvedInputVars,
-      );
-      console.log(
-        '🔷 [CODE-EXECUTION] Type of resolved:',
-        typeof resolvedInputVars,
-      );
 
-      // Se replaceVariables já retornou um objeto (por causa do parse interno), usar diretamente
-      if (typeof resolvedInputVars === 'object' && resolvedInputVars !== null) {
-        inputVars = resolvedInputVars;
+      try {
+        // Usar replaceVariablesInJSON para garantir JSON válido
+        inputVars = replaceVariablesInJSON(
+          config.inputVariables,
+          variableContext,
+        );
 
-        // Verificar se ainda há variáveis não resolvidas (converter para string para checar)
-        const jsonString = JSON.stringify(resolvedInputVars);
-        const hasUnresolvedVars = /\{\{[^}]+\}\}/.test(jsonString);
-        if (hasUnresolvedVars) {
-          console.error(
-            '🔴 [CODE-EXECUTION] Variáveis dinâmicas não foram resolvidas!',
-          );
-          console.error(
-            '🔴 [CODE-EXECUTION] Objeto com variáveis:',
-            resolvedInputVars,
-          );
-          console.error(
-            '🔴 [CODE-EXECUTION] Contexto disponível:',
-            Object.keys(variableContext),
-          );
-          throw new Error(
-            `Variáveis dinâmicas não foram resolvidas. Verifique se os nodes existem no fluxo. Variável não resolvida: ${jsonString.match(/\{\{[^}]+\}\}/)?.[0]}`,
-          );
-        }
-      } else {
-        // É uma string, precisa fazer parse
-        const resolvedString = String(resolvedInputVars);
-
-        // Verificar se ainda há variáveis não resolvidas
-        const hasUnresolvedVars = /\{\{[^}]+\}\}/.test(resolvedString);
-        if (hasUnresolvedVars) {
-          console.error(
-            '🔴 [CODE-EXECUTION] Variáveis dinâmicas não foram resolvidas!',
-          );
-          console.error(
-            '🔴 [CODE-EXECUTION] String com variáveis:',
-            resolvedString,
-          );
-          console.error(
-            '🔴 [CODE-EXECUTION] Contexto disponível:',
-            Object.keys(variableContext),
-          );
-          throw new Error(
-            `Variáveis dinâmicas não foram resolvidas. Verifique se os nodes existem no fluxo. Variável não resolvida: ${resolvedString.match(/\{\{[^}]+\}\}/)?.[0]}`,
-          );
-        }
-
-        try {
-          inputVars = JSON.parse(resolvedString);
-        } catch (error) {
-          console.error(
-            '🔴 [CODE-EXECUTION] Erro ao parsear inputVariables:',
-            error,
-          );
-          console.error(
-            '🔴 [CODE-EXECUTION] String que causou erro:',
-            resolvedString,
-          );
-          throw new Error(
-            `Erro ao parsear inputVariables: ${error instanceof Error ? error.message : 'JSON inválido'}. Valor recebido: ${resolvedString.substring(0, 200)}`,
-          );
-        }
+        console.log(
+          '🔷 [CODE-EXECUTION] Resolved input vars:',
+          JSON.stringify(inputVars, null, 2),
+        );
+      } catch (error) {
+        console.error(
+          '🔴 [CODE-EXECUTION] Erro ao resolver inputVariables:',
+          error,
+        );
+        console.error('🔴 [CODE-EXECUTION] Template:', config.inputVariables);
+        throw new Error(
+          `Erro ao processar inputVariables: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+        );
       }
     }
 
@@ -321,7 +309,10 @@ export async function processCodeExecutionNode(
 
     // 7. Preparar resultado final
     const outputVariable = config.outputVariable || 'codeResult';
-    const finalResult = {
+
+    // Retornar diretamente sem wrapper "result" redundante
+    // Agora o caminho fica: {{$nodes.nodeId.output.codeResult.0}}
+    return {
       [outputVariable]: parsedOutput,
       success,
       error,
@@ -330,15 +321,6 @@ export async function processCodeExecutionNode(
       language: config.language,
       status: statusDescription,
     };
-
-    return {
-      success,
-      output: parsedOutput, // Usar output parseado
-      error,
-      executionTime: result.time || undefined,
-      memory: result.memory || undefined,
-      result: finalResult,
-    };
   } catch (error) {
     console.error('🔴 [CODE-EXECUTION] Erro fatal:', error);
 
@@ -346,16 +328,12 @@ export async function processCodeExecutionNode(
       error instanceof Error ? error.message : 'Erro desconhecido';
     const outputVariable = config.outputVariable || 'codeResult';
 
+    // Retornar diretamente sem wrapper "result" redundante
     return {
+      [outputVariable]: null,
       success: false,
-      output: null,
       error: errorMessage,
-      result: {
-        [outputVariable]: null,
-        success: false,
-        error: errorMessage,
-        language: config.language,
-      },
+      language: config.language,
     };
   }
 }

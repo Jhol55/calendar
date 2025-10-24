@@ -153,6 +153,9 @@ function MessageFormFields({
   const interactiveMenuType =
     (form.interactiveMenuType as InteractiveMenuType) || 'button';
 
+  // Estado local para rastrear se o JSON foi editado manualmente
+  const [jsonManuallyEdited, setJsonManuallyEdited] = useState(false);
+
   // Gerenciar choices do menu interativo como objetos estruturados
   interface Choice {
     id: string;
@@ -215,13 +218,18 @@ function MessageFormFields({
     });
   };
 
-  // Sincronizar JSON quando o modo mudar para JSON ou quando carouselCards/listCategories mudar
+  // Sincronizar JSON quando o modo mudar para JSON APENAS NA PRIMEIRA VEZ
   useEffect(() => {
     // Verificar se o JSON atual é uma variável dinâmica
     const isCurrentlyVariable = /^\{\{.+\}\}$/.test(jsonConfig.trim());
 
     // Não sobrescrever se já for uma variável dinâmica
     if (isCurrentlyVariable) {
+      return;
+    }
+
+    // Não sobrescrever se o usuário já editou manualmente
+    if (jsonManuallyEdited) {
       return;
     }
 
@@ -252,9 +260,17 @@ function MessageFormFields({
     interactiveMenuType,
     carouselCards,
     listCategories,
+    jsonManuallyEdited,
     jsonConfig,
     setJsonConfig,
   ]);
+
+  // Resetar flag quando mudar de tipo de menu ou voltar para modo manual
+  useEffect(() => {
+    if (configMode === 'manual') {
+      setJsonManuallyEdited(false);
+    }
+  }, [configMode, interactiveMenuType]);
 
   // Atualizar campo do formulário quando JSON mudar (para passar validação Zod)
   useEffect(() => {
@@ -1409,7 +1425,10 @@ function MessageFormFields({
                     </div>
                     <textarea
                       value={jsonConfig}
-                      onChange={(e) => setJsonConfig(e.target.value)}
+                      onChange={(e) => {
+                        setJsonConfig(e.target.value);
+                        setJsonManuallyEdited(true);
+                      }}
                       placeholder="Cole ou edite o JSON de configuração aqui..."
                       rows={15}
                       className="w-full rounded-md border border-gray-300 bg-white p-3 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"
@@ -1709,7 +1728,10 @@ function MessageFormFields({
                     </div>
                     <textarea
                       value={jsonConfig}
-                      onChange={(e) => setJsonConfig(e.target.value)}
+                      onChange={(e) => {
+                        setJsonConfig(e.target.value);
+                        setJsonManuallyEdited(true);
+                      }}
                       placeholder="Cole ou edite o JSON de configuração aqui..."
                       rows={15}
                       className="w-full rounded-md border border-gray-300 bg-white p-3 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"

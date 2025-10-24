@@ -258,12 +258,16 @@ export function NodeExecutionPanel({
               const prevNodeExecution = nodeExecutions[prevNodeId];
               const prevNode = nodes.find((n) => n.id === prevNodeId);
 
-              if (prevNodeExecution?.result) {
+              // Usar "result" se existir, senão usar "data" (para webhook node)
+              const output =
+                prevNodeExecution?.result || prevNodeExecution?.data;
+
+              if (output) {
                 previousNodesOutputs[prevNodeId] = {
                   nodeId: prevNodeId,
                   nodeLabel:
                     prevNode?.data?.label || prevNode?.type || prevNodeId,
-                  output: prevNodeExecution.result,
+                  output: output,
                   customLabel: prevNode?.data?.label, // Nome customizado do node
                 };
               }

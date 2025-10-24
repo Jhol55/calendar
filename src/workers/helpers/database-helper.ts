@@ -7,6 +7,7 @@
 
 import { databaseNodeService } from '@/services/database/database.service';
 import type { DatabaseNodeConfig } from '@/services/database/database.types';
+import { parseJSONRecursively } from './json-parser';
 
 /**
  * Interface do contexto de execução
@@ -179,11 +180,14 @@ async function handleInsert(
 
   console.log('✅ [INSERT] New record created with ID:', newRecord._id);
 
+  // Parsear recursivamente strings JSON no record retornado
+  const parsedRecord = parseJSONRecursively(newRecord);
+
   return {
     success: true,
     operation: 'insert',
     tableName: config.tableName,
-    record: newRecord,
+    record: parsedRecord,
     message: 'Registro inserido com sucesso',
   };
 }
@@ -216,12 +220,17 @@ async function handleUpdate(
     resolvedUpdates,
   );
 
+  // Parsear recursivamente strings JSON nos records retornados
+  const parsedRecords = result.records
+    ? parseJSONRecursively(result.records)
+    : [];
+
   return {
     success: true,
     operation: 'update',
     tableName: config.tableName,
     affected: result.affected,
-    records: result.records,
+    records: parsedRecords,
     message: `${result.affected} registro(s) atualizado(s)`,
   };
 }
@@ -281,13 +290,16 @@ async function handleGet(
     options,
   );
 
+  // Parsear recursivamente strings JSON nos records
+  const parsedRecords = parseJSONRecursively(records);
+
   return {
     success: true,
     operation: 'get',
     tableName: config.tableName,
-    count: records.length,
-    records,
-    message: `${records.length} registro(s) encontrado(s)`,
+    count: parsedRecords.length,
+    records: parsedRecords,
+    message: `${parsedRecords.length} registro(s) encontrado(s)`,
   };
 }
 
@@ -403,8 +415,32 @@ function resolveString(
       const value = resolveValue(trimmedPath, { input, ...context.variables });
 
       if (value === undefined) {
-        console.warn(`⚠️  Variável não encontrada: {{${trimmedPath}}}`);
-        return match;
+        // Listar variáveis disponíveis para ajudar no debug
+        const availableVars = Object.keys({ input, ...context.variables });
+        console.error(`❌ Variável não encontrada: {{${trimmedPath}}}`);
+        console.error(`   Variáveis disponíveis:`, availableVars);
+
+        // Tentar sugerir variável similar
+        const pathParts = trimmedPath.split('.');
+        if (pathParts[0] === '$nodes' && pathParts.length > 1) {
+          const nodeId = pathParts[1];
+          const nodeVars = context.variables?.$nodes || {};
+          if (nodeVars[nodeId]) {
+            console.error(`   ✅ Node ${nodeId} existe!`);
+            console.error(
+              `   📋 Output disponível:`,
+              Object.keys(nodeVars[nodeId].output || {}),
+            );
+          } else {
+            console.error(`   ❌ Node ${nodeId} não encontrado`);
+            console.error(`   📋 Nodes disponíveis:`, Object.keys(nodeVars));
+          }
+        }
+
+        throw new Error(
+          `Variável obrigatória não encontrada: {{${trimmedPath}}}. ` +
+            `Verifique se o caminho está correto ou se o nó anterior foi executado.`,
+        );
       }
 
       // Sanitizar o valor resolvido
@@ -460,10 +496,9 @@ function resolveValue(path: string, data: any, depth: number = 0): any {
     return undefined;
   }
 
-  // Remove o $ inicial se existir (ex: $nodes -> nodes, $memory -> memory)
-  const cleanPath = path.startsWith('$') ? path.substring(1) : path;
-
-  const parts = cleanPath.split('.');
+  // NÃO remover o $ inicial! As propriedades do contexto TÊM $ no nome
+  // (ex: $nodes, $memory, $loop, $node)
+  const parts = path.split('.');
   let current = data;
 
   for (const part of parts) {

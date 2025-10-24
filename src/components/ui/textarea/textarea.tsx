@@ -6,7 +6,7 @@ import { forwardRef, useMemo, useState, useRef, useEffect } from 'react';
 import { mergeRefs } from '@/utils/mergeRefs';
 import { cn } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
-import { replaceVariables } from '@/workers/variable-replacer';
+import { replaceVariables } from '@/workers/helpers/variable-replacer';
 import { useFlowExecutionOptional } from '@/contexts/flow-execution/flow-execution-context';
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(

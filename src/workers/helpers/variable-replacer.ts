@@ -8,23 +8,6 @@ export function replaceVariables(text: string, context: any): any {
 
   console.log('🔹 [VARIABLE-REPLACER] Input:', text.substring(0, 200));
 
-  // Tentar parsear como JSON primeiro (para arrays e objetos literais SEM variáveis)
-  if (text.trim().startsWith('[') || text.trim().startsWith('{')) {
-    // Se NÃO contém variáveis dinâmicas, tentar parsear direto
-    if (!/\{\{[^}]+\}\}/.test(text)) {
-      try {
-        const parsed = JSON.parse(text);
-        console.log(
-          '🔹 [VARIABLE-REPLACER] Parsed as pure JSON:',
-          typeof parsed,
-        );
-        return parsed;
-      } catch {
-        // Se falhar, continuar com substituição de variáveis
-      }
-    }
-  }
-
   // Encontrar todas as variáveis no formato {{path}}
   // IMPORTANTE: Substituir variáveis SEM aspas usando JSON.stringify para manter tipos
   const replaced = text.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
@@ -49,12 +32,19 @@ export function replaceVariables(text: string, context: any): any {
         return match;
       }
 
-      // SEMPRE usar JSON.stringify para preservar tipos corretamente
-      // Isso permite que:
-      // - Strings virem "string" (com aspas)
-      // - Numbers virem 123 (sem aspas)
-      // - Arrays virem [1,2,3] (sem aspas)
-      // - Objects virem {"key": "value"} (sem aspas)
+      // Converter para string preservando tipos
+      // - Strings: retornar direto (SEM aspas extras)
+      // - Numbers/Booleans: converter para string
+      // - Arrays/Objects: usar JSON.stringify
+      if (typeof value === 'string') {
+        return value; // Não adicionar aspas extras!
+      }
+
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+      }
+
+      // Para arrays e objects, usar JSON.stringify
       try {
         return JSON.stringify(value);
       } catch {
@@ -69,25 +59,6 @@ export function replaceVariables(text: string, context: any): any {
     '🔹 [VARIABLE-REPLACER] After replace:',
     replaced.substring(0, 200),
   );
-
-  // Se a string toda foi uma variável e resultou em JSON, tentar parsear
-  if (
-    replaced !== text &&
-    (replaced.startsWith('[') || replaced.startsWith('{'))
-  ) {
-    try {
-      const parsed = JSON.parse(replaced);
-      console.log(
-        '🔹 [VARIABLE-REPLACER] Parsed after replace:',
-        typeof parsed,
-      );
-      return parsed;
-    } catch (e) {
-      console.log('🔹 [VARIABLE-REPLACER] Failed to parse after replace:', e);
-      return replaced;
-    }
-  }
-
   console.log('🔹 [VARIABLE-REPLACER] Returning as string');
   return replaced;
 }
