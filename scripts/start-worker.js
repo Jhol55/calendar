@@ -26,7 +26,10 @@ async function startWorker() {
     await import(`file://${workerPath.replace(/\\/g, '/')}`);
 
     // Importar e iniciar o job de limpeza de memórias
-    const cleanupPath = join(__dirname, '../src/workers/memory-cleanup.ts');
+    const cleanupPath = join(
+      __dirname,
+      '../src/workers/helpers/memory-cleanup.ts',
+    );
     const { iniciarJobLimpezaMemoria } = await import(
       `file://${cleanupPath.replace(/\\/g, '/')}`
     );

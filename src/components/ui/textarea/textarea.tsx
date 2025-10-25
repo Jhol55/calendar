@@ -71,19 +71,36 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         const $nodes: Record<string, { output: unknown }> = {};
         Object.keys(nodeExecutions).forEach((nodeId) => {
           const nodeExec = nodeExecutions[nodeId];
+          // Webhook nodes têm "data" ao invés de "result"
           if (nodeExec?.result) {
             $nodes[nodeId] = {
               output: nodeExec.result,
             };
+          } else if (nodeExec?.data) {
+            // Para webhook nodes, usar "data" como output
+            $nodes[nodeId] = {
+              output: nodeExec.data,
+            };
           }
         });
+
+        // Dados do webhook/trigger (entrada do flow)
+        const execution = flowExecution.selectedExecution as unknown as {
+          data?: unknown;
+          triggerData?: unknown;
+        };
+        const webhookData = execution.data || execution.triggerData;
 
         return {
           ...baseContext,
           $nodes,
           $node: {
-            input: flowExecution.selectedExecution.data,
+            input: webhookData,
           },
+          // Adicionar dados do webhook diretamente no contexto raiz também
+          ...(webhookData && typeof webhookData === 'object'
+            ? webhookData
+            : {}),
         };
       }
 
@@ -206,7 +223,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
                 ? typeof resolvedValue === 'object'
                   ? JSON.stringify(resolvedValue, null, 2)
                   : String(resolvedValue)
-                : 'Nenhuma execução disponível. Execute o flow para ver os valores.';
+                : 'Execute o flow para ver o valor';
 
               return (
                 <Tooltip

@@ -3,7 +3,7 @@
 // ============================================
 
 import { prisma } from '@/services/prisma';
-import { DatabaseNodeService } from '@/services/database/database.service';
+import { DatabaseService } from '@/services/database/database.service';
 import type { DatabaseNodeConfigType } from '@/config/database.config';
 
 /**
@@ -31,10 +31,10 @@ jest.mock('@/config/database.config', () => ({
 }));
 
 /**
- * Factory: Cria uma nova instância isolada do DatabaseNodeService
+ * Factory: Cria uma nova instância isolada do DatabaseService
  */
-export function createTestService(): DatabaseNodeService {
-  return new DatabaseNodeService();
+export function createTestService(): DatabaseService {
+  return new DatabaseService();
 }
 
 /**
@@ -43,8 +43,8 @@ export function createTestService(): DatabaseNodeService {
  */
 export function createTestServiceWithConfig(
   config: Partial<DatabaseNodeConfigType>,
-): DatabaseNodeService {
-  return new DatabaseNodeService(config);
+): DatabaseService {
+  return new DatabaseService(config);
 }
 
 /**
@@ -140,12 +140,12 @@ export function generateMultipleUsers(count: number): string[] {
 }
 
 /**
- * Mock de erro controlado no DatabaseNodeService
+ * Mock de erro controlado no DatabaseService
  * @returns SpyInstance que pode ser restaurado com .mockRestore()
  */
 export function mockDatabaseError(
-  service: DatabaseNodeService,
-  method: keyof DatabaseNodeService,
+  service: DatabaseService,
+  method: keyof DatabaseService,
   errorMessage: string,
 ): jest.SpyInstance {
   const error = new Error(errorMessage) as Error & { code: string };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import {
   MessageSquare,
   GitBranch,
@@ -98,7 +98,7 @@ interface SidebarProps {
   onDragStart: (event: React.DragEvent, nodeType: NodeType) => void;
 }
 
-export function Sidebar({ onDragStart }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ onDragStart }: SidebarProps) {
   return (
     <div className="w-64 bg-white border-l border-gray-200 p-4 overflow-y-auto">
       <h2 className="text-lg font-bold mb-4 text-gray-800">Módulos</h2>
@@ -136,4 +136,4 @@ export function Sidebar({ onDragStart }: SidebarProps) {
       </div>
     </div>
   );
-}
+});

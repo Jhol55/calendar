@@ -18,6 +18,7 @@ interface ExecutionData {
   nodeExecutions: Record<string, NodeExecution>;
   data?: unknown;
   result?: unknown;
+  triggerData?: unknown;
 }
 
 interface FlowExecutionContextType {

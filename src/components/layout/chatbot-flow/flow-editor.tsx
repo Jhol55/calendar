@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -69,6 +69,8 @@ import { CodeExecutionNodeConfig } from './nodes/code-execution-node/code-execut
 import { ExecutionsPanel } from './executions-panel';
 import { DatabaseSpreadsheet } from '@/components/layout/database-spreadsheet/database-spreadsheet';
 
+// Definir nodeTypes e edgeTypes FORA do componente para evitar re-criação
+// Isso garante que as referências permaneçam estáveis entre renders
 const nodeTypes = {
   end: EndNode,
   message: MessageNode,
@@ -407,25 +409,66 @@ function FlowEditorContent() {
           }),
         );
 
-        // Garantir que as edges tenham IDs únicos
-        const processedEdges = (flow.edges || []).map((edge: Edge) => ({
-          ...edge,
-          id:
-            edge.id ||
-            `edge_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-        }));
+        // Criar um Set com todos os node IDs válidos
+        const validNodeIds = new Set(processedNodes.map((n) => n.id));
 
-        console.log('Loading flow:', {
-          name: flow.name,
-          nodesCount: processedNodes.length,
-          edgesCount: processedEdges.length,
-          nodes: processedNodes.map((n) => ({ id: n.id, type: n.type })),
-        });
+        // Criar mapa de nodes para validação de handles
+        const nodesMap = new Map(processedNodes.map((n) => [n.id, n]));
 
+        // Filtrar edges inválidas (que referenciam nodes que não existem)
+        const processedEdges = (flow.edges || [])
+          .filter((edge: Edge) => {
+            // Verificar se source e target existem
+            const hasValidSource = validNodeIds.has(edge.source);
+            const hasValidTarget = validNodeIds.has(edge.target);
+
+            if (!hasValidSource || !hasValidTarget) {
+              return false;
+            }
+
+            // Validação específica para handles de condition nodes
+            const sourceNode = nodesMap.get(edge.source);
+            if (sourceNode?.type === 'condition' && edge.sourceHandle) {
+              const config = sourceNode.data?.conditionConfig;
+              const isSwitch = config?.conditionType === 'switch';
+
+              // Se for switch, validar se o handle é um case válido ou default
+              if (isSwitch) {
+                const validHandles = new Set([
+                  ...(config?.cases || []).map(
+                    (c: { id: string }) => `case_${c.id}`,
+                  ),
+                  'default',
+                ]);
+
+                if (!validHandles.has(edge.sourceHandle)) {
+                  return false;
+                }
+              }
+              // Se não for switch, aceitar apenas true/false
+              else if (!['true', 'false'].includes(edge.sourceHandle)) {
+                return false;
+              }
+            }
+
+            return true;
+          })
+          .map((edge: Edge) => ({
+            ...edge,
+            id:
+              edge.id ||
+              `edge_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+          }));
+
+        // Renderizar nodes primeiro
         setNodes(processedNodes);
-        setEdges(processedEdges);
         setFlowName(flow.name);
         setCurrentFlowId(flow.id);
+
+        // Adicionar edges após os nodes serem renderizados (evitar race condition)
+        setTimeout(() => {
+          setEdges(processedEdges);
+        }, 250);
       }, 100);
     },
     [setNodes, setEdges],
@@ -440,9 +483,9 @@ function FlowEditorContent() {
           description: '',
           nodes: [],
           edges: [],
-          token: `flow-${Date.now()}`,
+          token: null, // null porque não está vinculado a nenhuma instância ainda
           userId: user?.id,
-          isActive: false,
+          isActive: true, // Fluxo ativo por padrão
         };
 
         const newFlow = await createWorkflowMutation.mutateAsync(flowData);
@@ -709,6 +752,26 @@ function FlowEditorContent() {
     }
   }, []);
 
+  // Memoizar opções do ReactFlow para evitar recriação
+  const fitViewOptions = useMemo(
+    () => ({
+      padding: 0.2,
+      minZoom: 0.05,
+      maxZoom: 2,
+    }),
+    [],
+  );
+
+  const defaultViewport = useMemo(() => ({ x: 0, y: 0, zoom: 0.1 }), []);
+
+  const proOptions = useMemo(() => ({ hideAttribution: true }), []);
+
+  // Memoizar estilos do Panel para evitar recriação
+  const panelTopRightStyle = useMemo(() => ({ zoom: 0.9 }), []);
+
+  // Memoizar array panOnDrag para evitar recriação
+  const panOnDragConfig = useMemo(() => [2], []);
+
   return (
     <div className="flex h-full">
       <FlowsListSidebar
@@ -731,18 +794,14 @@ function FlowEditorContent() {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={{
-            padding: 0.2,
-            minZoom: 0.05,
-            maxZoom: 2,
-          }}
+          fitViewOptions={fitViewOptions}
           minZoom={0.05}
           maxZoom={2}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.1 }}
-          proOptions={{ hideAttribution: true }}
+          defaultViewport={defaultViewport}
+          proOptions={proOptions}
           className="bg-gray-50"
           selectionOnDrag
-          panOnDrag={[1, 2]}
+          panOnDrag={panOnDragConfig}
           selectionMode={SelectionMode.Partial}
         >
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
@@ -775,7 +834,7 @@ function FlowEditorContent() {
           <Panel
             position="top-right"
             className="flex gap-2 m-4"
-            style={{ zoom: 0.9 }}
+            style={panelTopRightStyle}
           >
             <div className="flex gap-4 h-fit">
               <Button

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
@@ -58,83 +58,79 @@ const menuItems: MenuItem[] = [
   },
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({
-  className,
-  isOpen = true,
-  headerClassName,
-  navClassName,
-  footerClassName,
-  logoClassName,
-  menuItemClassName,
-}) => {
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [activeItem, setActiveItem] = useState<string>('');
-  const router = useRouter();
+// Otimização: Usar CSS transitions ao invés de Framer Motion para melhor performance
 
-  const toggleExpanded = (itemId: string) => {
-    const newExpanded = new Set(expandedItems);
-    if (newExpanded.has(itemId)) {
-      newExpanded.delete(itemId);
-    } else {
-      newExpanded.add(itemId);
-    }
-    setExpandedItems(newExpanded);
-  };
-
-  const handleItemClick = (itemId: string, href?: string) => {
-    setActiveItem(itemId);
-    if (href) {
-      router.push(href);
-    }
-  };
-
-  const renderMenuItem = (item: MenuItem, level: number = 0) => {
-    const isExpanded = expandedItems.has(item.id);
-    const isActive = activeItem === item.id;
+// Componente MenuItem memoizado para evitar re-renders
+const MenuItemComponent = memo(
+  ({
+    item,
+    level,
+    isExpanded,
+    isActive,
+    isHovered,
+    onToggle,
+    onClick,
+    menuItemClassName,
+  }: {
+    item: MenuItem;
+    level: number;
+    isExpanded: boolean;
+    isActive: boolean;
+    isHovered: boolean;
+    onToggle: () => void;
+    onClick: () => void;
+    menuItemClassName?: string;
+  }) => {
     const hasSubItems = item.subItems && item.subItems.length > 0;
 
     return (
-      <div key={item.id} className="w-full">
+      <div className="w-full">
         <Button
           variant="ghost"
           className={cn(
-            'w-full justify-start gap-3 px-4 py-3 text-left transition-all duration-300',
+            'w-full gap-3 h-12 text-left transition-all duration-200',
+            isHovered ? 'justify-start px-4' : 'justify-center px-0',
             'hover:bg-neutral-200',
             isActive && '!bg-neutral-200 shadow-lg',
-            level > 0 && 'ml-4 text-sm py-2 sm:w-[calc(100%-1rem)]',
+            level > 0 && isHovered && 'ml-4 text-sm h-10 w-[calc(100%-1rem)]',
             'bg-transparent border-none shadow-none',
             menuItemClassName,
           )}
           onClick={() => {
             if (hasSubItems) {
-              toggleExpanded(item.id);
+              onToggle();
             } else {
-              handleItemClick(item.id, item.href);
+              onClick();
             }
           }}
         >
           <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <div
                 className={cn(
-                  'transition-colors duration-200',
+                  'flex-shrink-0',
                   isActive ? 'text-neutral-700' : 'text-neutral-500',
                 )}
               >
                 {item.icon}
               </div>
-              <Typography
-                variant="span"
-                className={cn(
-                  'transition-colors duration-200',
-                  isActive ? 'text-neutral-700' : 'text-neutral-500',
-                )}
-              >
-                {item.label}
-              </Typography>
+              {isHovered && (
+                <Typography
+                  variant="span"
+                  className={cn(
+                    'whitespace-nowrap overflow-hidden',
+                    isActive ? 'text-neutral-700' : 'text-neutral-500',
+                  )}
+                  style={{
+                    transition: 'opacity 0.15s ease-out',
+                  }}
+                >
+                  {item.label}
+                </Typography>
+              )}
             </div>
-            {hasSubItems && (
-              <div className="transition-transform duration-200">
+            {hasSubItems && isHovered && (
+              <div className="flex-shrink-0">
                 {isExpanded ? (
                   <ChevronDown size={16} />
                 ) : (
@@ -147,57 +143,124 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {hasSubItems && (
           <div
-            className={cn(
-              'overflow-hidden transition-all duration-300 ease-in-out',
-              isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0',
-            )}
+            className="overflow-hidden"
+            style={{
+              maxHeight: isHovered && isExpanded ? '500px' : '0',
+              opacity: isHovered && isExpanded ? 1 : 0,
+              transition: 'max-height 0.2s ease-out, opacity 0.15s ease-out',
+            }}
           >
             <div className="space-y-1">
-              {item.subItems!.map((subItem) =>
-                renderMenuItem(subItem, level + 1),
-              )}
+              {item.subItems!.map((subItem) => (
+                <MenuItemComponent
+                  key={subItem.id}
+                  item={subItem}
+                  level={level + 1}
+                  isExpanded={false}
+                  isActive={false}
+                  isHovered={isHovered}
+                  onToggle={() => {}}
+                  onClick={onClick}
+                  menuItemClassName={menuItemClassName}
+                />
+              ))}
             </div>
           </div>
         )}
       </div>
     );
-  };
+  },
+);
+
+MenuItemComponent.displayName = 'MenuItemComponent';
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  className,
+  isOpen = true,
+  headerClassName,
+  navClassName,
+  footerClassName,
+  logoClassName,
+  menuItemClassName,
+}) => {
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [activeItem, setActiveItem] = useState<string>('');
+  const [isHovered, setIsHovered] = useState(false);
+  const router = useRouter();
+
+  const toggleExpanded = useCallback((itemId: string) => {
+    setExpandedItems((prev) => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(itemId)) {
+        newExpanded.delete(itemId);
+      } else {
+        newExpanded.add(itemId);
+      }
+      return newExpanded;
+    });
+  }, []);
+
+  const handleItemClick = useCallback(
+    (itemId: string, href?: string) => {
+      setActiveItem(itemId);
+      if (href) {
+        router.push(href);
+      }
+    },
+    [router],
+  );
 
   return (
     <>
       {/* Sidebar */}
       <aside
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         className={cn(
           'fixed left-0 sm:top-0 top-10 h-screen bg-neutral-50 backdrop-blur-sm border-r border-neutral-200',
-          'transition-transform duration-300 ease-in-out z-50',
-          'flex flex-col',
+          'z-50 flex flex-col transition-all duration-200 ease-out',
           isOpen ? 'translate-y-0' : '-translate-y-full',
-          'sm:w-[16rem] w-full md:relative md:translate-x-0',
+          'md:relative md:translate-x-0',
+          isHovered ? 'sm:w-52' : 'sm:w-12',
+          'w-full',
           className,
         )}
       >
-        <div className="flex flex-col h-full" style={{ zoom: 0.9 }}>
+        <div className="flex flex-col h-full relative" style={{ zoom: 0.9 }}>
           {/* Header with Logo */}
           <div
             className={cn(
-              'flex items-center justify-between p-6 border-b border-neutral-200',
+              'absolute w-full flex items-center justify-start ml-1.5 border-neutral-200 h-20 transition-all duration-200',
               headerClassName,
             )}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center overflow-hidden">
               <div
                 className={cn(
-                  'w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center',
+                  'w-10 h-10 min-w-10 min-h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0',
                   logoClassName,
                 )}
               >
                 <Calendar size={24} className="text-white" />
               </div>
-              <div>
-                <Typography variant="h5" className="text-white font-bold">
+              <div
+                className="overflow-hidden whitespace-nowrap ml-4"
+                style={{
+                  opacity: isHovered ? 1 : 0,
+                  width: isHovered ? 'auto' : '0',
+                  transition: 'opacity 0.15s ease-out, width 0.2s ease-out',
+                }}
+              >
+                <Typography
+                  variant="h5"
+                  className="text-white font-bold whitespace-nowrap"
+                >
                   Calendar
                 </Typography>
-                <Typography variant="span" className="text-zinc-400 text-xs">
+                <Typography
+                  variant="span"
+                  className="text-zinc-400 text-xs whitespace-nowrap"
+                >
                   Sistema de Agendamento
                 </Typography>
               </div>
@@ -205,15 +268,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {/* Navigation Menu */}
           <nav
-            className={cn('flex-1 p-4 space-y-2 overflow-y-auto', navClassName)}
+            style={{ marginTop: '4rem' }}
+            className={cn('flex-1 p-4 overflow-y-auto', navClassName)}
           >
-            {menuItems.map((item) => renderMenuItem(item))}
+            {menuItems.map((item) => (
+              <MenuItemComponent
+                key={item.id}
+                item={item}
+                level={0}
+                isExpanded={expandedItems.has(item.id)}
+                isActive={activeItem === item.id}
+                isHovered={isHovered}
+                onToggle={() => toggleExpanded(item.id)}
+                onClick={() => handleItemClick(item.id, item.href)}
+                menuItemClassName={menuItemClassName}
+              />
+            ))}
           </nav>
           {/* Footer */}
           <div
-            className={cn('p-4 border-t border-neutral-200', footerClassName)}
+            className={cn(
+              'border-t border-neutral-200 h-20 flex items-center transition-all duration-200',
+              isHovered ? 'justify-start px-4' : 'justify-center px-0',
+              footerClassName,
+            )}
           >
-            <UserProfile />
+            <div
+              className="overflow-hidden"
+              style={{
+                opacity: isHovered ? 1 : 0,
+                width: isHovered ? '100%' : '0',
+                transition: 'opacity 0.15s ease-out, width 0.2s ease-out',
+              }}
+            >
+              <UserProfile />
+            </div>
+            {!isHovered && (
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <Users size={16} className="text-white" />
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -231,7 +325,7 @@ export const SidebarToggle: React.FC<SidebarToggleProps> = ({
     <Button
       variant="default"
       className={cn(
-        'z-50 sm:hidden p-3 bg-zinc-900/95 backdrop-blur-sm border rounded-none border-zinc-800/50 hover:bg-zinc-800/95',
+        'absolute z-50 sm:hidden p-3 bg-zinc-900/95 backdrop-blur-sm border rounded-none border-zinc-800/50 hover:bg-zinc-800/95',
         className,
       )}
       onClick={onToggle}

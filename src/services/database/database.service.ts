@@ -22,7 +22,7 @@ import type {
   TableStats,
 } from '@/services/database/database.types';
 
-export class DatabaseNodeService {
+export class DatabaseService {
   private readonly config: DatabaseNodeConfigType;
   private readonly MAX_PARTITION_SIZE: number;
   private readonly MAX_PARTITIONS: number;
@@ -1740,6 +1740,6 @@ export class DatabaseNodeService {
   }
 }
 
-// Export apenas a classe (não mais singleton)
-// Para manter compatibilidade com código existente, criamos instância padrão
-export const databaseNodeService = new DatabaseNodeService();
+// Export da classe para instanciar em testes
+// Export da instância padrão para uso geral
+export const databaseService = new DatabaseService();

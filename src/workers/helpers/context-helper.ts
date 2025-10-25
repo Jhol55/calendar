@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '@/services/prisma';
 import type { WebhookJobData } from '@/services/queue';
-import { listarMemorias } from './memory-helper';
+import { listarMemorias } from './node-processors/memory-helper';
 
 interface NodeExecutionsRecord {
   [nodeId: string]: {

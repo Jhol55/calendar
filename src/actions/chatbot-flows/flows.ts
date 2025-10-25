@@ -3,14 +3,6 @@
 import { Node, Edge } from 'reactflow';
 import { NodeData } from '@/components/layout/chatbot-flow';
 import { prisma } from '@/services/prisma';
-import { getSession } from '@/utils/security/session';
-
-interface SessionUser {
-  user: {
-    id: number;
-    email: string;
-  };
-}
 
 export interface ChatbotFlow {
   id: string;
@@ -40,7 +32,7 @@ export interface CreateFlowData {
   description?: string;
   nodes: Node<NodeData>[];
   edges: Edge[];
-  token?: string;
+  token?: string | null;
   userId?: number;
   isActive?: boolean;
 }
@@ -50,7 +42,7 @@ export interface UpdateFlowData {
   description?: string;
   nodes?: Node<NodeData>[];
   edges?: Edge[];
-  token?: string;
+  token?: string | null;
   isActive?: boolean;
 }
 

@@ -7,7 +7,7 @@
  */
 import { webhookQueue, WebhookJobData } from '../services/queue';
 import { prisma } from '../services/prisma';
-import { executeFlow } from './flow-executor';
+import { executeFlow } from './helpers/flow-executor';
 
 // Processar job de webhook
 webhookQueue.process('process-webhook', async (job) => {

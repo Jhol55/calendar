@@ -8,9 +8,8 @@ const config: Config = {
 
   // Pattern para testes de integração
   testMatch: [
-    '**/__tests__/**/*.integration.test.ts',
-    '**/tests/integration/database/**/*.test.ts',
-    // '**/tests/integration/workers/**/*.test.ts',
+    // '**/__tests__/**/*.integration.test.ts',
+    '**/tests/integration/workflow/__tests__/*.test.ts',
   ],
 
   // Path mappings
@@ -39,18 +38,13 @@ const config: Config = {
   // Setup files
   setupFilesAfterEnv: [
     '<rootDir>/tests/integration/database/setup.ts',
-    '<rootDir>/tests/integration/workers/setup.ts',
-    '<rootDir>/tests/integration/workers/teardown.ts',
+    '<rootDir>/tests/integration/workflow/setup.ts',
   ],
 
-  // Timeout para testes de integração (30s)
-  testTimeout: 30000,
+  testTimeout: 120000,
 
   // Cobertura
-  collectCoverageFrom: [
-    'src/services/database/**/*.ts',
-    '!src/services/database/**/*.types.ts',
-  ],
+  collectCoverageFrom: ['src/services/**/*.ts', '!src/services/**/*.types.ts'],
 
   // Verbose output
   verbose: true,

@@ -167,18 +167,21 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
         {/* Handles de Saída - Design melhorado */}
 
         {/* IF Type - Handles mais destacados */}
-        {isIfType && (
+        {/* Sempre renderizar handles true/false quando NÃO for switch */}
+        {!isSwitchType && (
           <>
             {/* Handle True */}
             <div className="absolute right-[-4px] top-[15%] flex items-center gap-1">
-              <div className="text-white px-2 py-0.5 rounded-l-md mr-1">
-                <Typography
-                  variant="span"
-                  className="absolute -right-5 -top-5 text-[10px] font-semibold text-neutral-600"
-                >
-                  true
-                </Typography>
-              </div>
+              {isIfType && (
+                <div className="text-white px-2 py-0.5 rounded-l-md mr-1">
+                  <Typography
+                    variant="span"
+                    className="absolute -right-5 -top-5 text-[10px] font-semibold text-neutral-600"
+                  >
+                    true
+                  </Typography>
+                </div>
+              )}
               <Handle
                 type="source"
                 position={Position.Right}
@@ -189,14 +192,16 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
 
             {/* Handle False */}
             <div className="absolute right-[-4px] bottom-[15%] flex items-center gap-1">
-              <div className="text-white px-2 py-0.5 rounded-l-md mr-1">
-                <Typography
-                  variant="span"
-                  className="absolute -right-6 -top-5 text-[10px] font-semibold text-neutral-600"
-                >
-                  false
-                </Typography>
-              </div>
+              {isIfType && (
+                <div className="text-white px-2 py-0.5 rounded-l-md mr-1">
+                  <Typography
+                    variant="span"
+                    className="absolute -right-6 -top-5 text-[10px] font-semibold text-neutral-600"
+                  >
+                    false
+                  </Typography>
+                </div>
+              )}
               <Handle
                 type="source"
                 position={Position.Right}
@@ -211,33 +216,43 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
         {isSwitchType && (
           <div className="absolute right-[-4px] top-[50%] -translate-y-1/2 flex flex-col gap-2">
             {/* Handles para cada caso - TODOS os casos */}
-            {switchCases.map((caseItem) => (
-              <div
-                key={caseItem.id}
-                className="flex items-center gap-1 relative"
-              >
-                <Typography
-                  variant="span"
-                  className="absolute left-[calc(100%-7px)] ml-2 -top-1 -translate-y-1/2 text-[10px] font-semibold text-neutral-600 whitespace-nowrap"
+            {switchCases.length > 0 ? (
+              switchCases.map((caseItem) => (
+                <div
+                  key={caseItem.id}
+                  className="flex items-center gap-1 relative"
                 >
-                  {caseItem.label.length > 12
-                    ? `${caseItem.label.substring(0, 12)}...`
-                    : caseItem.label}
-                </Typography>
-                <div className=" text-white px-2 py-0.5 rounded-l-md max-w-[100px] truncate">
-                  <div className="my-5"></div>
+                  <Typography
+                    variant="span"
+                    className="absolute left-[calc(100%-7px)] ml-2 -top-1 -translate-y-1/2 text-[10px] font-semibold text-neutral-600 whitespace-nowrap"
+                  >
+                    {caseItem.label.length > 12
+                      ? `${caseItem.label.substring(0, 12)}...`
+                      : caseItem.label}
+                  </Typography>
+                  <div className=" text-white px-2 py-0.5 rounded-l-md max-w-[100px] truncate">
+                    <div className="my-5"></div>
+                  </div>
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={`case_${caseItem.id}`}
+                    className="w-3 h-3 border-2 border-white shadow-lg hover:scale-125 transition-transform"
+                  />
                 </div>
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={`case_${caseItem.id}`}
-                  className="w-3 h-3 border-2 border-white shadow-lg hover:scale-125 transition-transform"
-                />
-              </div>
-            ))}
+              ))
+            ) : (
+              // Handle padrão se não houver casos ainda
+              <Handle
+                type="source"
+                position={Position.Right}
+                id="default"
+                className="w-3 h-3 !bg-gray-500 border-2 border-white shadow-lg hover:scale-125 transition-transform"
+              />
+            )}
 
-            {/* Handle Default */}
-            {hasDefaultCase && (
+            {/* Handle Default - sempre renderizar se configurado */}
+            {hasDefaultCase && switchCases.length > 0 && (
               <div className="flex items-center gap-1 mt-1 relative">
                 <div className=" text-white px-2 py-0.5 rounded-l-md">
                   <Typography
