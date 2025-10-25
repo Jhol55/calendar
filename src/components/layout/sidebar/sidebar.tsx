@@ -14,22 +14,30 @@ import {
   Settings,
   Menu,
   X,
+  Server,
+  Workflow,
 } from 'lucide-react';
 import { MenuItem, SidebarProps, SidebarToggleProps } from './sidebar.type';
 import { UserProfile } from '../user-profile';
 
 const menuItems: MenuItem[] = [
   {
-    id: 'calendar',
-    label: 'Calendário',
-    icon: <Calendar size={20} />,
+    id: 'home',
+    label: 'Home',
+    icon: <Home size={20} />,
     href: '/index',
   },
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: <Home size={20} />,
-    href: '/dashboard',
+    id: 'instances',
+    label: 'Instâncias',
+    icon: <Server size={20} />,
+    href: '/instances',
+  },
+  {
+    id: 'workflows',
+    label: 'Workflows',
+    icon: <Workflow size={20} />,
+    href: '/workflows',
   },
   {
     id: 'users',
@@ -58,9 +66,6 @@ const menuItems: MenuItem[] = [
   },
 ];
 
-// Otimização: Usar CSS transitions ao invés de Framer Motion para melhor performance
-
-// Componente MenuItem memoizado para evitar re-renders
 const MenuItemComponent = memo(
   ({
     item,
@@ -88,10 +93,10 @@ const MenuItemComponent = memo(
         <Button
           variant="ghost"
           className={cn(
-            'w-full gap-3 h-12 text-left transition-all duration-200',
+            'relative w-full gap-3 h-12 text-left transition-all duration-200',
             isHovered ? 'justify-start px-4' : 'justify-center px-0',
-            'hover:bg-neutral-200',
-            isActive && '!bg-neutral-200 shadow-lg',
+            isActive && isHovered && '!bg-neutral-200 shadow-lg rounded-full',
+            'hover:bg-neutral-200 rounded-full',
             level > 0 && isHovered && 'ml-4 text-sm h-10 w-[calc(100%-1rem)]',
             'bg-transparent border-none shadow-none',
             menuItemClassName,
@@ -104,6 +109,9 @@ const MenuItemComponent = memo(
             }
           }}
         >
+          {isActive && !isHovered && (
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !h-10 !w-10 inset-0 rounded-full bg-neutral-200 -z-50 border" />
+          )}
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3 min-w-0">
               <div
@@ -177,6 +185,7 @@ MenuItemComponent.displayName = 'MenuItemComponent';
 export const Sidebar: React.FC<SidebarProps> = ({
   className,
   isOpen = true,
+  isFakeHovered = false,
   headerClassName,
   navClassName,
   footerClassName,
@@ -185,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [activeItem, setActiveItem] = useState<string>('');
-  const [isHovered, setIsHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(isFakeHovered);
   const router = useRouter();
 
   const toggleExpanded = useCallback((itemId: string) => {
@@ -214,8 +223,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* Sidebar */}
       <aside
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={() => setIsHovered(!isHovered)}
+        onMouseLeave={() => setIsHovered(!isHovered)}
         className={cn(
           'fixed left-0 sm:top-0 top-10 h-screen bg-neutral-50 backdrop-blur-sm border-r border-neutral-200',
           'z-50 flex flex-col transition-all duration-200 ease-out',
@@ -269,7 +278,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Navigation Menu */}
           <nav
             style={{ marginTop: '4rem' }}
-            className={cn('flex-1 p-4 overflow-y-auto', navClassName)}
+            className={cn('flex-1 p-4 overflow-y-auto space-y-1', navClassName)}
           >
             {menuItems.map((item) => (
               <MenuItemComponent

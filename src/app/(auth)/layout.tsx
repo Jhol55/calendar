@@ -9,10 +9,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
+  const noExpandedRoutes = ['/workflows'];
 
   return (
     <>
-      {pathname !== '/confirm' && <Sidebar />}
+      {pathname !== '/confirm' && (
+        <Sidebar noExpandedRoutes={noExpandedRoutes} />
+      )}
       {children}
     </>
   );

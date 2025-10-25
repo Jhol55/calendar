@@ -8,7 +8,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Loading } from '@/components/ui/loading';
 import { useUser } from '@/hooks/use-user';
 
-export default function Index() {
+export default function Instances() {
   const [loading, setLoading] = useState(true);
   const [showCreateInstanceForm, setShowCreateInstanceForm] = useState(false);
 

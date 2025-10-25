@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Loader2,
   Plus,
+  Workflow,
 } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
@@ -82,12 +83,12 @@ export function FlowsListSidebar({
   }
 
   return (
-    <div className="w-72 min-w-72 bg-neutral-50 border-r border-gray-200 flex flex-col h-full">
+    <div className="w-64 min-w-64 bg-neutral-50 border-r border-gray-200 flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-neutral-600" />
+            <Workflow className="w-5 h-5 text-neutral-600" />
             <Typography variant="h3" className="font-semibold text-neutral-600">
               Workflows
             </Typography>

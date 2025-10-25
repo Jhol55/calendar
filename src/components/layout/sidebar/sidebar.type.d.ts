@@ -11,6 +11,7 @@ export interface MenuItem {
 export interface SidebarProps {
   className?: string;
   isOpen?: boolean;
+  isFakeHovered?: boolean;
   onToggle?: () => void;
   headerClassName?: string;
   navClassName?: string;
