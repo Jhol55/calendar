@@ -1,18 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
+import { getSession } from '@/utils/security/session';
 
-// GET - Listar todos os fluxos
+interface SessionUser {
+  user: {
+    email: string;
+  };
+  expires: Date;
+  remember: boolean;
+}
+
+// GET - Listar todos os fluxos do usuário autenticado
+// SEGURANÇA: userId é obtido da sessão, não do frontend
 export async function GET(request: NextRequest) {
   try {
+    // Buscar userId da sessão autenticada
+    const session = (await getSession()) as SessionUser | null;
+
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true },
+    });
+
+    if (!user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'User not found' },
+        { status: 404 },
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const token = searchParams.get('token');
 
-    const where: { isActive: boolean; userId?: number; token?: string } = {
+    const where: { isActive: boolean; userId: number; token?: string } = {
       isActive: true,
+      userId: user.id, // SEMPRE filtrar pelo usuário autenticado
     };
 
-    if (userId) where.userId = parseInt(userId);
     if (token) where.token = token;
 
     const flows = await prisma.chatbot_flows.findMany({
@@ -47,10 +78,33 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Criar novo fluxo
+// SEGURANÇA: userId é obtido da sessão, não do frontend
 export async function POST(request: NextRequest) {
   try {
+    // Buscar userId da sessão autenticada
+    const session = (await getSession()) as SessionUser | null;
+
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true },
+    });
+
+    if (!user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'User not found' },
+        { status: 404 },
+      );
+    }
+
     const body = await request.json();
-    const { name, description, nodes, edges, token, userId } = body;
+    const { name, description, nodes, edges, token } = body;
 
     if (!name || !nodes || !edges) {
       return NextResponse.json(
@@ -66,7 +120,7 @@ export async function POST(request: NextRequest) {
         nodes,
         edges,
         token,
-        userId,
+        userId: user.id, // SEMPRE usar o userId da sessão
       },
       include: {
         instance: {

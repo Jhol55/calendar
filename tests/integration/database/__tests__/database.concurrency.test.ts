@@ -4,11 +4,11 @@
 
 import {
   createTestService,
-  generateTestUserId,
+  generateStringUserId,
   executeInParallel,
   generateMultipleUsers,
   createTestServiceWithConfig,
-} from '../setup';
+} from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Concorrência', () => {
@@ -16,9 +16,11 @@ describe('DatabaseService - Concorrência', () => {
   let userId: string;
   let tableName: string;
 
+  console.log('\n📋 INICIANDO: DatabaseService - Concorrência');
+
   beforeEach(async () => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
     tableName = 'concurrency_test';
 
     // Criar tabela de teste
@@ -36,7 +38,12 @@ describe('DatabaseService - Concorrência', () => {
   // Inserções Simultâneas
   // ============================================
   describe('Inserções Simultâneas', () => {
+    console.log('  📂 Grupo: Inserções Simultâneas');
+
     it('deve inserir múltiplos registros simultaneamente sem perda', async () => {
+      console.log(
+        '    ✓ Teste: deve inserir múltiplos registros simultaneamente sem perda',
+      );
       // CENÁRIO POSITIVO: 10 inserções simultâneas
       const operations = Array.from(
         { length: 10 },
@@ -64,6 +71,9 @@ describe('DatabaseService - Concorrência', () => {
     });
 
     it('deve inserir simultaneamente em tabelas de múltiplos usuários', async () => {
+      console.log(
+        '    ✓ Teste: deve inserir simultaneamente em tabelas de múltiplos usuários',
+      );
       // CENÁRIO POSITIVO: Isolamento multi-tenant
       const users = generateMultipleUsers(3);
 
@@ -108,6 +118,9 @@ describe('DatabaseService - Concorrência', () => {
     });
 
     it('deve lidar corretamente com limite de partição em inserções simultâneas', async () => {
+      console.log(
+        '    ✓ Teste: deve lidar corretamente com limite de partição em inserções simultâneas',
+      );
       // CENÁRIO LIMITE: Inserir MAX_PARTITION_SIZE (50) registros de forma híbrida
       // 25 em paralelo + 25 sequenciais para evitar excesso de conflitos
       const parallelOps = Array.from(
@@ -160,7 +173,12 @@ describe('DatabaseService - Concorrência', () => {
   // Updates Simultâneos
   // ============================================
   describe('Updates Simultâneos', () => {
+    console.log('  📂 Grupo: Updates Simultâneos');
+
     it('deve atualizar o mesmo registro simultaneamente mantendo consistência', async () => {
+      console.log(
+        '    ✓ Teste: deve atualizar o mesmo registro simultaneamente mantendo consistência',
+      );
       // CENÁRIO LIMITE: Race condition em update
       // Inserir registro inicial
       const record = await service.insertRecord(userId, tableName, {
@@ -205,6 +223,9 @@ describe('DatabaseService - Concorrência', () => {
     });
 
     it('deve atualizar registros diferentes simultaneamente', async () => {
+      console.log(
+        '    ✓ Teste: deve atualizar registros diferentes simultaneamente',
+      );
       // CENÁRIO POSITIVO: Updates paralelos (com serialização por retry)
       // Inserir 5 registros sequencialmente
       const records = [];
@@ -248,6 +269,9 @@ describe('DatabaseService - Concorrência', () => {
     });
 
     it('deve lidar com update e delete simultâneos do mesmo registro', async () => {
+      console.log(
+        '    ✓ Teste: deve lidar com update e delete simultâneos do mesmo registro',
+      );
       // CENÁRIO NEGATIVO: Conflito entre update e delete
       const record = await service.insertRecord(userId, tableName, {
         value: 100,
@@ -300,7 +324,12 @@ describe('DatabaseService - Concorrência', () => {
   // Leitura vs Escrita
   // ============================================
   describe('Leitura vs Escrita', () => {
+    console.log('  📂 Grupo: Leitura vs Escrita');
+
     it('deve permitir leituras enquanto inserções estão ocorrendo', async () => {
+      console.log(
+        '    ✓ Teste: deve permitir leituras enquanto inserções estão ocorrendo',
+      );
       // CENÁRIO POSITIVO: Reads não bloqueiam writes
       // Inserir registros iniciais
       await Promise.all(
@@ -337,6 +366,7 @@ describe('DatabaseService - Concorrência', () => {
     });
 
     it('deve permitir múltiplas leituras simultâneas', async () => {
+      console.log('    ✓ Teste: deve permitir múltiplas leituras simultâneas');
       // CENÁRIO POSITIVO: Reads não bloqueiam reads
       // Inserir dados sequencialmente para garantir que completem antes das leituras
       for (let i = 0; i < 10; i++) {
@@ -365,6 +395,9 @@ describe('DatabaseService - Concorrência', () => {
     });
 
     it('deve permitir leitura durante modificação de schema', async () => {
+      console.log(
+        '    ✓ Teste: deve permitir leitura durante modificação de schema',
+      );
       // CENÁRIO NEGATIVO: Schema change não deve travar reads
       // Inserir dados sequencialmente
       for (let i = 0; i < 5; i++) {
@@ -404,7 +437,12 @@ describe('DatabaseService - Concorrência', () => {
   // Rate Limiting Concorrente
   // ============================================
   describe('Rate Limiting Concorrente', () => {
+    console.log('  📂 Grupo: Rate Limiting Concorrente');
+
     it('deve aplicar rate limit em burst de operações simultâneas', async () => {
+      console.log(
+        '    ✓ Teste: deve aplicar rate limit em burst de operações simultâneas',
+      );
       // CENÁRIO NEGATIVO: Burst deve respeitar rate limit
       const serviceWithLimit = createTestServiceWithConfig({
         RATE_LIMIT_MAX_OPS: 5,
@@ -445,6 +483,9 @@ describe('DatabaseService - Concorrência', () => {
     });
 
     it('deve manter rate limit independente por usuário', async () => {
+      console.log(
+        '    ✓ Teste: deve manter rate limit independente por usuário',
+      );
       // CENÁRIO POSITIVO: Isolamento de rate limit
       const serviceWithLimit = createTestServiceWithConfig({
         RATE_LIMIT_MAX_OPS: 5,
@@ -479,6 +520,7 @@ describe('DatabaseService - Concorrência', () => {
     });
 
     it('deve resetar rate limit após janela de tempo', async () => {
+      console.log('    ✓ Teste: deve resetar rate limit após janela de tempo');
       // CENÁRIO POSITIVO: Reset de rate limit
       const serviceWithLimit = createTestServiceWithConfig({
         RATE_LIMIT_MAX_OPS: 3,

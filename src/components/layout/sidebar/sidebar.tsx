@@ -194,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [activeItem, setActiveItem] = useState<string>('');
-  const [isHovered, setIsHovered] = useState(isFakeHovered);
+  const [isHovered, setIsHovered] = useState(false);
   const router = useRouter();
 
   const toggleExpanded = useCallback((itemId: string) => {
@@ -230,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           'z-50 flex flex-col transition-all duration-200 ease-out',
           isOpen ? 'translate-y-0' : '-translate-y-full',
           'md:relative md:translate-x-0',
-          isHovered ? 'sm:w-52' : 'sm:w-12',
+          isHovered || isFakeHovered ? 'sm:w-52' : 'sm:w-12',
           'w-full',
           className,
         )}
@@ -255,8 +255,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div
                 className="overflow-hidden whitespace-nowrap ml-4"
                 style={{
-                  opacity: isHovered ? 1 : 0,
-                  width: isHovered ? 'auto' : '0',
+                  opacity: isHovered || isFakeHovered ? 1 : 0,
+                  width: isHovered || isFakeHovered ? 'auto' : '0',
                   transition: 'opacity 0.15s ease-out, width 0.2s ease-out',
                 }}
               >
@@ -287,7 +287,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 level={0}
                 isExpanded={expandedItems.has(item.id)}
                 isActive={activeItem === item.id}
-                isHovered={isHovered}
+                isHovered={isHovered || isFakeHovered}
                 onToggle={() => toggleExpanded(item.id)}
                 onClick={() => handleItemClick(item.id, item.href)}
                 menuItemClassName={menuItemClassName}

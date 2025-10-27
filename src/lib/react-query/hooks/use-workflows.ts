@@ -27,7 +27,8 @@ import {
 } from '@/actions/chatbot-flows/flows';
 
 /**
- * Hook para listar todos os workflows
+ * Hook para listar todos os workflows do usuário autenticado
+ * SEGURANÇA: userId é obtido automaticamente da sessão no backend
  */
 export function useWorkflows(options?: CustomQueryOptions<ChatbotFlow[]>) {
   return useQuery({

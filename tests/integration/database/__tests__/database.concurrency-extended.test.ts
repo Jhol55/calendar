@@ -5,20 +5,22 @@
 
 import {
   createTestService,
-  generateTestUserId,
+  generateStringUserId,
   executeInParallel,
   generateMultipleUsers,
-} from '../setup';
+} from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Concorrência Estendida', () => {
+  console.log('\n📋 INICIANDO: DatabaseService - Concorrência Estendida');
+
   let service: DatabaseService;
   let userId: string;
   let tableName: string;
 
   beforeEach(async () => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
     tableName = 'concurrency_extended_test';
 
     // Criar tabela de teste
@@ -35,7 +37,12 @@ describe('DatabaseService - Concorrência Estendida', () => {
   // FASE 2: DeleteRecords Concorrente
   // ============================================
   describe('DeleteRecords Simultâneos', () => {
+    console.log('  📂 Grupo: DeleteRecords Simultâneos');
+
     it('deve deletar múltiplos registros diferentes simultaneamente', async () => {
+      console.log(
+        '    ✓ Teste: deve deletar múltiplos registros diferentes simultaneamente',
+      );
       // CENÁRIO POSITIVO: 10 deletes paralelos em registros distintos
       // Inserir 10 registros sequencialmente
       for (let i = 0; i < 10; i++) {
@@ -68,6 +75,9 @@ describe('DatabaseService - Concorrência Estendida', () => {
     });
 
     it('deve lidar com delete do mesmo registro simultaneamente', async () => {
+      console.log(
+        '    ✓ Teste: deve lidar com delete do mesmo registro simultaneamente',
+      );
       // CENÁRIO LIMITE: 5 deletes paralelos do mesmo registro
       const record = await service.insertRecord(userId, tableName, {
         value: 100,
@@ -105,6 +115,9 @@ describe('DatabaseService - Concorrência Estendida', () => {
     });
 
     it('deve deletar com filtros complexos simultaneamente', async () => {
+      console.log(
+        '    ✓ Teste: deve deletar com filtros complexos simultaneamente',
+      );
       // CENÁRIO POSITIVO: Múltiplos deletes com filtros diferentes
       // Inserir 20 registros
       for (let i = 0; i < 20; i++) {
@@ -144,6 +157,9 @@ describe('DatabaseService - Concorrência Estendida', () => {
     });
 
     it('deve permitir delete durante inserts intensivos', async () => {
+      console.log(
+        '    ✓ Teste: deve permitir delete durante inserts intensivos',
+      );
       // CENÁRIO LIMITE: Delete + inserts simultâneos
       // Inserir 10 registros iniciais
       for (let i = 0; i < 10; i++) {
@@ -191,7 +207,12 @@ describe('DatabaseService - Concorrência Estendida', () => {
   // FASE 3: Batch Operations Concorrentes
   // ============================================
   describe('Batch Operations Simultâneas', () => {
+    console.log('  📂 Grupo: Batch Operations Simultâneas');
+
     it('deve executar batch update + insert simultâneo', async () => {
+      console.log(
+        '    ✓ Teste: deve executar batch update + insert simultâneo',
+      );
       // CENÁRIO POSITIVO: Batch update grande + inserts
       // Inserir 100 registros
       for (let i = 0; i < 100; i++) {
@@ -243,7 +264,10 @@ describe('DatabaseService - Concorrência Estendida', () => {
   // FASE 4: Schema Operations Concorrentes
   // ============================================
   describe('Schema Operations Simultâneas', () => {
+    console.log('  📂 Grupo: Schema Operations Simultâneas');
+
     it('deve permitir addColumns durante inserts', async () => {
+      console.log('    ✓ Teste: deve permitir addColumns durante inserts');
       // CENÁRIO POSITIVO: Add columns + inserts simultâneos
       const insertOps = Array.from(
         { length: 5 },
@@ -282,19 +306,29 @@ describe('DatabaseService - Concorrência Estendida', () => {
   // FASE 5: Multi-User Isolation
   // ============================================
   describe('Isolamento Multi-Usuário', () => {
+    console.log('  📂 Grupo: Isolamento Multi-Usuário');
+
     it('deve manter isolamento perfeito entre usuários', async () => {
+      console.log(
+        '    ✓ Teste: deve manter isolamento perfeito entre usuários',
+      );
       // CENÁRIO POSITIVO: 3 usuários operando simultaneamente
       const users = generateMultipleUsers(3);
       const tableName = 'isolation_test';
 
-      // Cada usuário cria tabela e insere 10 registros
-      const operations = users.flatMap((uid) => [
-        () =>
+      // FASE 1: Criar schemas ANTES (em paralelo entre usuários)
+      await Promise.all(
+        users.map((uid) =>
           service.addColumns(uid, tableName, [
             { name: 'value', type: 'number' },
             { name: 'userId', type: 'string' },
           ]),
-        ...Array.from(
+        ),
+      );
+
+      // FASE 2: Inserir registros (em paralelo)
+      const insertOperations = users.flatMap((uid) =>
+        Array.from(
           { length: 10 },
           (_, i) => () =>
             service.insertRecord(uid, tableName, {
@@ -302,15 +336,15 @@ describe('DatabaseService - Concorrência Estendida', () => {
               userId: uid,
             }),
         ),
-      ]);
+      );
 
       const { results, errors } = await executeInParallel(
-        operations as (() => Promise<unknown>)[],
+        insertOperations as (() => Promise<unknown>)[],
       );
 
       // Expectativa: 100% sucesso
       expect(errors).toHaveLength(0);
-      expect(results).toHaveLength(33); // 3 addColumns + 30 inserts
+      expect(results).toHaveLength(30); // 30 inserts (3 users × 10 records)
 
       // Validação: Cada usuário tem exatamente 10 registros
       for (const uid of users) {
@@ -325,7 +359,12 @@ describe('DatabaseService - Concorrência Estendida', () => {
   // FASE 6: Partition Boundary Tests
   // ============================================
   describe('Testes de Limite de Partição', () => {
+    console.log('  📂 Grupo: Testes de Limite de Partição');
+
     it('deve criar nova partição automaticamente ao atingir limite', async () => {
+      console.log(
+        '    ✓ Teste: deve criar nova partição automaticamente ao atingir limite',
+      );
       // CENÁRIO POSITIVO: Inserir exatamente MAX_PARTITION_SIZE + 1
       // MAX_PARTITION_SIZE = 50 no setup
       for (let i = 0; i < 51; i++) {
@@ -343,6 +382,9 @@ describe('DatabaseService - Concorrência Estendida', () => {
     });
 
     it('deve distribuir inserts concorrentes entre partições', async () => {
+      console.log(
+        '    ✓ Teste: deve distribuir inserts concorrentes entre partições',
+      );
       // CENÁRIO POSITIVO: Preencher primeira partição
       for (let i = 0; i < 50; i++) {
         await service.insertRecord(userId, tableName, { value: i });

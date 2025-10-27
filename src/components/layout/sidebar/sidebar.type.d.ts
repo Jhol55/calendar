@@ -18,6 +18,7 @@ export interface SidebarProps {
   footerClassName?: string;
   logoClassName?: string;
   menuItemClassName?: string;
+  changeWidthOnHover?: boolean;
 }
 
 export interface SidebarToggleProps {

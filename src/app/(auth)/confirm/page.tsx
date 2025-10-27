@@ -11,7 +11,10 @@ export default function Confirm() {
 
   return (
     <main className="relative flex justify-center items-center w-screen h-screen overflow-hidden p-6 md:p-10 bg-gradient-to-br from-slate-50 via-white to-blue-50 text-slate-800">
-      <section className="relative w-full max-w-lg rounded-3xl bg-white/80 backdrop-blur border border-slate-200 shadow-xl px-6 py-8 md:px-10 md:py-12 flex flex-col items-center gap-6">
+      <section
+        className="relative w-full max-w-lg rounded-3xl bg-white/80 backdrop-blur border border-slate-200 shadow-xl px-6 py-8 md:px-10 md:py-12 flex flex-col items-center gap-6"
+        style={{ zoom: 0.9 }}
+      >
         <div className="w-full flex flex-col items-center gap-2">
           <Typography
             variant="h1"

@@ -2,7 +2,7 @@
 // TESTES DE RECUPERAÇÃO E CONSISTÊNCIA - DatabaseService
 // ============================================
 
-import { createTestService, generateTestUserId } from '../setup';
+import { createTestService, generateStringUserId } from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Recuperação e Consistência', () => {
@@ -10,9 +10,11 @@ describe('DatabaseService - Recuperação e Consistência', () => {
   let userId: string;
   let tableName: string;
 
+  console.log('\n📋 INICIANDO: DatabaseService - Recuperação e Consistência');
+
   beforeEach(async () => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
     tableName = 'recovery_test';
 
     // Criar tabela de teste
@@ -29,11 +31,14 @@ describe('DatabaseService - Recuperação e Consistência', () => {
   // Validação de Tipos e Consistência
   // ============================================
   describe('Validação de Tipos', () => {
+    console.log('  📂 Grupo: Validação de Tipos');
+
     it('deve rejeitar inserção com tipo inválido', async () => {
+      console.log('    ✓ Teste: deve rejeitar inserção com tipo inválido');
       // CENÁRIO NEGATIVO: Inserir string em campo number
       await expect(
         service.insertRecord(userId, tableName, {
-          value: 'not-a-number' as any,
+          value: 'not-a-number' as unknown as number,
           status: 'test',
         }),
       ).rejects.toThrow();
@@ -44,6 +49,9 @@ describe('DatabaseService - Recuperação e Consistência', () => {
     });
 
     it('deve rejeitar update com tipo inválido e manter dados originais', async () => {
+      console.log(
+        '    ✓ Teste: deve rejeitar update com tipo inválido e manter dados originais',
+      );
       // CENÁRIO NEGATIVO: Update com tipo inválido preserva estado original
       // Inserir registro válido
       await service.insertRecord(userId, tableName, {
@@ -57,7 +65,7 @@ describe('DatabaseService - Recuperação e Consistência', () => {
           userId,
           tableName,
           { condition: 'AND', rules: [] },
-          { value: 'invalid' as any },
+          { value: 'invalid' as unknown as number },
         ),
       ).rejects.toThrow();
 
@@ -69,6 +77,9 @@ describe('DatabaseService - Recuperação e Consistência', () => {
     });
 
     it('deve manter integridade ao rejeitar campo obrigatório ausente', async () => {
+      console.log(
+        '    ✓ Teste: deve manter integridade ao rejeitar campo obrigatório ausente',
+      );
       // CENÁRIO NEGATIVO: Campo required ausente
       // Adicionar campo obrigatório
       await service.addColumns(userId, tableName, [
@@ -90,6 +101,9 @@ describe('DatabaseService - Recuperação e Consistência', () => {
     });
 
     it('deve rejeitar DELETE com filtro de tipo inválido', async () => {
+      console.log(
+        '    ✓ Teste: deve rejeitar DELETE com filtro de tipo inválido',
+      );
       // CENÁRIO NEGATIVO: Filtro com tipo incompatível deve ser rejeitado
       // Inserir registros válidos
       await Promise.all([
@@ -106,7 +120,7 @@ describe('DatabaseService - Recuperação e Consistência', () => {
             {
               field: 'value',
               operator: 'equals',
-              value: 'not-a-number' as any,
+              value: 'not-a-number' as unknown as number,
             },
           ],
         }),
@@ -122,7 +136,12 @@ describe('DatabaseService - Recuperação e Consistência', () => {
   // Limites e Capacidade
   // ============================================
   describe('Limites e Capacidade', () => {
+    console.log('  📂 Grupo: Limites e Capacidade');
+
     it('deve rejeitar inserção quando MAX_PARTITIONS atingido e todas cheias', async () => {
+      console.log(
+        '    ✓ Teste: deve rejeitar inserção quando MAX_PARTITIONS atingido e todas cheias',
+      );
       // CENÁRIO NEGATIVO: Limite absoluto de capacidade
       // MAX_PARTITION_SIZE = 50, MAX_PARTITIONS = 20
       // Capacidade máxima = 50 × 20 = 1000 registros
@@ -153,9 +172,12 @@ describe('DatabaseService - Recuperação e Consistência', () => {
       const finalRecords = await service.getRecords(userId, tableName, {});
       expect(finalRecords).toHaveLength(1000);
       expect(finalRecords.every((r) => r.value !== 9999)).toBe(true);
-    });
+    }, 60000);
 
     it('deve permitir operações após deletar registros de partição cheia', async () => {
+      console.log(
+        '    ✓ Teste: deve permitir operações após deletar registros de partição cheia',
+      );
       // CENÁRIO POSITIVO: Recuperação de espaço após delete
       // Encher uma partição (50 registros)
       for (let i = 0; i < 50; i++) {
@@ -186,6 +208,9 @@ describe('DatabaseService - Recuperação e Consistência', () => {
     });
 
     it('deve manter stats consistentes após operações falhadas', async () => {
+      console.log(
+        '    ✓ Teste: deve manter stats consistentes após operações falhadas',
+      );
       // CENÁRIO POSITIVO: Stats não corrompem após erro
       // Inserir registros válidos
       for (let i = 0; i < 3; i++) {
@@ -202,7 +227,7 @@ describe('DatabaseService - Recuperação e Consistência', () => {
       // Tentar inserção inválida (deve falhar)
       await expect(
         service.insertRecord(userId, tableName, {
-          value: 'invalid' as any,
+          value: 'invalid' as unknown as number,
           status: 'test',
         }),
       ).rejects.toThrow();
@@ -215,6 +240,9 @@ describe('DatabaseService - Recuperação e Consistência', () => {
     });
 
     it('deve manter isFull correto após preenchimento gradual', async () => {
+      console.log(
+        '    ✓ Teste: deve manter isFull correto após preenchimento gradual',
+      );
       // CENÁRIO POSITIVO: Flag isFull atualiza corretamente
       // Inserir 49 registros (MAX_PARTITION_SIZE = 50, quase cheia)
       for (let i = 0; i < 49; i++) {
@@ -255,7 +283,12 @@ describe('DatabaseService - Recuperação e Consistência', () => {
   // Consistência de Dados
   // ============================================
   describe('Consistência de Dados', () => {
+    console.log('  📂 Grupo: Consistência de Dados');
+
     it('deve manter integridade após múltiplas operações sequenciais', async () => {
+      console.log(
+        '    ✓ Teste: deve manter integridade após múltiplas operações sequenciais',
+      );
       // CENÁRIO POSITIVO: Operações sequenciais não corrompem dados
       // Inserir dados
       await service.insertRecord(userId, tableName, {
@@ -292,6 +325,9 @@ describe('DatabaseService - Recuperação e Consistência', () => {
     });
 
     it('deve manter cache consistente após mudanças de schema', async () => {
+      console.log(
+        '    ✓ Teste: deve manter cache consistente após mudanças de schema',
+      );
       // CENÁRIO POSITIVO: Cache de schema não corrompe após alterações
       // Inserir dados com schema inicial
       await service.insertRecord(userId, tableName, {
@@ -326,6 +362,9 @@ describe('DatabaseService - Recuperação e Consistência', () => {
     });
 
     it('deve validar filtros complexos não corrompem resultados', async () => {
+      console.log(
+        '    ✓ Teste: deve validar filtros complexos não corrompem resultados',
+      );
       // CENÁRIO POSITIVO: Filtros complexos mantêm consistência
       // Inserir dataset de teste
       await Promise.all([
@@ -360,7 +399,12 @@ describe('DatabaseService - Recuperação e Consistência', () => {
   // Performance e Cache
   // ============================================
   describe('Performance e Cache', () => {
+    console.log('  📂 Grupo: Performance e Cache');
+
     it('deve usar cache de schema após primeira operação', async () => {
+      console.log(
+        '    ✓ Teste: deve usar cache de schema após primeira operação',
+      );
       // CENÁRIO POSITIVO: Cache melhora performance
       // Primeira operação (cache miss)
       await service.insertRecord(userId, tableName, { value: 1, status: 'ok' });
@@ -383,6 +427,7 @@ describe('DatabaseService - Recuperação e Consistência', () => {
     });
 
     it('deve limpar cache ao modificar schema', async () => {
+      console.log('    ✓ Teste: deve limpar cache ao modificar schema');
       // CENÁRIO POSITIVO: Cache é invalidado corretamente
       // Popular cache
       await service.insertRecord(userId, tableName, { value: 1, status: 'ok' });

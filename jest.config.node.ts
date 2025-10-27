@@ -8,8 +8,8 @@ const config: Config = {
 
   // Pattern para testes de integração
   testMatch: [
-    // '**/__tests__/**/*.integration.test.ts',
-    '**/tests/integration/workflow/__tests__/*.test.ts',
+    '**/tests/integration/**/__tests__/**/*.test.ts', // Todos os testes de integração
+    '!**/tests/integration/**/__tests__/**/*.stress.test.ts', // Excluir stress tests por padrão
   ],
 
   // Path mappings
@@ -35,13 +35,16 @@ const config: Config = {
     ],
   },
 
-  // Setup files
+  // Setup files - cada setup será carregado apenas para seus próprios testes
+  // Nota: Não podemos usar setupFilesAfterEnv condicional diretamente no Jest
+  // então usamos a verificação de path dentro de cada setup
   setupFilesAfterEnv: [
-    '<rootDir>/tests/integration/database/setup.ts',
-    '<rootDir>/tests/integration/workflow/setup.ts',
+    '<rootDir>/tests/integration/setup.ts',
+    // '<rootDir>/tests/integration/nodes/webhook-node/setup.ts',
+    // '<rootDir>/tests/integration/workflow/setup.ts',
   ],
 
-  testTimeout: 120000,
+  testTimeout: 60000,
 
   // Cobertura
   collectCoverageFrom: ['src/services/**/*.ts', '!src/services/**/*.types.ts'],

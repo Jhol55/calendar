@@ -19,7 +19,7 @@ export const Sidebar = ({ noExpandedRoutes = [] }: SidebarProps) => {
 
   const shouldStartExpanded = useMemo(() => {
     return noExpandedRoutes.some((route) => pathname?.startsWith(route));
-  }, [pathname, noExpandedRoutes]);
+  }, [noExpandedRoutes, pathname]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const isFakeHovered = !shouldStartExpanded;

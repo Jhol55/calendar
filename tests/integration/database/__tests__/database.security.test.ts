@@ -5,27 +5,32 @@
 import {
   createTestService,
   createTestServiceWithConfig,
-  generateTestUserId,
+  generateStringUserId,
   expectErrorCode,
-} from '../setup';
+} from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Segurança e Limites', () => {
+  console.log('\n📋 INICIANDO: DatabaseService - Segurança e Limites');
+
   let service: DatabaseService;
   let userId1: string;
   let userId2: string;
 
   beforeEach(() => {
     service = createTestService();
-    userId1 = generateTestUserId();
-    userId2 = generateTestUserId();
+    userId1 = generateStringUserId();
+    userId2 = generateStringUserId();
   });
 
   // ============================================
   // 10.1. checkTableLimit (MAX_TABLES = 10)
   // ============================================
   describe('Limite de Tabelas', () => {
+    console.log('  📂 Grupo: Limite de Tabelas');
+
     it('deve permitir criar até MAX_TABLES tabelas', async () => {
+      console.log('    ✓ Teste: deve permitir criar até MAX_TABLES tabelas');
       // Criar 10 tabelas (MAX_TABLES = 10)
       for (let i = 1; i <= 10; i++) {
         await service.addColumns(userId1, `table${i}`, [
@@ -42,6 +47,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('deve lançar erro TABLE_LIMIT ao tentar criar 11ª tabela', async () => {
+      console.log(
+        '    ✓ Teste: deve lançar erro TABLE_LIMIT ao tentar criar 11ª tabela',
+      );
       // Criar 10 tabelas
       for (let i = 1; i <= 10; i++) {
         await service.addColumns(userId1, `table${i}`, [
@@ -59,6 +67,7 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('limite de tabelas deve ser por usuário', async () => {
+      console.log('    ✓ Teste: limite de tabelas deve ser por usuário');
       // User 1 cria 10 tabelas
       for (let i = 1; i <= 10; i++) {
         await service.addColumns(userId1, `table${i}`, [
@@ -81,6 +90,7 @@ describe('DatabaseService - Segurança e Limites', () => {
   // 10.2. verifyTableOwnership
   // ============================================
   describe('Verificação de Propriedade', () => {
+    console.log('  📂 Grupo: Verificação de Propriedade');
     beforeEach(async () => {
       // User 1 cria uma tabela
       await service.addColumns(userId1, 'user1_table', [
@@ -93,6 +103,7 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('dono da tabela deve ter acesso completo', async () => {
+      console.log('    ✓ Teste: dono da tabela deve ter acesso completo');
       // User 1 deve conseguir ler
       const records = await service.getRecords(userId1, 'user1_table', {});
       expect(records).toHaveLength(1);
@@ -122,6 +133,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('outro usuário NÃO deve conseguir ler tabela alheia', async () => {
+      console.log(
+        '    ✓ Teste: outro usuário NÃO deve conseguir ler tabela alheia',
+      );
       // User2 tenta ler "user1_table" → TABLE_NOT_FOUND (não existe no namespace dele)
       await expectErrorCode(
         service.getRecords(userId2, 'user1_table', {}),
@@ -130,6 +144,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('outro usuário NÃO deve conseguir inserir em tabela alheia', async () => {
+      console.log(
+        '    ✓ Teste: outro usuário NÃO deve conseguir inserir em tabela alheia',
+      );
       // User2 tenta inserir em "user1_table" → TABLE_NOT_FOUND
       await expectErrorCode(
         service.insertRecord(userId2, 'user1_table', { data: 'Hacked data' }),
@@ -138,6 +155,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('outro usuário NÃO deve conseguir atualizar tabela alheia', async () => {
+      console.log(
+        '    ✓ Teste: outro usuário NÃO deve conseguir atualizar tabela alheia',
+      );
       // User2 tenta atualizar "user1_table" → TABLE_NOT_FOUND
       await expectErrorCode(
         service.updateRecords(
@@ -151,6 +171,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('outro usuário NÃO deve conseguir deletar da tabela alheia', async () => {
+      console.log(
+        '    ✓ Teste: outro usuário NÃO deve conseguir deletar da tabela alheia',
+      );
       // User2 tenta deletar de "user1_table" → TABLE_NOT_FOUND
       await expectErrorCode(
         service.deleteRecords(userId2, 'user1_table', {
@@ -162,6 +185,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('outro usuário NÃO deve conseguir ver stats da tabela alheia', async () => {
+      console.log(
+        '    ✓ Teste: outro usuário NÃO deve conseguir ver stats da tabela alheia',
+      );
       // User2 tenta ver stats de "user1_table" → TABLE_NOT_FOUND
       await expectErrorCode(
         service.getTableStats(userId2, 'user1_table'),
@@ -170,6 +196,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('outro usuário NÃO deve conseguir modificar schema da tabela alheia', async () => {
+      console.log(
+        '    ✓ Teste: outro usuário NÃO deve conseguir modificar schema da tabela alheia',
+      );
       // User2 tenta modificar schema de "user1_table"
       // Como a tabela não existe no namespace dele, deveria criar uma NOVA tabela
       // Este teste está INCORRETO - deveria passar!
@@ -192,7 +221,10 @@ describe('DatabaseService - Segurança e Limites', () => {
   // 10.3. checkRateLimit
   // ============================================
   describe('Rate Limiting', () => {
+    console.log('  📂 Grupo: Rate Limiting');
+
     it('deve permitir operações dentro do limite', async () => {
+      console.log('    ✓ Teste: deve permitir operações dentro do limite');
       // Criar tabela
       await service.addColumns(userId1, 'rate_test', [
         { name: 'data', type: 'string' },
@@ -207,6 +239,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('deve bloquear operações após exceder rate limit', async () => {
+      console.log(
+        '    ✓ Teste: deve bloquear operações após exceder rate limit',
+      );
       // Criar serviço com limite de rate muito baixo para teste
       const serviceWithLowLimit = createTestServiceWithConfig({
         RATE_LIMIT_MAX_OPS: 5, // Apenas 5 operações permitidas
@@ -237,6 +272,7 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('rate limit deve ser independente por usuário', async () => {
+      console.log('    ✓ Teste: rate limit deve ser independente por usuário');
       // Criar tabelas para ambos os usuários
       await service.addColumns(userId1, 'user1_rate', [
         { name: 'data', type: 'string' },
@@ -268,7 +304,12 @@ describe('DatabaseService - Segurança e Limites', () => {
   // 10.4. Validação de Entrada (Segurança)
   // ============================================
   describe('Validação de Entrada', () => {
+    console.log('  📂 Grupo: Validação de Entrada');
+
     it('deve rejeitar nome de tabela com SQL injection', async () => {
+      console.log(
+        '    ✓ Teste: deve rejeitar nome de tabela com SQL injection',
+      );
       await expectErrorCode(
         service.addColumns(userId1, "table'; DROP TABLE users; --", [
           { name: 'field', type: 'string' },
@@ -278,6 +319,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('deve rejeitar nome de tabela com path traversal', async () => {
+      console.log(
+        '    ✓ Teste: deve rejeitar nome de tabela com path traversal',
+      );
       await expectErrorCode(
         service.addColumns(userId1, '../../../etc/passwd', [
           { name: 'field', type: 'string' },
@@ -287,6 +331,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('deve rejeitar nome de coluna vazio ou inválido', async () => {
+      console.log(
+        '    ✓ Teste: deve rejeitar nome de coluna vazio ou inválido',
+      );
       await expectErrorCode(
         service.addColumns(userId1, 'test_table', [
           { name: '', type: 'string' },
@@ -296,6 +343,7 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('deve validar tipos de dados corretamente', async () => {
+      console.log('    ✓ Teste: deve validar tipos de dados corretamente');
       await service.addColumns(userId1, 'validation_test', [
         { name: 'email', type: 'string' },
       ]);
@@ -314,7 +362,12 @@ describe('DatabaseService - Segurança e Limites', () => {
   // 10.5. Isolamento de Dados
   // ============================================
   describe('Isolamento de Dados', () => {
+    console.log('  📂 Grupo: Isolamento de Dados');
+
     it('dados de diferentes usuários devem ser completamente isolados', async () => {
+      console.log(
+        '    ✓ Teste: dados de diferentes usuários devem ser completamente isolados',
+      );
       // User 1 e User 2 criam tabelas com mesmo nome
       await service.addColumns(userId1, 'shared_name', [
         { name: 'owner', type: 'string' },
@@ -340,6 +393,9 @@ describe('DatabaseService - Segurança e Limites', () => {
     });
 
     it('operações de um usuário não devem afetar dados de outro', async () => {
+      console.log(
+        '    ✓ Teste: operações de um usuário não devem afetar dados de outro',
+      );
       // Criar tabelas
       await service.addColumns(userId1, 'isolation_test', [
         { name: 'data', type: 'string' },

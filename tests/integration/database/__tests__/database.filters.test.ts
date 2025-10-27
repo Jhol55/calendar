@@ -2,17 +2,19 @@
 // TESTES DO MOTOR DE FILTROS - DatabaseService
 // ============================================
 
-import { createTestService, generateTestUserId } from '../setup';
+import { createTestService, generateStringUserId } from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 import type { FilterConfig } from '@/services/database/database.types.d';
 
 describe('DatabaseService - Filtros', () => {
+  console.log('\n📋 INICIANDO: DatabaseService - Filtros');
+
   let service: DatabaseService;
   let userId: string;
 
   beforeEach(async () => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
 
     // Criar tabela de teste
     await service.addColumns(userId, 'filter_test', [
@@ -61,7 +63,12 @@ describe('DatabaseService - Filtros', () => {
   // 5.1. Operadores de Comparação
   // ============================================
   describe('Operadores de Comparação', () => {
+    console.log('  📂 Grupo: Operadores de Comparação');
+
     it('equals: {val: 10} deve bater com {val: "10"} (coerção numérica)', async () => {
+      console.log(
+        '    ✓ Teste: equals: {val: 10} deve bater com {val: "10"} (coerção numérica)',
+      );
       // Primeiro, inserir um registro com valor numérico e outro com string
       await service.addColumns(userId, 'coercion_test', [
         { name: 'val', type: 'number' },
@@ -83,6 +90,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('equals: deve bater valores iguais', async () => {
+      console.log('    ✓ Teste: equals: deve bater valores iguais');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'age', operator: 'equals', value: 25 }],
@@ -97,6 +105,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('notEquals: deve retornar valores diferentes', async () => {
+      console.log('    ✓ Teste: notEquals: deve retornar valores diferentes');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'age', operator: 'notEquals', value: 25 }],
@@ -111,6 +120,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('greaterThan: 30 > 25', async () => {
+      console.log('    ✓ Teste: greaterThan: 30 > 25');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'age', operator: 'greaterThan', value: 25 }],
@@ -125,6 +135,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('greaterThanOrEqual: 25 >= 25', async () => {
+      console.log('    ✓ Teste: greaterThanOrEqual: 25 >= 25');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'age', operator: 'greaterThanOrEqual', value: 25 }],
@@ -139,6 +150,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('lessThan: 25 < 30', async () => {
+      console.log('    ✓ Teste: lessThan: 25 < 30');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'age', operator: 'lessThan', value: 30 }],
@@ -153,6 +165,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('lessThanOrEqual: 25 <= 25', async () => {
+      console.log('    ✓ Teste: lessThanOrEqual: 25 <= 25');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'age', operator: 'lessThanOrEqual', value: 25 }],
@@ -171,7 +184,10 @@ describe('DatabaseService - Filtros', () => {
   // 5.2. Operadores de String
   // ============================================
   describe('Operadores de String', () => {
+    console.log('  📂 Grupo: Operadores de String');
+
     it('contains: "hello world" contains "world"', async () => {
+      console.log('    ✓ Teste: contains: "hello world" contains "world"');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'name', operator: 'contains', value: 'li' }],
@@ -186,6 +202,9 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('notContains: deve retornar strings que não contêm', async () => {
+      console.log(
+        '    ✓ Teste: notContains: deve retornar strings que não contêm',
+      );
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'name', operator: 'notContains', value: 'li' }],
@@ -200,6 +219,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('startsWith: "hello" startsWith "he"', async () => {
+      console.log('    ✓ Teste: startsWith: "hello" startsWith "he"');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'name', operator: 'startsWith', value: 'Al' }],
@@ -214,6 +234,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('endsWith: "hello" endsWith "lo"', async () => {
+      console.log('    ✓ Teste: endsWith: "hello" endsWith "lo"');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'name', operator: 'endsWith', value: 'e' }],
@@ -232,7 +253,10 @@ describe('DatabaseService - Filtros', () => {
   // 5.3. Operadores de Array
   // ============================================
   describe('Operadores de Array', () => {
+    console.log('  📂 Grupo: Operadores de Array');
+
     it('in: 25 in [20, 25, 30]', async () => {
+      console.log('    ✓ Teste: in: 25 in [20, 25, 30]');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'age', operator: 'in', value: [20, 25, 30] }],
@@ -246,6 +270,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('notIn: 35 not in [20, 25, 30]', async () => {
+      console.log('    ✓ Teste: notIn: 35 not in [20, 25, 30]');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'age', operator: 'notIn', value: [20, 25, 30] }],
@@ -264,7 +289,10 @@ describe('DatabaseService - Filtros', () => {
   // 5.4. Operadores de Null/Boolean
   // ============================================
   describe('Operadores de Null/Boolean', () => {
+    console.log('  📂 Grupo: Operadores de Null/Boolean');
+
     it('isNull: metadata === null', async () => {
+      console.log('    ✓ Teste: isNull: metadata === null');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'metadata', operator: 'isNull', value: null }],
@@ -279,6 +307,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('isNotNull: metadata !== null', async () => {
+      console.log('    ✓ Teste: isNotNull: metadata !== null');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'metadata', operator: 'isNotNull', value: null }],
@@ -292,6 +321,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('isTrue: active === true', async () => {
+      console.log('    ✓ Teste: isTrue: active === true');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'active', operator: 'isTrue', value: null }],
@@ -306,6 +336,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('isFalse: active === false', async () => {
+      console.log('    ✓ Teste: isFalse: active === false');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'active', operator: 'isFalse', value: null }],
@@ -320,6 +351,9 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('isEmpty: deve detectar "", [], null, undefined', async () => {
+      console.log(
+        '    ✓ Teste: isEmpty: deve detectar "", [], null, undefined',
+      );
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'name', operator: 'isEmpty', value: null }],
@@ -333,6 +367,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('isEmpty: deve detectar array vazio', async () => {
+      console.log('    ✓ Teste: isEmpty: deve detectar array vazio');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'tags', operator: 'isEmpty', value: null }],
@@ -347,6 +382,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('isNotEmpty: inverso de isEmpty', async () => {
+      console.log('    ✓ Teste: isNotEmpty: inverso de isEmpty');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [{ field: 'name', operator: 'isNotEmpty', value: null }],
@@ -364,7 +400,10 @@ describe('DatabaseService - Filtros', () => {
   // 5.5. Lógica AND/OR
   // ============================================
   describe('Lógica AND/OR', () => {
+    console.log('  📂 Grupo: Lógica AND/OR');
+
     it('AND: todas as regras devem bater', async () => {
+      console.log('    ✓ Teste: AND: todas as regras devem bater');
       const filter: FilterConfig = {
         condition: 'AND',
         rules: [
@@ -384,6 +423,7 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('OR: pelo menos uma regra deve bater', async () => {
+      console.log('    ✓ Teste: OR: pelo menos uma regra deve bater');
       const filter: FilterConfig = {
         condition: 'OR',
         rules: [
@@ -404,6 +444,9 @@ describe('DatabaseService - Filtros', () => {
     });
 
     it('Teste complexo: (age > 25 OR active = true) AND name contains "e"', async () => {
+      console.log(
+        '    ✓ Teste: Teste complexo: (age > 25 OR active = true) AND name contains "e"',
+      );
       // Como o sistema não suporta grupos aninhados, vamos testar separadamente
       const filter: FilterConfig = {
         condition: 'AND',

@@ -3,49 +3,43 @@
  * Valida resolução de variáveis entre nodes
  */
 
-import '../setup';
 import {
   cleanDatabase,
   cleanQueue,
   closeDatabaseConnection,
   createTestFlow,
-  createWebhookNode,
-  triggerAndWait,
   getNodeOutput,
   getNodeExecutions,
   generateTestId,
   createTestUser,
-} from '../setup';
-import {
-  createMessageNode,
-  createDatabaseNode,
-  createMemoryNode,
+  testContext,
   createEdge,
-} from '../fixtures';
+} from '../../setup';
+import { createWebhookNode, triggerAndWait } from '../../../helpers/webhook';
+import { createDatabaseNode } from '../../nodes/database-node/setup';
+import { createMemoryNode } from '../../nodes/memory-node/setup';
 import { databaseService } from '@/services/database/database.service';
 
 describe('Variables - $nodes', () => {
-  beforeEach(async () => {
-    await cleanDatabase();
-    await cleanQueue();
-  });
-
   it('deve resolver {{$nodes.webhook.output.field}}', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Nome: {{$nodes.' + webhookId + '.output.message.name}}',
-        { useTestCredentials: true },
+        'write',
+        'test_name',
+        '{{$nodes.' + webhookId + '.output.message.name}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { name: 'João Silva', age: 30 },
@@ -63,16 +57,19 @@ describe('Variables - $nodes', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Primeiro: {{$nodes.' + webhookId + '.output.message.items.0.name}}',
-        { useTestCredentials: true },
+        'write',
+        'test_item',
+        '{{$nodes.' + webhookId + '.output.message.items.0.name}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: {
@@ -102,10 +99,11 @@ describe('Variables - $nodes', () => {
         'userName',
         '{{$nodes.' + webhookId + '.output.message.name}}',
       ),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Olá {{$nodes.' + memoryId + '.output.items.0.value}}!',
-        { useTestCredentials: true },
+        'write',
+        'final_greeting',
+        '{{$nodes.' + memoryId + '.output.items.0.value}}',
       ),
     ];
 
@@ -137,7 +135,7 @@ describe('Variables - $nodes', () => {
 
 describe('Variables - Database Output', () => {
   it('deve usar output do database em node seguinte', async () => {
-    const userId = await createTestUser();
+    const userId = testContext.userId!;
     const tableName = generateTestId('table');
 
     // Criar schema e inserir dados de teste
@@ -158,11 +156,15 @@ describe('Variables - Database Output', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createDatabaseNode(dbNodeId, 'get', tableName, { userId }),
-      createMessageNode(
+      createDatabaseNode(dbNodeId, {
+        operation: 'get',
+        table: tableName,
+      }),
+      createMemoryNode(
         messageId,
-        'Total de produtos: {{$nodes.' + dbNodeId + '.output.count}}',
-        { useTestCredentials: true },
+        'write',
+        'product_count',
+        '{{$nodes.' + dbNodeId + '.output.count}}',
       ),
     ];
 
@@ -171,7 +173,9 @@ describe('Variables - Database Output', () => {
       createEdge('e2', dbNodeId, messageId),
     ];
 
-    const flowId = await createTestFlow(nodes, edges, { userId });
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { text: 'Get products' },
@@ -184,7 +188,7 @@ describe('Variables - Database Output', () => {
   });
 
   it('deve acessar campo específico de record do database', async () => {
-    const userId = await createTestUser();
+    const userId = testContext.userId!;
     const tableName = generateTestId('table');
 
     await databaseService.addColumns(String(userId), tableName, [
@@ -204,13 +208,15 @@ describe('Variables - Database Output', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createDatabaseNode(dbNodeId, 'get', tableName, { userId }),
-      createMessageNode(
+      createDatabaseNode(dbNodeId, {
+        operation: 'get',
+        table: tableName,
+      }),
+      createMemoryNode(
         messageId,
-        'Responsável: {{$nodes.' +
-          dbNodeId +
-          '.output.records.0.details.assignee}}',
-        { useTestCredentials: true },
+        'write',
+        'assignee',
+        '{{$nodes.' + dbNodeId + '.output.records.0.details.assignee}}',
       ),
     ];
 
@@ -219,7 +225,9 @@ describe('Variables - Database Output', () => {
       createEdge('e2', dbNodeId, messageId),
     ];
 
-    const flowId = await createTestFlow(nodes, edges, { userId });
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { text: 'Get details' },
@@ -240,30 +248,30 @@ describe('Variables - Variável não encontrada', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Valor: {{$nodes.' + webhookId + '.output.message.nonExistent}}',
-        { useTestCredentials: true },
+        'write',
+        'non_existent',
+        '{{$nodes.' + webhookId + '.output.message.nonExistent}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { text: 'Test' },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Variável não resolvida deve manter o placeholder original
-    expect(messageOutput.text).toContain('{{$nodes.');
-    expect(messageOutput.text).toContain('.output.message.nonExistent}}');
-
-    // A mensagem enviada deve conter o placeholder não resolvido
-    expect(messageOutput.text).toBe(
-      `Valor: {{$nodes.${webhookId}.output.message.nonExistent}}`,
+    // Variável não resolvida deve manter o placeholder original (save retorna items[])
+    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
+    expect(memoryOutput.items[0].value).toContain(
+      '.output.message.nonExistent}}',
     );
   });
 });
@@ -273,36 +281,34 @@ describe('Variables - Variável não encontrada', () => {
 // ==============================================
 
 describe('Variables - Edge Cases (Invalid Syntax)', () => {
-  beforeEach(async () => {
-    await cleanDatabase();
-    await cleanQueue();
-  });
-
   it('should keep placeholder when variable has malformed brackets', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Test: {{$nodes.' + webhookId + '.output.name}', // Falta fechar }}
-        { useTestCredentials: true },
+        'write',
+        'malformed',
+        '{{$nodes.' + webhookId + '.output.name}', // Falta fechar }}
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { name: 'Test' },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Variável mal formada deve ser mantida como está
-    expect(messageOutput.text).toContain('{{$nodes.');
+    // Variável mal formada deve ser mantida como está (save retorna items[])
+    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
   });
 
   it('should keep placeholder when variable has missing dots in path', async () => {
@@ -311,25 +317,28 @@ describe('Variables - Edge Cases (Invalid Syntax)', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Test: {{$nodes.' + webhookId + 'outputmessagename}}', // Faltam os dots
-        { useTestCredentials: true },
+        'write',
+        'missing_dots',
+        '{{$nodes.' + webhookId + 'outputmessagename}}', // Faltam os dots
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { name: 'Test' },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Sintaxe inválida deve manter placeholder
-    expect(messageOutput.text).toContain('{{$nodes.');
+    // Sintaxe inválida deve manter placeholder (save retorna items[])
+    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
   });
 });
 
@@ -338,38 +347,34 @@ describe('Variables - Edge Cases (Invalid Syntax)', () => {
 // ==============================================
 
 describe('Variables - Edge Cases (Property Access)', () => {
-  beforeEach(async () => {
-    await cleanDatabase();
-    await cleanQueue();
-  });
-
   it('should keep placeholder when accessing property on null/undefined', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Test: {{$nodes.' +
-          webhookId +
-          '.output.message.nullField.nestedProperty}}',
-        { useTestCredentials: true },
+        'write',
+        'nested_null',
+        '{{$nodes.' + webhookId + '.output.message.nullField.nestedProperty}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { nullField: null },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Acessar propriedade de null deve manter placeholder
-    expect(messageOutput.text).toContain('{{$nodes.');
+    // Acessar propriedade de null deve manter placeholder (save retorna items[])
+    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
   });
 
   it('should handle very deep object nesting (10+ levels)', async () => {
@@ -378,18 +383,21 @@ describe('Variables - Edge Cases (Property Access)', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Value: {{$nodes.' +
+        'write',
+        'deep_nested',
+        '{{$nodes.' +
           webhookId +
           '.output.message.l1.l2.l3.l4.l5.l6.l7.l8.l9.l10.value}}',
-        { useTestCredentials: true },
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: {
@@ -409,9 +417,10 @@ describe('Variables - Edge Cases (Property Access)', () => {
       },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    expect(messageOutput.text).toBe('Value: deep value');
+    // Save retorna items[]
+    expect(memoryOutput.items[0].value).toBe('deep value');
   });
 
   it('should keep placeholder when array index is out of bounds', async () => {
@@ -420,16 +429,19 @@ describe('Variables - Edge Cases (Property Access)', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Item: {{$nodes.' + webhookId + '.output.message.items.99.name}}',
-        { useTestCredentials: true },
+        'write',
+        'out_of_bounds',
+        '{{$nodes.' + webhookId + '.output.message.items.99.name}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: {
@@ -437,10 +449,10 @@ describe('Variables - Edge Cases (Property Access)', () => {
       },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Índice fora do limite deve manter placeholder
-    expect(messageOutput.text).toContain('{{$nodes.');
+    // Índice fora do limite deve manter placeholder (save retorna items[])
+    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
   });
 
   it('should keep placeholder when using negative array index', async () => {
@@ -449,16 +461,19 @@ describe('Variables - Edge Cases (Property Access)', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Item: {{$nodes.' + webhookId + '.output.message.items.-1.name}}',
-        { useTestCredentials: true },
+        'write',
+        'negative_index',
+        '{{$nodes.' + webhookId + '.output.message.items.-1.name}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: {
@@ -466,10 +481,10 @@ describe('Variables - Edge Cases (Property Access)', () => {
       },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Índice negativo deve manter placeholder
-    expect(messageOutput.text).toContain('{{$nodes.');
+    // Índice negativo deve manter placeholder (save retorna items[])
+    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
   });
 
   it('should keep placeholder when treating string as object', async () => {
@@ -478,27 +493,28 @@ describe('Variables - Edge Cases (Property Access)', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Value: {{$nodes.' +
-          webhookId +
-          '.output.message.stringField.property}}',
-        { useTestCredentials: true },
+        'write',
+        'string_property',
+        '{{$nodes.' + webhookId + '.output.message.stringField.property}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { stringField: 'just a string' },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Acessar propriedade de string deve manter placeholder
-    expect(messageOutput.text).toContain('{{$nodes.');
+    // Acessar propriedade de string deve manter placeholder (save retorna items[])
+    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
   });
 });
 
@@ -507,36 +523,34 @@ describe('Variables - Edge Cases (Property Access)', () => {
 // ==============================================
 
 describe('Variables - Edge Cases (Special Characters)', () => {
-  beforeEach(async () => {
-    await cleanDatabase();
-    await cleanQueue();
-  });
-
   it('should handle property names with special characters', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Value: {{$nodes.' + webhookId + '.output.message.user-id}}',
-        { useTestCredentials: true },
+        'write',
+        'hyphen_key',
+        '{{$nodes.' + webhookId + '.output.message.user-id}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { 'user-id': '12345' },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Propriedade com hífen deve ser resolvida
-    expect(messageOutput.text).toBe('Value: 12345');
+    // Propriedade com hífen deve ser resolvida (save retorna items[])
+    expect(memoryOutput.items[0].value).toBe('12345');
   });
 
   it('should handle unicode and emoji in variable values', async () => {
@@ -545,24 +559,27 @@ describe('Variables - Edge Cases (Special Characters)', () => {
 
     const nodes = [
       createWebhookNode(webhookId),
-      createMessageNode(
+      createMemoryNode(
         messageId,
-        'Name: {{$nodes.' + webhookId + '.output.message.name}}',
-        { useTestCredentials: true },
+        'write',
+        'test_name',
+        '{{$nodes.' + webhookId + '.output.message.name}}',
       ),
     ];
 
     const edges = [createEdge('e1', webhookId, messageId)];
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { name: '🚀 João 世界 مرحبا' },
     });
 
-    const messageOutput = await getNodeOutput(executionId, messageId);
+    const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Unicode e emojis devem ser preservados
-    expect(messageOutput.text).toBe('Name: 🚀 João 世界 مرحبا');
+    // Unicode e emojis devem ser preservados (save retorna items[])
+    expect(memoryOutput.items[0].value).toBe('🚀 João 世界 مرحبا');
   });
 });

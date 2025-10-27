@@ -2,16 +2,18 @@
 // TESTES DE STRESS - DatabaseService
 // ============================================
 
-import { createTestService, generateTestUserId } from '../setup';
+import { createTestService, generateStringUserId } from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Stress Testing', () => {
+  console.log('\n📋 INICIANDO: DatabaseService - Stress Testing');
+
   let service: DatabaseService;
   let userId: string;
 
   beforeEach(async () => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
   });
 
   // Timeout maior para testes de stress (2 minutos)
@@ -21,7 +23,10 @@ describe('DatabaseService - Stress Testing', () => {
   // Volume de Inserção
   // ============================================
   describe('Volume de Inserção', () => {
+    console.log('  📂 Grupo: Volume de Inserção');
+
     it('deve inserir 200 registros em tempo aceitável', async () => {
+      console.log('    ✓ Teste: deve inserir 200 registros em tempo aceitável');
       // CENÁRIO POSITIVO: Teste de volume realista
       const tableName = 'stress_200';
 
@@ -63,6 +68,9 @@ describe('DatabaseService - Stress Testing', () => {
     });
 
     it('deve processar 100 registros com processamento em lotes eficiente', async () => {
+      console.log(
+        '    ✓ Teste: deve processar 100 registros com processamento em lotes eficiente',
+      );
       // CENÁRIO POSITIVO: Validar batch processing em volume médio
       const tableName = 'stress_batch';
 
@@ -126,6 +134,9 @@ describe('DatabaseService - Stress Testing', () => {
     });
 
     it('deve manter stats consistentes com 500 registros', async () => {
+      console.log(
+        '    ✓ Teste: deve manter stats consistentes com 500 registros',
+      );
       // CENÁRIO POSITIVO: Validar consistência de stats com alto volume
       const tableName = 'stress_stats';
 
@@ -167,7 +178,10 @@ describe('DatabaseService - Stress Testing', () => {
   // Performance de Busca
   // ============================================
   describe('Performance de Busca', () => {
+    console.log('  📂 Grupo: Performance de Busca');
+
     it('deve buscar 300 registros rapidamente', async () => {
+      console.log('    ✓ Teste: deve buscar 300 registros rapidamente');
       // CENÁRIO POSITIVO: Busca sem filtros deve ser rápida mesmo com volume
       const tableName = 'search_perf';
 
@@ -204,6 +218,9 @@ describe('DatabaseService - Stress Testing', () => {
     });
 
     it('deve buscar com filtros complexos em 300 registros', async () => {
+      console.log(
+        '    ✓ Teste: deve buscar com filtros complexos em 300 registros',
+      );
       // CENÁRIO POSITIVO: Filtros não devem degradar muito a performance
       const tableName = 'search_filters';
 
@@ -251,6 +268,7 @@ describe('DatabaseService - Stress Testing', () => {
     });
 
     it('deve ordenar 300 registros eficientemente', async () => {
+      console.log('    ✓ Teste: deve ordenar 300 registros eficientemente');
       // CENÁRIO POSITIVO: Ordenação deve ser rápida mesmo com volume
       const tableName = 'search_sort';
 
@@ -288,7 +306,12 @@ describe('DatabaseService - Stress Testing', () => {
   // Updates em Massa
   // ============================================
   describe('Updates em Massa', () => {
+    console.log('  📂 Grupo: Updates em Massa');
+
     it('deve atualizar 250 registros com métricas de batch', async () => {
+      console.log(
+        '    ✓ Teste: deve atualizar 250 registros com métricas de batch',
+      );
       // CENÁRIO POSITIVO: Update em massa com alto volume
       const tableName = 'mass_update';
 
@@ -334,6 +357,7 @@ describe('DatabaseService - Stress Testing', () => {
     });
 
     it('deve deletar 250 registros eficientemente', async () => {
+      console.log('    ✓ Teste: deve deletar 250 registros eficientemente');
       // CENÁRIO POSITIVO: Delete em massa com alto volume
       const tableName = 'mass_delete';
 
@@ -377,7 +401,12 @@ describe('DatabaseService - Stress Testing', () => {
   // Múltiplas Partições
   // ============================================
   describe('Múltiplas Partições', () => {
+    console.log('  📂 Grupo: Múltiplas Partições');
+
     it('deve criar e gerenciar 10 partições corretamente', async () => {
+      console.log(
+        '    ✓ Teste: deve criar e gerenciar 10 partições corretamente',
+      );
       // CENÁRIO POSITIVO: Teste com múltiplas partições
       // MAX_PARTITIONS = 20, MAX_PARTITION_SIZE = 50 → até 1000 registros
       const tableName = 'multi_partition';
@@ -419,6 +448,9 @@ describe('DatabaseService - Stress Testing', () => {
     });
 
     it('deve manter performance de stats com múltiplas partições', async () => {
+      console.log(
+        '    ✓ Teste: deve manter performance de stats com múltiplas partições',
+      );
       // CENÁRIO POSITIVO: Stats não devem degradar com múltiplas partições
       const tableName = 'stats_performance';
 
@@ -454,7 +486,12 @@ describe('DatabaseService - Stress Testing', () => {
   // Teste de Limite
   // ============================================
   describe('Teste de Limite', () => {
+    console.log('  📂 Grupo: Teste de Limite');
+
     it('deve rejeitar inserção além do limite de partições', async () => {
+      console.log(
+        '    ✓ Teste: deve rejeitar inserção além do limite de partições',
+      );
       // CENÁRIO NEGATIVO: Validar que o limite é respeitado
       const tableName = 'limit_test';
 

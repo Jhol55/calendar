@@ -2,16 +2,18 @@
 // TESTES DE ORDENAÇÃO - DatabaseService
 // ============================================
 
-import { createTestService, generateTestUserId } from '../setup';
+import { createTestService, generateStringUserId } from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Ordenação', () => {
+  console.log('\n📋 INICIANDO: DatabaseService - Ordenação');
+
   let service: DatabaseService;
   let userId: string;
 
   beforeEach(async () => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
 
     // Criar tabela de teste
     await service.addColumns(userId, 'sort_test', [
@@ -26,7 +28,10 @@ describe('DatabaseService - Ordenação', () => {
   // 6.1. sortRecords
   // ============================================
   describe('sortRecords', () => {
+    console.log('  📂 Grupo: sortRecords');
+
     it('asc: [1,3,5,2,4] → [1,2,3,4,5]', async () => {
+      console.log('    ✓ Teste: asc: [1,3,5,2,4] → [1,2,3,4,5]');
       // Inserir números desordenados
       await service.insertRecord(userId, 'sort_test', { value: 1 });
       await service.insertRecord(userId, 'sort_test', { value: 3 });
@@ -42,6 +47,7 @@ describe('DatabaseService - Ordenação', () => {
     });
 
     it('desc: [1,3,5,2,4] → [5,4,3,2,1]', async () => {
+      console.log('    ✓ Teste: desc: [1,3,5,2,4] → [5,4,3,2,1]');
       // Inserir números desordenados
       await service.insertRecord(userId, 'sort_test', { value: 1 });
       await service.insertRecord(userId, 'sort_test', { value: 3 });
@@ -57,6 +63,7 @@ describe('DatabaseService - Ordenação', () => {
     });
 
     it('null/undefined devem ir para o fim (asc)', async () => {
+      console.log('    ✓ Teste: null/undefined devem ir para o fim (asc)');
       await service.insertRecord(userId, 'sort_test', {
         value: 10,
         nullable: 5,
@@ -95,6 +102,7 @@ describe('DatabaseService - Ordenação', () => {
     });
 
     it('null/undefined devem ir para o fim (desc)', async () => {
+      console.log('    ✓ Teste: null/undefined devem ir para o fim (desc)');
       await service.insertRecord(userId, 'sort_test', {
         value: 10,
         nullable: 5,
@@ -133,6 +141,7 @@ describe('DatabaseService - Ordenação', () => {
     });
 
     it('ordenação alfabética de strings (asc)', async () => {
+      console.log('    ✓ Teste: ordenação alfabética de strings (asc)');
       await service.insertRecord(userId, 'sort_test', { text: 'Zebra' });
       await service.insertRecord(userId, 'sort_test', { text: 'Apple' });
       await service.insertRecord(userId, 'sort_test', { text: 'Mango' });
@@ -151,6 +160,7 @@ describe('DatabaseService - Ordenação', () => {
     });
 
     it('ordenação alfabética de strings (desc)', async () => {
+      console.log('    ✓ Teste: ordenação alfabética de strings (desc)');
       await service.insertRecord(userId, 'sort_test', { text: 'Zebra' });
       await service.insertRecord(userId, 'sort_test', { text: 'Apple' });
       await service.insertRecord(userId, 'sort_test', { text: 'Mango' });
@@ -169,6 +179,7 @@ describe('DatabaseService - Ordenação', () => {
     });
 
     it('ordenação de datas (asc)', async () => {
+      console.log('    ✓ Teste: ordenação de datas (asc)');
       await service.insertRecord(userId, 'sort_test', { date: '2024-03-15' });
       await service.insertRecord(userId, 'sort_test', { date: '2024-01-10' });
       await service.insertRecord(userId, 'sort_test', { date: '2024-12-25' });
@@ -187,6 +198,7 @@ describe('DatabaseService - Ordenação', () => {
     });
 
     it('ordenação de datas (desc)', async () => {
+      console.log('    ✓ Teste: ordenação de datas (desc)');
       await service.insertRecord(userId, 'sort_test', { date: '2024-03-15' });
       await service.insertRecord(userId, 'sort_test', { date: '2024-01-10' });
       await service.insertRecord(userId, 'sort_test', { date: '2024-12-25' });

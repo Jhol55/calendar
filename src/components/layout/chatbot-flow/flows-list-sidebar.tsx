@@ -31,7 +31,7 @@ export function FlowsListSidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Usar React Query para buscar workflows
+  // Usar React Query para buscar workflows (userId obtido automaticamente no backend)
   const { data: workflows = [], isLoading: loading } = useWorkflows();
 
   // Hook para deletar workflow
@@ -111,8 +111,8 @@ export function FlowsListSidebar({
             <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
           </div>
         ) : workflows.length === 0 ? (
-          <div className="p-8 text-center">
-            <FileText className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
+          <div className="p-8 text-center" style={{ zoom: 0.9 }}>
+            <FileText className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
             <Typography variant="p" className="text-neutral-600 text-sm">
               Nenhum workflow criado ainda
             </Typography>

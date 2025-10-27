@@ -14,6 +14,7 @@ import { FormSelect } from '@/components/ui/select';
 import { useUser } from '@/hooks/use-user';
 import { NodeConfigLayout } from '../node-config-layout';
 import { getInstanceWebhook } from '@/actions/uazapi/instance';
+import { Copy, CheckCircle } from 'lucide-react';
 
 interface WebhookNodeConfigProps {
   isOpen: boolean;
@@ -26,22 +27,59 @@ interface WebhookNodeConfigProps {
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
+// Função para criar slug válido
+const slugify = (text: string): string => {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '') // Remove caracteres especiais
+    .replace(/[\s_-]+/g, '-') // Substitui espaços/underscores por hífen
+    .replace(/^-+|-+$/g, ''); // Remove hífens do início/fim
+};
+
+// Validação de path do webhook
+const validateWebhookPath = (path: string): boolean => {
+  // Apenas alfanuméricos, hífens e underscores
+  const regex = /^[a-z0-9_-]+$/i;
+  return regex.test(path) && path.length >= 3 && path.length <= 50;
+};
+
 function WebhookFormFields({
   config,
   webhookId,
+  webhookPath,
+  setWebhookPath,
+  pathError,
+  setPathError,
 }: {
   config?: WebhookConfig;
   webhookId: string;
+  webhookPath: string;
+  setWebhookPath: (path: string) => void;
+  pathError: string | null;
+  setPathError: (error: string | null) => void;
 }) {
   const { form, setValue } = useForm();
-  const { instances } = useUser();
+  const { instances, user } = useUser();
   const [selectedMethods, setSelectedMethods] = useState<HttpMethod[]>([
     'POST',
   ]);
+  const [copied, setCopied] = useState(false);
 
   const serviceType = form.serviceType as 'manual' | 'whatsapp' | undefined;
   const authenticationType =
     (form.authenticationType as 'none' | 'basic' | 'bearer') || 'none';
+
+  const copyToClipboard = () => {
+    const fullUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/api/webhooks/${user?.id}/${webhookPath}`
+        : `/api/webhooks/${user?.id}/${webhookPath}`;
+
+    navigator.clipboard.writeText(fullUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     // Usar setTimeout para garantir que o formulário esteja pronto
@@ -174,7 +212,7 @@ function WebhookFormFields({
 
           {/* Basic Auth */}
           {authenticationType === 'basic' && (
-            <div className="space-y-3 border-l-4 border-blue-500 pl-4">
+            <div className="space-y-3 border-l-4 border-gray-600 pl-4">
               <div className="p-1">
                 <FormControl variant="label">Username</FormControl>
                 <Input
@@ -196,7 +234,7 @@ function WebhookFormFields({
 
           {/* Bearer Token */}
           {authenticationType === 'bearer' && (
-            <div className="border-l-4 border-blue-500 pl-4">
+            <div className="border-l-4 border-gray-600 pl-4">
               <div className="p-1">
                 <FormControl variant="label">Bearer Token</FormControl>
                 <Input
@@ -208,18 +246,77 @@ function WebhookFormFields({
             </div>
           )}
 
-          {/* Webhook URL Preview */}
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mt-4">
-            <Typography
-              variant="p"
-              className="block mb-2 text-sm font-semibold text-blue-900"
-            >
-              URL do Webhook
-            </Typography>
-            <div className="bg-white p-3 rounded border border-blue-200 break-all font-mono text-sm text-blue-900">
-              {typeof window !== 'undefined' &&
-                `${window.location.origin}/api/webhooks/${webhookId}`}
+          {/* Webhook URL com Path Editável */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-4">
+            <FormControl variant="label">URL do Webhook</FormControl>
+
+            {/* Campo hidden para sincronizar com form */}
+            <input type="hidden" name="webhookPath" value={webhookPath} />
+
+            {/* URL Base Fixa + Path Editável + Botão Copiar */}
+            <div className="flex items-center gap-2 w-full">
+              <div className="flex items-center gap-0 flex-1">
+                {/* Base URL (não editável) com userId */}
+                <div className="rounded-md rounded-tr-none rounded-br-none border border-gray-300 bg-neutral-100 p-2.5 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] text-sm">
+                  <Typography
+                    variant="span"
+                    className="text-sm font-mono text-gray-600"
+                  >
+                    {typeof window !== 'undefined'
+                      ? `${window.location.origin}/api/webhooks/${user?.id}/`
+                      : `/api/webhooks/${user?.id}/`}
+                  </Typography>
+                </div>
+
+                {/* Path Editável usando componente Input */}
+                <div className="flex-1 [&_input]:rounded-l-none [&_input]:border-l-0 [&_input]:font-mono">
+                  <Input
+                    type="text"
+                    fieldName="webhookPathInput"
+                    value={webhookPath}
+                    onChange={(e) => {
+                      const newPath = slugify(e.target.value);
+                      setWebhookPath(newPath);
+
+                      if (!validateWebhookPath(newPath)) {
+                        setPathError(
+                          'Path deve ter 3-50 caracteres (apenas letras, números e hífens)',
+                        );
+                      } else {
+                        setPathError(null);
+                      }
+                    }}
+                    placeholder="meu-webhook-personalizado"
+                  />
+                </div>
+              </div>
+
+              {/* Botão Copiar */}
+              <button
+                type="button"
+                onClick={copyToClipboard}
+                className="mx-2 rounded-md hover:bg-neutral-100 transition-colors flex items-center justify-center"
+                title="Copiar URL completa"
+              >
+                {copied ? (
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Copy className="w-4 h-4 text-gray-600" />
+                )}
+              </button>
             </div>
+
+            {pathError && (
+              <Typography variant="p" className="text-xs text-red-500 mt-2">
+                ⚠️ {pathError}
+              </Typography>
+            )}
+
+            {!pathError && (
+              <Typography variant="p" className="text-xs text-gray-600 mt-2">
+                ✓ Path válido: <strong>{webhookPath}</strong>
+              </Typography>
+            )}
           </div>
         </>
       )}
@@ -248,10 +345,25 @@ export function WebhookNodeConfig({
     return `wh_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   });
 
-  // Atualizar webhookId quando config mudar
+  // Estado para path editável (apenas Manual)
+  const [webhookPath, setWebhookPath] = useState(() => {
+    if (config?.webhookId && config.serviceType === 'manual') {
+      // Se já tem config manual, usar o webhookId como path
+      return config.webhookId;
+    }
+    // Gerar path aleatório inicial
+    return `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  });
+
+  const [pathError, setPathError] = useState<string | null>(null);
+
+  // Atualizar webhookId e webhookPath quando config mudar
   useEffect(() => {
     if (config?.webhookId) {
       setWebhookId(config.webhookId);
+      if (config.serviceType === 'manual') {
+        setWebhookPath(config.webhookId);
+      }
     }
   }, [config]);
 
@@ -282,14 +394,40 @@ export function WebhookNodeConfig({
         finalWebhookId = data.instanceToken;
       }
     } else {
-      // Para Manual, usar o webhookId gerado
-      finalWebhookId = data.webhookId || webhookId;
+      // Para Manual, usar o path customizável (validado)
+      if (pathError || !validateWebhookPath(webhookPath)) {
+        console.error('Invalid webhook path');
+        return; // Não submeter se path inválido
+      }
+
+      // IMPORTANTE: garantir que seja apenas o path, sem URL ou userId
+      // Se por acaso tiver URL completa, extrair apenas o path final
+      let cleanPath = webhookPath;
+
+      // Remover qualquer URL base se existir
+      if (cleanPath.includes('/api/webhooks/')) {
+        const parts = cleanPath.split('/api/webhooks/');
+        if (parts[1]) {
+          // Pode ter userId também: userId/path
+          const pathParts = parts[1].split('/');
+          cleanPath = pathParts[pathParts.length - 1]; // Pegar última parte
+        }
+      }
+
+      // Remover protocolo e domínio se existir
+      if (cleanPath.includes('://')) {
+        const urlParts = cleanPath.split('/');
+        cleanPath = urlParts[urlParts.length - 1]; // Última parte da URL
+      }
+
+      finalWebhookId = cleanPath;
+      console.log('✅ Saving webhook with clean path:', finalWebhookId);
     }
 
     const webhookConfig: WebhookConfig = {
       serviceType: data.serviceType as 'manual' | 'whatsapp',
       instanceToken: data.instanceToken,
-      webhookId: finalWebhookId,
+      webhookId: finalWebhookId, // Apenas o path limpo
       methods:
         data.serviceType === 'manual'
           ? (data.methods as HttpMethod[])
@@ -323,7 +461,14 @@ export function WebhookNodeConfig({
         zodSchema={webhookConfigSchema}
         onSubmit={handleSubmit}
       >
-        <WebhookFormFields config={config} webhookId={webhookId} />
+        <WebhookFormFields
+          config={config}
+          webhookId={webhookId}
+          webhookPath={webhookPath}
+          setWebhookPath={setWebhookPath}
+          pathError={pathError}
+          setPathError={setPathError}
+        />
       </Form>
     </NodeConfigLayout>
   );

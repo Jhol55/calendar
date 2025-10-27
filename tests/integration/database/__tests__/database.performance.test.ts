@@ -2,16 +2,18 @@
 // TESTES DE PERFORMANCE - DatabaseService
 // ============================================
 
-import { createTestService, generateTestUserId } from '../setup';
+import { createTestService, generateStringUserId } from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Performance', () => {
+  console.log('\n📋 INICIANDO: DatabaseService - Performance');
+
   let service: DatabaseService;
   let userId: string;
 
   beforeEach(async () => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
 
     // Criar tabela de teste
     await service.addColumns(userId, 'perf_test', [
@@ -24,12 +26,14 @@ describe('DatabaseService - Performance', () => {
   // 11.1. Cache de Schema
   // ============================================
   describe('Cache de Schema', () => {
+    console.log('  📂 Grupo: Cache de Schema');
     // Cache de schema agora está integrado na arquitetura:
     // - insertRecord valida com cache antes de buscar partição
     // - Operações de leitura/escrita populam cache oportunisticamente
     // - addColumns/removeColumns invalidam e re-populam cache
 
     it('primeira busca deve causar cache miss', async () => {
+      console.log('    ✓ Teste: primeira busca deve causar cache miss');
       // Usar service existente que já tem tabela criada (via beforeEach)
       // mas cache está popular. Vamos criar NOVA instância do service
       // com mesmo userId e tabela - cache estará vazio nessa instância
@@ -48,6 +52,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('segunda busca deve causar cache hit', async () => {
+      console.log('    ✓ Teste: segunda busca deve causar cache hit');
       // Primeira busca popula cache
       await service.getRecords(userId, 'perf_test', {});
 
@@ -67,6 +72,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('múltiplas operações devem aproveitar cache', async () => {
+      console.log('    ✓ Teste: múltiplas operações devem aproveitar cache');
       // Primeira inserção causa cache miss, próximas usam cache
       for (let i = 0; i < 5; i++) {
         await service.insertRecord(userId, 'perf_test', {
@@ -82,6 +88,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('modificar schema deve invalidar cache', async () => {
+      console.log('    ✓ Teste: modificar schema deve invalidar cache');
       // Buscar uma vez (popular cache)
       await service.getRecords(userId, 'perf_test', {});
 
@@ -109,7 +116,10 @@ describe('DatabaseService - Performance', () => {
   // 11.2. Expiração de Cache (TTL = 5 min)
   // ============================================
   describe('Expiração de Cache', () => {
+    console.log('  📂 Grupo: Expiração de Cache');
+
     it('cache deve expirar após TTL (5 minutos)', async () => {
+      console.log('    ✓ Teste: cache deve expirar após TTL (5 minutos)');
       // Popular cache com primeira operação
       await service.insertRecord(userId, 'perf_test', {
         title: 'Test',
@@ -143,7 +153,10 @@ describe('DatabaseService - Performance', () => {
   // 11.3. Métricas de Performance
   // ============================================
   describe('Métricas de Performance', () => {
+    console.log('  📂 Grupo: Métricas de Performance');
+
     it('deve registrar tempos de query', async () => {
+      console.log('    ✓ Teste: deve registrar tempos de query');
       // Executar algumas queries
       await service.getRecords(userId, 'perf_test', {});
       await service.getRecords(userId, 'perf_test', {});
@@ -157,6 +170,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('deve calcular taxa de cache hit corretamente', async () => {
+      console.log('    ✓ Teste: deve calcular taxa de cache hit corretamente');
       // Primeira operação (cache miss)
       await service.insertRecord(userId, 'perf_test', {
         title: 'Test 1',
@@ -182,6 +196,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('queries lentas devem ser logadas', async () => {
+      console.log('    ✓ Teste: queries lentas devem ser logadas');
       // Executar query simples
       await service.getRecords(userId, 'perf_test', {});
 
@@ -196,7 +211,12 @@ describe('DatabaseService - Performance', () => {
   // 11.4. Performance de Operações
   // ============================================
   describe('Performance de Operações', () => {
+    console.log('  📂 Grupo: Performance de Operações');
+
     it('inserção de múltiplos registros deve ser eficiente', async () => {
+      console.log(
+        '    ✓ Teste: inserção de múltiplos registros deve ser eficiente',
+      );
       const start = Date.now();
 
       // Inserir 10 registros (dentro do limite de 15 = MAX_PARTITIONS × MAX_PARTITION_SIZE)
@@ -214,6 +234,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('busca sem filtros deve ser eficiente', async () => {
+      console.log('    ✓ Teste: busca sem filtros deve ser eficiente');
       // Inserir alguns registros
       for (let i = 0; i < 10; i++) {
         await service.insertRecord(userId, 'perf_test', {
@@ -234,6 +255,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('busca com filtros deve ser eficiente', async () => {
+      console.log('    ✓ Teste: busca com filtros deve ser eficiente');
       // Inserir registros
       for (let i = 0; i < 10; i++) {
         await service.insertRecord(userId, 'perf_test', {
@@ -259,6 +281,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('update em massa deve ser eficiente', async () => {
+      console.log('    ✓ Teste: update em massa deve ser eficiente');
       // Inserir registros
       for (let i = 0; i < 10; i++) {
         await service.insertRecord(userId, 'perf_test', {
@@ -284,6 +307,7 @@ describe('DatabaseService - Performance', () => {
     });
 
     it('delete em massa deve ser eficiente', async () => {
+      console.log('    ✓ Teste: delete em massa deve ser eficiente');
       // Inserir registros
       for (let i = 0; i < 10; i++) {
         await service.insertRecord(userId, 'perf_test', {
@@ -311,7 +335,12 @@ describe('DatabaseService - Performance', () => {
   // 11.5. Cache vs No Cache
   // ============================================
   describe('Comparação Cache vs No Cache', () => {
+    console.log('  📂 Grupo: Comparação Cache vs No Cache');
+
     it('cache deve melhorar performance em operações repetidas', async () => {
+      console.log(
+        '    ✓ Teste: cache deve melhorar performance em operações repetidas',
+      );
       // Primeira operação (sem cache)
       const start1 = Date.now();
       await service.getRecords(userId, 'perf_test', {});

@@ -5,12 +5,16 @@
  * A lógica de execução do fluxo foi movida para flow-executor.ts
  * Os processadores de nós estão organizados em helpers/
  */
-import { webhookQueue, WebhookJobData } from '../services/queue';
+import {
+  webhookQueue,
+  WebhookJobData,
+  WEBHOOK_CONCURRENCY,
+} from '../services/queue';
 import { prisma } from '../services/prisma';
 import { executeFlow } from './helpers/flow-executor';
 
-// Processar job de webhook
-webhookQueue.process('process-webhook', async (job) => {
+// Processar job de webhook com concurrency configurável
+webhookQueue.process('process-webhook', WEBHOOK_CONCURRENCY, async (job) => {
   const data = job.data as WebhookJobData;
   console.log(
     `🔄 Processing webhook job ${job.id} for webhook ${data.webhookId}`,
@@ -80,36 +84,38 @@ webhookQueue.process('process-webhook', async (job) => {
   } catch (error) {
     console.error(`❌ Error processing webhook job ${job.id}:`, error);
 
+    let executionId: string | undefined;
+
     // Se houver execução criada, marcar como erro
     if (data.flowId) {
       try {
-        // Buscar execução para calcular duração
+        // Buscar execução para calcular duração e obter ID
         const runningExecution = await prisma.flow_executions.findFirst({
           where: {
             flowId: data.flowId,
             status: 'running',
             triggerType: 'webhook',
           },
-          select: { startTime: true },
+          select: { id: true, startTime: true },
         });
 
-        const duration = runningExecution?.startTime
-          ? Date.now() - new Date(runningExecution.startTime).getTime()
-          : undefined;
+        if (runningExecution) {
+          executionId = runningExecution.id;
 
-        await prisma.flow_executions.updateMany({
-          where: {
-            flowId: data.flowId,
-            status: 'running',
-            triggerType: 'webhook',
-          },
-          data: {
-            status: 'error',
-            endTime: new Date(),
-            duration,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          },
-        });
+          const duration = runningExecution.startTime
+            ? Date.now() - new Date(runningExecution.startTime).getTime()
+            : undefined;
+
+          await prisma.flow_executions.update({
+            where: { id: executionId },
+            data: {
+              status: 'error',
+              endTime: new Date(),
+              duration,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+          });
+        }
       } catch (dbError) {
         console.error('Error updating execution status:', dbError);
       }
@@ -122,6 +128,7 @@ webhookQueue.process('process-webhook', async (job) => {
     // NÃO fazer throw para evitar retry automático
     // Retornar erro mas marcar job como "processado"
     return {
+      executionId,
       status: 'error',
       message: error instanceof Error ? error.message : 'Execution failed',
       error: true,

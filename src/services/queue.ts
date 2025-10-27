@@ -1,6 +1,11 @@
 import Queue from 'bull';
 import Redis from 'ioredis';
 
+// Configuração de concurrency para processamento de webhooks
+export const WEBHOOK_CONCURRENCY = parseInt(
+  process.env.WEBHOOK_CONCURRENCY || '10',
+);
+
 // Configuração do Redis
 const redisConfig = {
   host: process.env.REDIS_HOST || 'localhost',

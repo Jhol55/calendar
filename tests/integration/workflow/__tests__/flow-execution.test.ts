@@ -3,31 +3,25 @@
  * Testa o fluxo básico de execução do webhook worker
  */
 
-import '../setup';
 import {
-  cleanDatabase,
-  cleanQueue,
   createTestFlow,
-  createWebhookNode,
-  triggerAndWait,
   getFlowExecution,
   getNodeExecutions,
   generateTestId,
-} from '../setup';
-import { simpleFlow } from '../fixtures';
+  testContext,
+  simpleFlow,
+} from '../../setup';
+import { createWebhookNode, triggerAndWait } from '../../../helpers/webhook';
 
 describe('Flow Execution - Básico', () => {
-  beforeEach(async () => {
-    await cleanDatabase();
-    await cleanQueue();
-  });
-
   it('deve criar execution quando webhook é disparado', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
     const { nodes, edges } = simpleFlow(webhookId, messageId);
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { text: 'Hello!' },
@@ -46,7 +40,9 @@ describe('Flow Execution - Básico', () => {
     const messageId = generateTestId('message');
     const { nodes, edges } = simpleFlow(webhookId, messageId);
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const payload = {
       message: {
@@ -69,7 +65,9 @@ describe('Flow Execution - Básico', () => {
     const messageId = generateTestId('message');
     const { nodes, edges } = simpleFlow(webhookId, messageId);
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const payload = {
       message: {
@@ -99,7 +97,9 @@ describe('Flow Execution - Básico', () => {
     const messageId = generateTestId('message');
     const { nodes, edges } = simpleFlow(webhookId, messageId);
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     const { executionId } = await triggerAndWait(flowId, webhookId, {
       message: { text: 'Status test' },
@@ -118,11 +118,6 @@ describe('Flow Execution - Básico', () => {
 // ==============================================
 
 describe('Flow Execution - Error Scenarios', () => {
-  beforeEach(async () => {
-    await cleanDatabase();
-    await cleanQueue();
-  });
-
   it('should fail when triggering non-existent flow', async () => {
     const nonExistentFlowId = '999999'; // ID não existente
     const webhookId = generateTestId('webhook');
@@ -200,9 +195,13 @@ describe('Flow Execution - Error Scenarios', () => {
 
     const flowId = await createTestFlow(nodes, edges);
 
-    const result = await triggerAndWait(flowId, webhookId, {
-      message: { text: 'Test' },
-    });
+    const result = await triggerAndWait(
+      flowId,
+      webhookId,
+      { message: { text: 'Test' } },
+      10000,
+      false, // ✅ Não jogar exceção em erros
+    );
 
     // Execução deve completar mas com erro no node inválido
     expect(result.jobResult.status).toBe('error');
@@ -214,7 +213,9 @@ describe('Flow Execution - Error Scenarios', () => {
     const messageId = generateTestId('message');
     const { nodes, edges } = simpleFlow(webhookId, messageId);
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     // Enviar payload null - pode falhar ou executar com dados vazios
     const result = await triggerAndWait(flowId, webhookId, null);
@@ -235,7 +236,9 @@ describe('Flow Execution - Error Scenarios', () => {
     const messageId = generateTestId('message');
     const { nodes, edges } = simpleFlow(webhookId, messageId);
 
-    const flowId = await createTestFlow(nodes, edges);
+    const flowId = await createTestFlow(nodes, edges, {
+      userId: testContext.userId!,
+    });
 
     // Enviar payload vazio
     const { executionId } = await triggerAndWait(flowId, webhookId, {});
@@ -278,9 +281,13 @@ describe('Flow Execution - Error Scenarios', () => {
 
     const flowId = await createTestFlow(nodes, edges);
 
-    const result = await triggerAndWait(flowId, webhookId, {
-      message: { text: 'Test' },
-    });
+    const result = await triggerAndWait(
+      flowId,
+      webhookId,
+      { message: { text: 'Test' } },
+      10000,
+      false, // ✅ Não jogar exceção em erros
+    );
 
     // Execution deve ter status error
     expect(result.jobResult.status).toBe('error');

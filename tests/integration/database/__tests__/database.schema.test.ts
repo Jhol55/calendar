@@ -2,23 +2,28 @@
 // TESTES DE SCHEMA - DatabaseService
 // ============================================
 
-import { createTestService, generateTestUserId } from '../setup';
+import { createTestService, generateStringUserId } from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Schema', () => {
+  console.log('\n📋 INICIANDO: DatabaseService - Schema');
+
   let service: DatabaseService;
   let userId: string;
 
   beforeEach(() => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
   });
 
   // ============================================
   // 7.1. Fluxo de Criação/Modificação
   // ============================================
   describe('Fluxo de Criação/Modificação', () => {
+    console.log('  📂 Grupo: Fluxo de Criação/Modificação');
+
     it('deve criar tabela com addColumns', async () => {
+      console.log('    ✓ Teste: deve criar tabela com addColumns');
       const schema = await service.addColumns(userId, 'tasks', [
         { name: 'title', type: 'string', required: true },
       ]);
@@ -32,6 +37,7 @@ describe('DatabaseService - Schema', () => {
     });
 
     it('deve adicionar colunas a tabela existente', async () => {
+      console.log('    ✓ Teste: deve adicionar colunas a tabela existente');
       // 1. Criar tabela
       await service.addColumns(userId, 'tasks', [
         { name: 'title', type: 'string', required: true },
@@ -52,6 +58,7 @@ describe('DatabaseService - Schema', () => {
     });
 
     it('deve manter dados ao adicionar colunas', async () => {
+      console.log('    ✓ Teste: deve manter dados ao adicionar colunas');
       // 1. Criar tabela e inserir dados
       await service.addColumns(userId, 'tasks', [
         { name: 'title', type: 'string', required: true },
@@ -74,6 +81,7 @@ describe('DatabaseService - Schema', () => {
     });
 
     it('não deve duplicar colunas existentes', async () => {
+      console.log('    ✓ Teste: não deve duplicar colunas existentes');
       // 1. Criar tabela
       await service.addColumns(userId, 'tasks', [
         { name: 'title', type: 'string' },
@@ -93,6 +101,7 @@ describe('DatabaseService - Schema', () => {
   // 7.2. Remoção de Colunas
   // ============================================
   describe('Remoção de Colunas', () => {
+    console.log('  📂 Grupo: Remoção de Colunas');
     beforeEach(async () => {
       // Criar tabela com múltiplas colunas
       await service.addColumns(userId, 'tasks', [
@@ -116,6 +125,7 @@ describe('DatabaseService - Schema', () => {
     });
 
     it('deve remover coluna do schema', async () => {
+      console.log('    ✓ Teste: deve remover coluna do schema');
       const schema = await service.removeColumns(userId, 'tasks', ['priority']);
 
       expect(schema.columns).toHaveLength(2);
@@ -125,6 +135,7 @@ describe('DatabaseService - Schema', () => {
     });
 
     it('deve remover coluna dos dados existentes', async () => {
+      console.log('    ✓ Teste: deve remover coluna dos dados existentes');
       await service.removeColumns(userId, 'tasks', ['priority']);
 
       const records = await service.getRecords(userId, 'tasks', {});
@@ -140,6 +151,7 @@ describe('DatabaseService - Schema', () => {
     });
 
     it('deve remover múltiplas colunas de uma vez', async () => {
+      console.log('    ✓ Teste: deve remover múltiplas colunas de uma vez');
       const schema = await service.removeColumns(userId, 'tasks', [
         'priority',
         'status',
@@ -158,6 +170,9 @@ describe('DatabaseService - Schema', () => {
     });
 
     it('deve manter dados se remover coluna inexistente', async () => {
+      console.log(
+        '    ✓ Teste: deve manter dados se remover coluna inexistente',
+      );
       await service.removeColumns(userId, 'tasks', ['nonexistent_column']);
 
       const records = await service.getRecords(userId, 'tasks', {});
@@ -173,7 +188,10 @@ describe('DatabaseService - Schema', () => {
   // 7.3. Verificar stats após modificação de schema
   // ============================================
   describe('Stats após modificação de schema', () => {
+    console.log('  📂 Grupo: Stats após modificação de schema');
+
     it('stats devem refletir schema atualizado', async () => {
+      console.log('    ✓ Teste: stats devem refletir schema atualizado');
       // Criar tabela
       await service.addColumns(userId, 'test_stats', [
         { name: 'field1', type: 'string' },

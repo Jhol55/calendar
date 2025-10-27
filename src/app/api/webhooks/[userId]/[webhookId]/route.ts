@@ -42,17 +42,18 @@ function validateAuth(
   return false;
 }
 
-// Função para buscar o webhook no banco de dados - RETORNA TODOS OS MATCHES
-async function findWebhookInFlows(webhookId: string) {
-  console.log('🔍 Searching for webhook:', webhookId);
+// Função para buscar o webhook no banco de dados - RETORNA TODOS OS MATCHES FILTRADOS POR USERID
+async function findWebhookInFlows(webhookId: string, userId: number) {
+  console.log('🔍 Searching for webhook:', webhookId, 'for user:', userId);
 
-  // Buscar apenas fluxos ATIVOS
+  // Buscar apenas fluxos ATIVOS do usuário específico
   const flows = await prisma.chatbot_flows.findMany({
     where: {
       isActive: true, // ✅ Apenas fluxos ativos
+      userId: userId, // ✅ Filtrar por usuário
     },
   });
-  console.log(`📊 Found ${flows.length} ACTIVE flows in database`);
+  console.log(`📊 Found ${flows.length} ACTIVE flows for user ${userId}`);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const matches: Array<{
@@ -102,11 +103,25 @@ async function findWebhookInFlows(webhookId: string) {
       };
       const nodeWebhookId = n.data?.webhookConfig?.webhookId;
 
-      // Comparar diretamente ou extrair ID de URL
+      if (!nodeWebhookId) return false;
+
+      // Comparar diretamente (webhookId já é apenas o path)
       const directMatch = nodeWebhookId === webhookId;
-      const urlMatch =
-        nodeWebhookId?.includes('/api/webhooks/') &&
-        nodeWebhookId.split('/api/webhooks/')[1] === webhookId;
+
+      // ✅ COMPATIBILIDADE: Extrair path de URLs antigas salvas no banco
+      // Exemplo de URL antiga: https://domain.com/api/webhooks/userId/path
+      // ou: https://domain.com/api/webhooks/path
+      let extractedPath = nodeWebhookId;
+      if (nodeWebhookId.includes('/api/webhooks/')) {
+        const parts = nodeWebhookId.split('/api/webhooks/');
+        if (parts[1]) {
+          // Pode ter userId: userId/path ou apenas path
+          const pathParts = parts[1].split('/');
+          extractedPath = pathParts[pathParts.length - 1]; // Última parte
+        }
+      }
+
+      const urlMatch = extractedPath === webhookId;
 
       return n.type === 'webhook' && (directMatch || urlMatch);
     });
@@ -133,8 +148,8 @@ async function findWebhookInFlows(webhookId: string) {
   }
 
   if (matches.length === 0) {
-    console.log('❌ No webhook found with ID:', webhookId);
-    console.log('📋 All webhook IDs found in database:');
+    console.log('❌ No webhook found with ID:', webhookId, 'for user:', userId);
+    console.log('📋 All webhook IDs found in database for this user:');
 
     // Listar todos os webhookIds para debug
     for (const flow of flows) {
@@ -256,17 +271,24 @@ async function findWebhookByInstance(instanceToken: string) {
 
 async function handleWebhook(
   request: NextRequest,
-  { params }: { params: { webhookId: string } },
+  { params }: { params: { userId: string; webhookId: string } },
 ) {
-  let webhookId = params.webhookId;
+  const { userId, webhookId } = params;
   const method = request.method;
 
   try {
-    // Se for uma URL completa, extrair apenas o ID
-    if (webhookId.includes('/api/webhooks/')) {
-      webhookId = webhookId.split('/api/webhooks/')[1];
-      console.log('🔧 Extracted webhook ID from URL:', webhookId);
+    // Converter userId para número
+    const userIdNum = parseInt(userId, 10);
+    if (isNaN(userIdNum)) {
+      return NextResponse.json(
+        { error: 'Invalid userId format' },
+        { status: 400 },
+      );
     }
+
+    console.log(
+      `🔍 Processing webhook for userId: ${userIdNum}, webhookId: ${webhookId}`,
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let webhookMatches: Array<{ flow: any; node: any; config: any }> = [];
@@ -295,11 +317,22 @@ async function handleWebhook(
         );
       }
 
-      // Buscar todos os fluxos que usam esta instância
-      webhookMatches = await findWebhookByInstance(instance.token);
+      // Buscar todos os fluxos que usam esta instância (filtrado por userId)
+      const allMatches = await findWebhookByInstance(instance.token);
+
+      // Filtrar apenas os fluxos do usuário específico
+      webhookMatches = allMatches.filter(
+        (match) => match.flow.userId === userIdNum,
+      );
+
+      if (webhookMatches.length === 0) {
+        console.log(
+          `⚠️ WhatsApp webhook found, but no flows for userId ${userIdNum}`,
+        );
+      }
     } else {
-      // Webhook manual - buscar todos os fluxos com este webhookId
-      webhookMatches = await findWebhookInFlows(webhookId);
+      // Webhook manual - buscar fluxos com este webhookId do usuário específico
+      webhookMatches = await findWebhookInFlows(webhookId, userIdNum);
     }
 
     console.log('Webhook matches:', webhookMatches);
@@ -334,6 +367,7 @@ async function handleWebhook(
 
     // Criar registro do webhook recebido
     const webhookEvent = {
+      userId: userIdNum,
       webhookId,
       method,
       timestamp: new Date().toISOString(),
@@ -447,35 +481,35 @@ async function handleWebhook(
 // Exportar handlers para todos os métodos HTTP
 export async function GET(
   request: NextRequest,
-  context: { params: { webhookId: string } },
+  context: { params: { userId: string; webhookId: string } },
 ) {
   return handleWebhook(request, context);
 }
 
 export async function POST(
   request: NextRequest,
-  context: { params: { webhookId: string } },
+  context: { params: { userId: string; webhookId: string } },
 ) {
   return handleWebhook(request, context);
 }
 
 export async function PUT(
   request: NextRequest,
-  context: { params: { webhookId: string } },
+  context: { params: { userId: string; webhookId: string } },
 ) {
   return handleWebhook(request, context);
 }
 
 export async function PATCH(
   request: NextRequest,
-  context: { params: { webhookId: string } },
+  context: { params: { userId: string; webhookId: string } },
 ) {
   return handleWebhook(request, context);
 }
 
 export async function DELETE(
   request: NextRequest,
-  context: { params: { webhookId: string } },
+  context: { params: { userId: string; webhookId: string } },
 ) {
   return handleWebhook(request, context);
 }

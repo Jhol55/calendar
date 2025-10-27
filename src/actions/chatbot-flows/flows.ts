@@ -3,6 +3,15 @@
 import { Node, Edge } from 'reactflow';
 import { NodeData } from '@/components/layout/chatbot-flow';
 import { prisma } from '@/services/prisma';
+import { getSession } from '@/utils/security/session';
+
+interface SessionUser {
+  user: {
+    email: string;
+  };
+  expires: Date;
+  remember: boolean;
+}
 
 export interface ChatbotFlow {
   id: string;
@@ -47,27 +56,46 @@ export interface UpdateFlowData {
 }
 
 export interface FlowFilters {
-  userId?: number;
   token?: string;
 }
 
 /**
- * Listar todos os fluxos ativos
+ * Buscar userId da sessão autenticada
+ */
+async function getUserIdFromSession(): Promise<number | null> {
+  const session = (await getSession()) as SessionUser | null;
+
+  if (!session?.user?.email) {
+    return null;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true },
+  });
+
+  return user?.id ?? null;
+}
+
+/**
+ * Listar todos os fluxos ativos do usuário autenticado
  * Acesso direto ao Prisma (sem HTTP overhead)
+ * SEGURANÇA: userId é sempre obtido da sessão, nunca do frontend
  */
 export async function listFlows(filters?: FlowFilters) {
   try {
-    // Validação de sessão opcional (se precisar forçar autenticação, descomente)
-    // const session = (await getSession()) as SessionUser | null;
-    // if (!session) {
-    //   return { success: false, error: 'Unauthorized', code: 401 };
-    // }
+    // Buscar userId da sessão autenticada
+    const userId = await getUserIdFromSession();
 
-    const where: { isActive: boolean; userId?: number; token?: string } = {
+    if (!userId) {
+      return { success: false, error: 'Unauthorized', code: 401 };
+    }
+
+    const where: { isActive: boolean; userId: number; token?: string } = {
       isActive: true,
+      userId, // SEMPRE filtrar pelo usuário autenticado
     };
 
-    if (filters?.userId) where.userId = filters.userId;
     if (filters?.token) where.token = filters.token;
 
     const flows = await prisma.chatbot_flows.findMany({
@@ -101,6 +129,7 @@ export async function listFlows(filters?: FlowFilters) {
 /**
  * Buscar fluxo específico por ID
  * Acesso direto ao Prisma (sem HTTP overhead)
+ * SEGURANÇA: Valida que o fluxo pertence ao usuário autenticado
  */
 export async function getFlow(id: string) {
   try {
@@ -108,8 +137,18 @@ export async function getFlow(id: string) {
       return { success: false, error: 'ID do fluxo é obrigatório' };
     }
 
-    const flow = await prisma.chatbot_flows.findUnique({
-      where: { id },
+    // Buscar userId da sessão autenticada
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return { success: false, error: 'Unauthorized', code: 401 };
+    }
+
+    const flow = await prisma.chatbot_flows.findFirst({
+      where: {
+        id,
+        userId, // SEMPRE filtrar pelo usuário autenticado
+      },
       include: {
         instance: {
           select: {
@@ -193,6 +232,7 @@ export async function createFlow(flowData: CreateFlowData) {
 /**
  * Atualizar fluxo existente
  * Acesso direto ao Prisma (sem HTTP overhead)
+ * SEGURANÇA: Valida que o fluxo pertence ao usuário autenticado
  */
 export async function updateFlow(id: string, flowData: UpdateFlowData) {
   try {
@@ -200,9 +240,16 @@ export async function updateFlow(id: string, flowData: UpdateFlowData) {
       return { success: false, error: 'ID do fluxo é obrigatório' };
     }
 
-    // Verificar se o fluxo existe
-    const existingFlow = await prisma.chatbot_flows.findUnique({
-      where: { id },
+    // Buscar userId da sessão autenticada
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return { success: false, error: 'Unauthorized', code: 401 };
+    }
+
+    // Verificar se o fluxo existe E pertence ao usuário
+    const existingFlow = await prisma.chatbot_flows.findFirst({
+      where: { id, userId },
     });
 
     if (!existingFlow) {
@@ -249,6 +296,7 @@ export async function updateFlow(id: string, flowData: UpdateFlowData) {
 /**
  * Deletar fluxo
  * Acesso direto ao Prisma (sem HTTP overhead)
+ * SEGURANÇA: Valida que o fluxo pertence ao usuário autenticado
  */
 export async function deleteFlow(id: string) {
   try {
@@ -256,9 +304,16 @@ export async function deleteFlow(id: string) {
       return { success: false, error: 'ID do fluxo é obrigatório' };
     }
 
-    // Verificar se o fluxo existe
-    const existingFlow = await prisma.chatbot_flows.findUnique({
-      where: { id },
+    // Buscar userId da sessão autenticada
+    const userId = await getUserIdFromSession();
+
+    if (!userId) {
+      return { success: false, error: 'Unauthorized', code: 401 };
+    }
+
+    // Verificar se o fluxo existe E pertence ao usuário
+    const existingFlow = await prisma.chatbot_flows.findFirst({
+      where: { id, userId },
     });
 
     if (!existingFlow) {

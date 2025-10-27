@@ -2,16 +2,18 @@
 // TESTES DE PROCESSAMENTO EM LOTES - DatabaseService
 // ============================================
 
-import { createTestService, generateTestUserId } from '../setup';
+import { createTestService, generateStringUserId } from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Processamento em Lotes', () => {
   let service: DatabaseService;
   let userId: string;
 
+  console.log('\n📋 INICIANDO: DatabaseService - Processamento em Lotes');
+
   beforeEach(async () => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
 
     // Criar tabela
     await service.addColumns(userId, 'batch_test', [
@@ -24,7 +26,12 @@ describe('DatabaseService - Processamento em Lotes', () => {
   // 9.1. Update em Lotes (BATCH_SIZE = 10)
   // ============================================
   describe('Update em Lotes', () => {
+    console.log('  📂 Grupo: Update em Lotes');
+
     it('deve processar update em lotes quando > BATCH_SIZE', async () => {
+      console.log(
+        '    ✓ Teste: deve processar update em lotes quando > BATCH_SIZE',
+      );
       // Inserir 15 registros (maior que BATCH_SIZE = 10)
       for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'batch_test', {
@@ -48,6 +55,9 @@ describe('DatabaseService - Processamento em Lotes', () => {
     });
 
     it('update em lote deve atualizar todos os registros', async () => {
+      console.log(
+        '    ✓ Teste: update em lote deve atualizar todos os registros',
+      );
       // Inserir 15 registros
       for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'batch_test', {
@@ -72,6 +82,9 @@ describe('DatabaseService - Processamento em Lotes', () => {
     });
 
     it('update pequeno não deve usar processamento em lotes', async () => {
+      console.log(
+        '    ✓ Teste: update pequeno não deve usar processamento em lotes',
+      );
       // Inserir apenas 2 registros (= BATCH_SIZE)
       await service.insertRecord(userId, 'batch_test', {
         title: 'Task 1',
@@ -100,7 +113,12 @@ describe('DatabaseService - Processamento em Lotes', () => {
   // 9.2. Delete em Lotes
   // ============================================
   describe('Delete em Lotes', () => {
+    console.log('  📂 Grupo: Delete em Lotes');
+
     it('deve processar delete em lotes quando > BATCH_SIZE', async () => {
+      console.log(
+        '    ✓ Teste: deve processar delete em lotes quando > BATCH_SIZE',
+      );
       // Inserir 15 registros (maior que BATCH_SIZE = 10)
       for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'batch_test', {
@@ -120,6 +138,9 @@ describe('DatabaseService - Processamento em Lotes', () => {
     });
 
     it('delete em lote deve remover todos os registros', async () => {
+      console.log(
+        '    ✓ Teste: delete em lote deve remover todos os registros',
+      );
       // Inserir 5 registros
       for (let i = 0; i < 5; i++) {
         await service.insertRecord(userId, 'batch_test', {
@@ -140,6 +161,9 @@ describe('DatabaseService - Processamento em Lotes', () => {
     });
 
     it('delete com filtro deve processar apenas registros que batem', async () => {
+      console.log(
+        '    ✓ Teste: delete com filtro deve processar apenas registros que batem',
+      );
       // Inserir 10 registros (metade com status "pending")
       for (let i = 0; i < 10; i++) {
         await service.insertRecord(userId, 'batch_test', {
@@ -168,7 +192,12 @@ describe('DatabaseService - Processamento em Lotes', () => {
   // 9.3. Atualização de isFull após deleção
   // ============================================
   describe('Atualização de isFull após deleção', () => {
+    console.log('  📂 Grupo: Atualização de isFull após deleção');
+
     it('partição cheia deve virar isFull=false após deleção', async () => {
+      console.log(
+        '    ✓ Teste: partição cheia deve virar isFull=false após deleção',
+      );
       // Inserir 50 registros para encher a primeira partição (MAX_PARTITION_SIZE = 50)
       for (let i = 0; i < 50; i++) {
         await service.insertRecord(userId, 'batch_test', {
@@ -195,6 +224,9 @@ describe('DatabaseService - Processamento em Lotes', () => {
     });
 
     it('múltiplas deleções devem atualizar isFull corretamente', async () => {
+      console.log(
+        '    ✓ Teste: múltiplas deleções devem atualizar isFull corretamente',
+      );
       // Inserir 100 registros (2 partições cheias: 50 + 50)
       for (let i = 0; i < 100; i++) {
         await service.insertRecord(userId, 'batch_test', {
@@ -230,7 +262,12 @@ describe('DatabaseService - Processamento em Lotes', () => {
   // 9.4. Performance de Lotes
   // ============================================
   describe('Performance de Lotes', () => {
+    console.log('  📂 Grupo: Performance de Lotes');
+
     it('processamento em lotes deve incluir métricas de tempo', async () => {
+      console.log(
+        '    ✓ Teste: processamento em lotes deve incluir métricas de tempo',
+      );
       // Inserir 15 registros (> BATCH_SIZE = 10)
       for (let i = 0; i < 15; i++) {
         await service.insertRecord(userId, 'batch_test', {
@@ -253,6 +290,9 @@ describe('DatabaseService - Processamento em Lotes', () => {
     });
 
     it('lotes grandes devem ter tempo de execução proporcional', async () => {
+      console.log(
+        '    ✓ Teste: lotes grandes devem ter tempo de execução proporcional',
+      );
       // Inserir 25 registros (> BATCH_SIZE = 10, força 3 batches)
       for (let i = 0; i < 25; i++) {
         await service.insertRecord(userId, 'batch_test', {

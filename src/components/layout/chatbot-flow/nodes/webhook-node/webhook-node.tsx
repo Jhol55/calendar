@@ -4,10 +4,12 @@ import { Webhook, Settings, Copy, CheckCircle } from 'lucide-react';
 import { NodeData } from '../../types';
 import { Typography } from '@/components/ui/typography/typography';
 import { cn } from '@/lib/utils';
+import { useUser } from '@/hooks/use-user';
 
 function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
   const [copied, setCopied] = useState(false);
   const webhookConfig = data.webhookConfig;
+  const { user } = useUser();
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -16,23 +18,22 @@ function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
   };
 
   const getWebhookUrl = () => {
-    // Se for WhatsApp, buscar webhook da instância (será implementado)
+    // WhatsApp: não mostrar URL (será ocultado no componente)
     if (
       webhookConfig?.serviceType === 'whatsapp' &&
       webhookConfig?.instanceToken
     ) {
-      return `Webhook da instância ${webhookConfig.instanceToken.substring(0, 8)}...`;
+      return null; // Retornar null ao invés de string
     }
 
-    // Se for Manual, usar webhookId
-    if (webhookConfig?.webhookUrl) {
-      return webhookConfig.webhookUrl;
-    }
-    if (webhookConfig?.webhookId) {
+    // Manual: mostrar URL limpa com userId + path
+    if (webhookConfig?.webhookId && user?.id) {
       const baseUrl =
         typeof window !== 'undefined' ? window.location.origin : '';
-      return `${baseUrl}/api/webhooks/${webhookConfig.webhookId}`;
+      // URL inclui userId para evitar colisões entre usuários
+      return `${baseUrl}/api/webhooks/${user.id}/${webhookConfig.webhookId}`;
     }
+
     return 'Configure o webhook...';
   };
 
@@ -87,9 +88,8 @@ function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
           </>
         )}
 
-        {/* Só mostrar URL se for Manual ou não tiver serviceType definido */}
-        {(!webhookConfig?.serviceType ||
-          webhookConfig.serviceType === 'manual') && (
+        {/* Só mostrar URL se for Manual */}
+        {webhookConfig?.serviceType === 'manual' && (
           <div className="mt-3 bg-gray-50 p-2 rounded border border-gray-200">
             <div className="flex items-center justify-between mb-1">
               <Typography variant="span" className="text-xs text-gray-700">
@@ -98,7 +98,8 @@ function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  copyToClipboard(getWebhookUrl());
+                  const url = getWebhookUrl();
+                  if (url) copyToClipboard(url);
                 }}
                 className="text-gray-500 hover:text-gray-700 transition-colors"
                 title="Copiar URL"
@@ -119,6 +120,16 @@ function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
           </div>
         )}
 
+        {/* Para WhatsApp, mostrar apenas um indicador */}
+        {webhookConfig?.serviceType === 'whatsapp' && (
+          <Typography
+            variant="p"
+            className="text-xs text-gray-500 mt-2 italic text-center"
+          >
+            Webhook da instância será usado automaticamente
+          </Typography>
+        )}
+
         {!webhookConfig && (
           <Typography
             variant="p"
@@ -135,3 +146,4 @@ function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
 }
 
 export const WebhookNode = memo(WebhookNodeComponent);
+WebhookNode.displayName = 'WebhookNode';

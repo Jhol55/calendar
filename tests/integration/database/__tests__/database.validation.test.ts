@@ -4,25 +4,30 @@
 
 import {
   createTestService,
-  generateTestUserId,
+  generateStringUserId,
   expectErrorCode,
-} from '../setup';
+} from '../../setup';
 import { DatabaseService } from '@/services/database/database.service';
 
 describe('DatabaseService - Validação', () => {
+  console.log('\n📋 INICIANDO: DatabaseService - Validação');
+
   let service: DatabaseService;
   let userId: string;
 
   beforeEach(() => {
     service = createTestService();
-    userId = generateTestUserId();
+    userId = generateStringUserId();
   });
 
   // ============================================
   // 4.1. validateTableName
   // ============================================
   describe('validateTableName', () => {
+    console.log('  📂 Grupo: validateTableName');
+
     it('✅ deve aceitar nome válido: "my_table-123"', async () => {
+      console.log('    ✓ Teste: ✅ deve aceitar nome válido: "my_table-123"');
       await expect(
         service.addColumns(userId, 'my_table-123', [
           { name: 'field', type: 'string' },
@@ -31,6 +36,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ deve rejeitar nome com espaços: "nome inválido"', async () => {
+      console.log(
+        '    ✓ Teste: ❌ deve rejeitar nome com espaços: "nome inválido"',
+      );
       await expectErrorCode(
         service.addColumns(userId, 'nome inválido', [
           { name: 'field', type: 'string' },
@@ -40,6 +48,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ deve rejeitar nome vazio: ""', async () => {
+      console.log('    ✓ Teste: ❌ deve rejeitar nome vazio: ""');
       await expectErrorCode(
         service.addColumns(userId, '', [{ name: 'field', type: 'string' }]),
         'INVALID_TABLE_NAME',
@@ -47,6 +56,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ deve rejeitar nome com caracteres especiais: "table@123"', async () => {
+      console.log(
+        '    ✓ Teste: ❌ deve rejeitar nome com caracteres especiais: "table@123"',
+      );
       await expectErrorCode(
         service.addColumns(userId, 'table@123', [
           { name: 'field', type: 'string' },
@@ -60,7 +72,10 @@ describe('DatabaseService - Validação', () => {
   // 4.2. validateColumns
   // ============================================
   describe('validateColumns', () => {
+    console.log('  📂 Grupo: validateColumns');
+
     it('✅ deve aceitar array válido de colunas', async () => {
+      console.log('    ✓ Teste: ✅ deve aceitar array válido de colunas');
       const schema = await service.addColumns(userId, 'test_table', [
         { name: 'name', type: 'string' },
         { name: 'age', type: 'number' },
@@ -75,6 +90,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ deve rejeitar array vazio', async () => {
+      console.log('    ✓ Teste: ❌ deve rejeitar array vazio');
       await expectErrorCode(
         service.addColumns(userId, 'test_table', []),
         'INVALID_COLUMNS',
@@ -82,6 +98,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ deve rejeitar coluna sem nome', async () => {
+      console.log('    ✓ Teste: ❌ deve rejeitar coluna sem nome');
       await expectErrorCode(
         service.addColumns(userId, 'test_table', [
           { name: '', type: 'string' },
@@ -91,6 +108,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ deve rejeitar tipo inválido: "invalid"', async () => {
+      console.log('    ✓ Teste: ❌ deve rejeitar tipo inválido: "invalid"');
       await expectErrorCode(
         service.addColumns(userId, 'test_table', [
           { name: 'field', type: 'invalid' as 'string' },
@@ -100,6 +118,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('✅ deve aceitar todos os tipos válidos', async () => {
+      console.log('    ✓ Teste: ✅ deve aceitar todos os tipos válidos');
       const schema = await service.addColumns(userId, 'test_table', [
         { name: 'str', type: 'string' },
         { name: 'num', type: 'number' },
@@ -117,6 +136,7 @@ describe('DatabaseService - Validação', () => {
   // 4.3. validateFieldType
   // ============================================
   describe('validateFieldType', () => {
+    console.log('  📂 Grupo: validateFieldType');
     beforeEach(async () => {
       await service.addColumns(userId, 'types_test', [
         { name: 'str_field', type: 'string', required: false },
@@ -130,6 +150,7 @@ describe('DatabaseService - Validação', () => {
 
     // STRING
     it('✅ string: "text" deve passar', async () => {
+      console.log('    ✓ Teste: ✅ string: "text" deve passar');
       await expect(
         service.insertRecord(userId, 'types_test', {
           str_field: 'text',
@@ -138,6 +159,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ string: 123 deve falhar', async () => {
+      console.log('    ✓ Teste: ❌ string: 123 deve falhar');
       await expectErrorCode(
         service.insertRecord(userId, 'types_test', {
           str_field: 123,
@@ -148,6 +170,7 @@ describe('DatabaseService - Validação', () => {
 
     // NUMBER
     it('✅ number: 42 deve passar', async () => {
+      console.log('    ✓ Teste: ✅ number: 42 deve passar');
       await expect(
         service.insertRecord(userId, 'types_test', {
           num_field: 42,
@@ -156,6 +179,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('✅ number: "42" (string) deve passar com conversão', async () => {
+      console.log(
+        '    ✓ Teste: ✅ number: "42" (string) deve passar com conversão',
+      );
       await expect(
         service.insertRecord(userId, 'types_test', {
           num_field: '42',
@@ -164,6 +190,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ number: NaN deve falhar', async () => {
+      console.log('    ✓ Teste: ❌ number: NaN deve falhar');
       await expectErrorCode(
         service.insertRecord(userId, 'types_test', {
           num_field: NaN,
@@ -173,6 +200,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ number: Infinity deve falhar', async () => {
+      console.log('    ✓ Teste: ❌ number: Infinity deve falhar');
       await expectErrorCode(
         service.insertRecord(userId, 'types_test', {
           num_field: Infinity,
@@ -183,6 +211,7 @@ describe('DatabaseService - Validação', () => {
 
     // BOOLEAN
     it('✅ boolean: true deve passar', async () => {
+      console.log('    ✓ Teste: ✅ boolean: true deve passar');
       await expect(
         service.insertRecord(userId, 'types_test', {
           bool_field: true,
@@ -191,6 +220,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ boolean: "true" (string) deve falhar', async () => {
+      console.log('    ✓ Teste: ❌ boolean: "true" (string) deve falhar');
       await expectErrorCode(
         service.insertRecord(userId, 'types_test', {
           bool_field: 'true',
@@ -201,6 +231,7 @@ describe('DatabaseService - Validação', () => {
 
     // DATE
     it('✅ date: "2024-01-15" deve passar', async () => {
+      console.log('    ✓ Teste: ✅ date: "2024-01-15" deve passar');
       await expect(
         service.insertRecord(userId, 'types_test', {
           date_field: '2024-01-15',
@@ -209,6 +240,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('✅ date: "2024-01-15T10:30:00.000Z" deve passar', async () => {
+      console.log(
+        '    ✓ Teste: ✅ date: "2024-01-15T10:30:00.000Z" deve passar',
+      );
       await expect(
         service.insertRecord(userId, 'types_test', {
           date_field: '2024-01-15T10:30:00.000Z',
@@ -217,6 +251,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('✅ date: "15/01/2024" deve passar', async () => {
+      console.log('    ✓ Teste: ✅ date: "15/01/2024" deve passar');
       await expect(
         service.insertRecord(userId, 'types_test', {
           date_field: '15/01/2024',
@@ -225,6 +260,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ date: "1234567890" (timestamp Unix) deve falhar', async () => {
+      console.log(
+        '    ✓ Teste: ❌ date: "1234567890" (timestamp Unix) deve falhar',
+      );
       await expectErrorCode(
         service.insertRecord(userId, 'types_test', {
           date_field: '1234567890',
@@ -235,6 +273,7 @@ describe('DatabaseService - Validação', () => {
 
     // ARRAY
     it('✅ array: [1,2,3] deve passar', async () => {
+      console.log('    ✓ Teste: ✅ array: [1,2,3] deve passar');
       await expect(
         service.insertRecord(userId, 'types_test', {
           arr_field: [1, 2, 3],
@@ -243,6 +282,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ array: "array" (string) deve falhar', async () => {
+      console.log('    ✓ Teste: ❌ array: "array" (string) deve falhar');
       await expectErrorCode(
         service.insertRecord(userId, 'types_test', {
           arr_field: 'array',
@@ -253,6 +293,7 @@ describe('DatabaseService - Validação', () => {
 
     // OBJECT
     it('✅ object: {a:1} deve passar', async () => {
+      console.log('    ✓ Teste: ✅ object: {a:1} deve passar');
       await expect(
         service.insertRecord(userId, 'types_test', {
           obj_field: { a: 1 },
@@ -261,6 +302,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ object: [] (array) deve falhar', async () => {
+      console.log('    ✓ Teste: ❌ object: [] (array) deve falhar');
       await expectErrorCode(
         service.insertRecord(userId, 'types_test', {
           obj_field: [],
@@ -270,6 +312,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('✅ object: null deve passar para campo opcional', async () => {
+      console.log(
+        '    ✓ Teste: ✅ object: null deve passar para campo opcional',
+      );
       // Campos opcionais devem aceitar null
       const record = await service.insertRecord(userId, 'types_test', {
         obj_field: null,
@@ -278,6 +323,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ object: null deve falhar para campo required', async () => {
+      console.log(
+        '    ✓ Teste: ❌ object: null deve falhar para campo required',
+      );
       // Criar tabela com campo required
       await service.addColumns(userId, 'required_test', [
         { name: 'obj_field', type: 'object', required: true },
@@ -297,6 +345,7 @@ describe('DatabaseService - Validação', () => {
   // 4.4. validateRecord
   // ============================================
   describe('validateRecord', () => {
+    console.log('  📂 Grupo: validateRecord');
     beforeEach(async () => {
       await service.addColumns(userId, 'validation_test', [
         { name: 'required_field', type: 'string', required: true },
@@ -306,6 +355,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('✅ deve aceitar record válido com todos os campos', async () => {
+      console.log(
+        '    ✓ Teste: ✅ deve aceitar record válido com todos os campos',
+      );
       const record = await service.insertRecord(userId, 'validation_test', {
         required_field: 'value',
         optional_field: 'optional',
@@ -318,6 +370,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ deve rejeitar campo required ausente', async () => {
+      console.log('    ✓ Teste: ❌ deve rejeitar campo required ausente');
       await expectErrorCode(
         service.insertRecord(userId, 'validation_test', {
           optional_field: 'value',
@@ -327,6 +380,7 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('✅ deve aplicar default quando campo ausente', async () => {
+      console.log('    ✓ Teste: ✅ deve aplicar default quando campo ausente');
       const record = await service.insertRecord(userId, 'validation_test', {
         required_field: 'value',
       });
@@ -335,6 +389,9 @@ describe('DatabaseService - Validação', () => {
     });
 
     it('❌ deve rejeitar tipo incorreto (string em campo number)', async () => {
+      console.log(
+        '    ✓ Teste: ❌ deve rejeitar tipo incorreto (string em campo number)',
+      );
       await expectErrorCode(
         service.insertRecord(userId, 'validation_test', {
           required_field: 'value',

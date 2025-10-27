@@ -82,6 +82,7 @@ export async function executeFlow(
       startTime: new Date().toISOString(),
       endTime: new Date().toISOString(),
       data: webhookData.body,
+      result: webhookData.body, // ✅ Adicionar result para consistência
     };
 
     await prisma.flow_executions.update({
@@ -96,7 +97,7 @@ export async function executeFlow(
     );
     console.log(
       `🔍 [WEBHOOK-SAVE] Saved data keys:`,
-      Object.keys(webhookData.body),
+      Object.keys(webhookData.body || {}),
     );
     console.log(
       `🔍 [WEBHOOK-SAVE] nodeExecutions now has:`,
@@ -376,7 +377,7 @@ async function processNode(
         break;
       default:
         console.log(`⚠️ Unknown node type: ${node.type}`);
-        result = { status: 'skipped', message: 'Unknown node type' };
+        throw new Error(`Tipo de nó não suportado: ${node.type}`);
     }
 
     // Atualizar status do nó
@@ -431,8 +432,6 @@ async function processNode(
 }
 
 // ==================== NODE PROCESSORS ====================
-// Estes processadores ainda estão no webhook-worker.ts
-// Por enquanto importamos ou re-implementamos aqui temporariamente
 
 async function processDatabaseNode(
   executionId: string,
