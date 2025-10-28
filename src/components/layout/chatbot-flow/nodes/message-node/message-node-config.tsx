@@ -138,6 +138,12 @@ function MessageFormFields({
   setConfigMode,
   jsonConfig,
   setJsonConfig,
+  choices,
+  setChoices,
+  listCategories,
+  setListCategories,
+  carouselCards,
+  setCarouselCards,
 }: {
   instances: InstanceProps[];
   config?: MessageConfig;
@@ -147,6 +153,74 @@ function MessageFormFields({
   setConfigMode: React.Dispatch<React.SetStateAction<'manual' | 'json'>>;
   jsonConfig: string;
   setJsonConfig: React.Dispatch<React.SetStateAction<string>>;
+  choices: {
+    id: string;
+    text: string;
+    description: string;
+    actionType?: 'copy' | 'link' | 'call' | 'return_id';
+  }[];
+  setChoices: React.Dispatch<
+    React.SetStateAction<
+      {
+        id: string;
+        text: string;
+        description: string;
+        actionType?: 'copy' | 'link' | 'call' | 'return_id';
+      }[]
+    >
+  >;
+  listCategories: {
+    id: string;
+    name: string;
+    items: {
+      id: string;
+      text: string;
+      description: string;
+      actionType?: 'copy' | 'link' | 'call' | 'return_id';
+    }[];
+  }[];
+  setListCategories: React.Dispatch<
+    React.SetStateAction<
+      {
+        id: string;
+        name: string;
+        items: {
+          id: string;
+          text: string;
+          description: string;
+          actionType?: 'copy' | 'link' | 'call' | 'return_id';
+        }[];
+      }[]
+    >
+  >;
+  carouselCards: {
+    id: string;
+    title: string;
+    description: string;
+    imageUrl: string;
+    buttons: {
+      id: string;
+      text: string;
+      description: string;
+      actionType?: 'copy' | 'link' | 'call' | 'return_id';
+    }[];
+  }[];
+  setCarouselCards: React.Dispatch<
+    React.SetStateAction<
+      {
+        id: string;
+        title: string;
+        description: string;
+        imageUrl: string;
+        buttons: {
+          id: string;
+          text: string;
+          description: string;
+          actionType?: 'copy' | 'link' | 'call' | 'return_id';
+        }[];
+      }[]
+    >
+  >;
 }) {
   const { form, setValue, errors } = useForm();
   const messageType = (form.messageType as MessageType) || 'text';
@@ -177,28 +251,6 @@ function MessageFormFields({
     imageUrl: string;
     buttons: Choice[];
   }
-
-  const [choices, setChoices] = useState<Choice[]>([
-    { id: '', text: '', description: '', actionType: undefined },
-  ]);
-
-  const [listCategories, setListCategories] = useState<ListCategory[]>([
-    {
-      id: crypto.randomUUID(),
-      name: '',
-      items: [{ id: '', text: '', description: '', actionType: undefined }],
-    },
-  ]);
-
-  const [carouselCards, setCarouselCards] = useState<CarouselCard[]>([
-    {
-      id: crypto.randomUUID(),
-      title: '',
-      description: '',
-      imageUrl: '',
-      buttons: [{ id: '', text: '', description: '', actionType: undefined }],
-    },
-  ]);
 
   // Estado para controlar quais categorias estão expandidas
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
@@ -642,19 +694,55 @@ function MessageFormFields({
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [config, setValue, setConfigMode, setJsonConfig, setMemoryItems]);
+  }, [
+    config,
+    setValue,
+    setConfigMode,
+    setJsonConfig,
+    setMemoryItems,
+    setChoices,
+    setListCategories,
+    setCarouselCards,
+  ]);
 
-  // Sincronizar actionType dos FormSelects com o estado choices/carouselCards
+  // 🔧 CORREÇÃO: Sincronizar valores dos inputs com o formulário
   useEffect(() => {
-    if (interactiveMenuType === 'button') {
+    // Sincronizar choices (button, poll)
+    if (interactiveMenuType === 'button' || interactiveMenuType === 'poll') {
       choices.forEach((choice, index) => {
+        setValue(`choice_text_${index}`, choice.text);
+        setValue(`choice_id_${index}`, choice.id);
+        setValue(`choice_description_${index}`, choice.description);
         if (choice.actionType) {
           setValue(`choice_actionType_${index}`, choice.actionType);
         }
       });
-    } else if (interactiveMenuType === 'carousel') {
+    }
+
+    // Sincronizar listCategories (list)
+    if (interactiveMenuType === 'list') {
+      listCategories.forEach((category) => {
+        setValue(`category_name_${category.id}`, category.name);
+        category.items.forEach((item, itemIndex) => {
+          setValue(`category_${category.id}_item_text_${itemIndex}`, item.text);
+          setValue(`category_${category.id}_item_id_${itemIndex}`, item.id);
+          setValue(
+            `category_${category.id}_item_desc_${itemIndex}`,
+            item.description,
+          );
+        });
+      });
+    }
+
+    // Sincronizar carouselCards (carousel)
+    if (interactiveMenuType === 'carousel') {
       carouselCards.forEach((card) => {
+        setValue(`card_title_${card.id}`, card.title);
+        setValue(`card_description_${card.id}`, card.description);
+        setValue(`card_image_${card.id}`, card.imageUrl);
         card.buttons.forEach((button, buttonIndex) => {
+          setValue(`card_${card.id}_button_text_${buttonIndex}`, button.text);
+          setValue(`card_${card.id}_button_id_${buttonIndex}`, button.id);
           if (button.actionType) {
             setValue(
               `card_${card.id}_button_actionType_${buttonIndex}`,
@@ -664,7 +752,7 @@ function MessageFormFields({
         });
       });
     }
-  }, [choices, carouselCards, interactiveMenuType, setValue]);
+  }, [choices, listCategories, carouselCards, interactiveMenuType, setValue]);
 
   // Atualizar choices no formulário quando mudar (converter para strings com pipe)
   useEffect(() => {
@@ -772,6 +860,9 @@ function MessageFormFields({
     configMode,
     jsonConfig,
     setValue,
+    setChoices,
+    setListCategories,
+    setCarouselCards,
   ]);
 
   // Funções para gerenciar choices simples (button, poll)
@@ -1606,7 +1697,6 @@ function MessageFormFields({
                                 <Input
                                   type="text"
                                   fieldName={`category_name_${category.id}`}
-                                  value={category.name}
                                   onChange={(e) =>
                                     updateCategoryName(
                                       category.id,
@@ -1667,7 +1757,6 @@ function MessageFormFields({
                                       <Input
                                         type="text"
                                         fieldName={`category_${category.id}_item_text_${itemIndex}`}
-                                        value={item.text}
                                         onChange={(e) =>
                                           updateCategoryItem(
                                             category.id,
@@ -1692,7 +1781,6 @@ function MessageFormFields({
                                       <Input
                                         type="text"
                                         fieldName={`category_${category.id}_item_id_${itemIndex}`}
-                                        value={item.id}
                                         onChange={(e) =>
                                           updateCategoryItem(
                                             category.id,
@@ -1717,7 +1805,6 @@ function MessageFormFields({
                                       <Input
                                         type="text"
                                         fieldName={`category_${category.id}_item_desc_${itemIndex}`}
-                                        value={item.description}
                                         onChange={(e) =>
                                           updateCategoryItem(
                                             category.id,
@@ -1872,7 +1959,6 @@ function MessageFormFields({
                               <Input
                                 type="text"
                                 fieldName={`card_title_${card.id}`}
-                                value={card.title}
                                 onChange={(e) =>
                                   updateCarouselCard(
                                     card.id,
@@ -1899,7 +1985,6 @@ function MessageFormFields({
                               </FormControl>
                               <Textarea
                                 fieldName={`card_description_${card.id}`}
-                                value={card.description}
                                 onChange={(e) =>
                                   updateCarouselCard(
                                     card.id,
@@ -1922,7 +2007,6 @@ function MessageFormFields({
                               <Input
                                 type="url"
                                 fieldName={`card_image_${card.id}`}
-                                value={card.imageUrl}
                                 onChange={(e) =>
                                   updateCarouselCard(
                                     card.id,
@@ -1983,7 +2067,6 @@ function MessageFormFields({
                                 <Input
                                   type="text"
                                   fieldName={`card_${card.id}_button_text_${buttonIndex}`}
-                                  value={button.text}
                                   onChange={(e) =>
                                     updateCardButton(
                                       card.id,
@@ -2049,7 +2132,6 @@ function MessageFormFields({
                                 <Input
                                   type="text"
                                   fieldName={`card_${card.id}_button_id_${buttonIndex}`}
-                                  value={button.id}
                                   onChange={(e) =>
                                     updateCardButton(
                                       card.id,
@@ -2126,7 +2208,6 @@ function MessageFormFields({
                       <Input
                         type="text"
                         fieldName={`choice_text_${index}`}
-                        value={choice.text}
                         onChange={(e) =>
                           updateChoice(index, 'text', e.target.value)
                         }
@@ -2181,7 +2262,6 @@ function MessageFormFields({
                           <Input
                             type="text"
                             fieldName={`choice_id_${index}`}
-                            value={choice.id}
                             onChange={(e) =>
                               updateChoice(index, 'id', e.target.value)
                             }
@@ -2217,7 +2297,6 @@ function MessageFormFields({
                         <Input
                           type="text"
                           fieldName={`choice_description_${index}`}
-                          value={choice.description}
                           onChange={(e) =>
                             updateChoice(index, 'description', e.target.value)
                           }
@@ -2725,6 +2804,54 @@ export function MessageNodeConfig({
   );
   const [currentJsonConfig, setCurrentJsonConfig] = useState<string>('');
 
+  // 🔧 Estados para armazenar choices, categorias e cartões (necessários para o submit)
+  interface Choice {
+    id: string;
+    text: string;
+    description: string;
+    actionType?: 'copy' | 'link' | 'call' | 'return_id';
+  }
+
+  interface ListCategory {
+    id: string;
+    name: string;
+    items: Choice[];
+  }
+
+  interface CarouselCard {
+    id: string;
+    title: string;
+    description: string;
+    imageUrl: string;
+    buttons: Choice[];
+  }
+
+  const [currentChoices, setCurrentChoices] = useState<Choice[]>([
+    { id: '', text: '', description: '', actionType: undefined },
+  ]);
+
+  const [currentListCategories, setCurrentListCategories] = useState<
+    ListCategory[]
+  >([
+    {
+      id: crypto.randomUUID(),
+      name: '',
+      items: [{ id: '', text: '', description: '', actionType: undefined }],
+    },
+  ]);
+
+  const [currentCarouselCards, setCurrentCarouselCards] = useState<
+    CarouselCard[]
+  >([
+    {
+      id: crypto.randomUUID(),
+      title: '',
+      description: '',
+      imageUrl: '',
+      buttons: [{ id: '', text: '', description: '', actionType: undefined }],
+    },
+  ]);
+
   // Carregar configuração de memória quando config mudar
   useEffect(() => {
     if (config?.memoryConfig?.items && config.memoryConfig.items.length > 0) {
@@ -2735,6 +2862,76 @@ export function MessageNodeConfig({
   }, [config]);
 
   const handleSubmit = async (data: FieldValues) => {
+    // 🔧 CORREÇÃO: Sincronizar manualmente os estados locais com o campo do formulário
+    // antes de processar o submit, garantindo que os dados estejam atualizados
+    if (
+      data.messageType === 'interactive_menu' &&
+      currentConfigMode === 'manual'
+    ) {
+      if (data.interactiveMenuType === 'list') {
+        // Sincronizar listCategories
+        const choicesStrings: string[] = [];
+        currentListCategories.forEach((category) => {
+          if (category.name && category.name.trim() !== '') {
+            choicesStrings.push(`[${category.name}]`);
+          }
+          category.items.forEach((item) => {
+            if (item.text && item.text.trim() !== '') {
+              choicesStrings.push(
+                `${item.text}|${item.id || ''}|${item.description || ''}`,
+              );
+            }
+          });
+        });
+        data.interactiveMenuChoices = JSON.stringify(choicesStrings);
+      } else if (data.interactiveMenuType === 'carousel') {
+        // Sincronizar carouselCards
+        const choicesStrings: string[] = [];
+        currentCarouselCards.forEach((card) => {
+          if (card.title && card.title.trim() !== '') {
+            const titleLine = card.description
+              ? `[${card.title}\n${card.description}]`
+              : `[${card.title}]`;
+            choicesStrings.push(titleLine);
+          }
+          if (card.imageUrl && card.imageUrl.trim() !== '') {
+            choicesStrings.push(`{${card.imageUrl}}`);
+          }
+          card.buttons.forEach((button) => {
+            if (button.text && button.text.trim() !== '') {
+              let finalId = button.id || '';
+              if (button.actionType === 'copy') {
+                finalId = `copy:${button.id}`;
+              } else if (button.actionType === 'call') {
+                finalId = `call:${button.id}`;
+              } else if (button.actionType === 'return_id') {
+                finalId = `${button.id}`;
+              }
+              choicesStrings.push(`${button.text}|${finalId}`);
+            }
+          });
+        });
+        data.interactiveMenuChoices = JSON.stringify(choicesStrings);
+      } else {
+        // Sincronizar choices (button, poll)
+        const choicesStrings = currentChoices
+          .map((choice) => {
+            if (!choice.text || choice.text.trim() === '') return '';
+            let finalId = choice.id || '';
+            if (choice.actionType === 'copy') {
+              finalId = `copy:${choice.id}`;
+            } else if (choice.actionType === 'call') {
+              finalId = `call:${choice.id}`;
+            } else if (choice.actionType === 'return_id') {
+              finalId = `${choice.id}`;
+            }
+            return `${choice.text}|${finalId}|${choice.description || ''}`;
+          })
+          .filter((str) => str !== '');
+        data.interactiveMenuChoices = JSON.stringify(choicesStrings);
+      }
+    }
+
     // Se estiver no modo JSON e for interactive_menu do tipo list, processar o JSON das categorias
     if (
       currentConfigMode === 'json' &&
@@ -3016,6 +3213,12 @@ export function MessageNodeConfig({
           setConfigMode={setCurrentConfigMode}
           jsonConfig={currentJsonConfig}
           setJsonConfig={setCurrentJsonConfig}
+          choices={currentChoices}
+          setChoices={setCurrentChoices}
+          listCategories={currentListCategories}
+          setListCategories={setCurrentListCategories}
+          carouselCards={currentCarouselCards}
+          setCarouselCards={setCurrentCarouselCards}
         />
       </Form>
     </NodeConfigLayout>

@@ -6,6 +6,11 @@ const globalForPrisma = globalThis as unknown as {
 
 let prisma: PrismaClient;
 
+// Flag para garantir que os listeners sejam adicionados apenas uma vez
+const globalForListeners = globalThis as unknown as {
+  prismaListenersAdded?: boolean;
+};
+
 if (process.env.NODE_ENV === 'production') {
   prisma = new PrismaClient({
     log: ['error', 'warn'],
@@ -30,18 +35,23 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Graceful shutdown para evitar broken pipes
-process.on('beforeExit', async () => {
-  await prisma.$disconnect();
-});
+// Adiciona listeners apenas uma vez, mesmo com hot-reload
+if (!globalForListeners.prismaListenersAdded) {
+  globalForListeners.prismaListenersAdded = true;
 
-process.on('SIGINT', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
-});
+  process.on('beforeExit', async () => {
+    await prisma.$disconnect();
+  });
 
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
-});
+  process.on('SIGINT', async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  });
+}
 
 export { prisma };
