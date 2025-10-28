@@ -46,7 +46,7 @@ function HttpRequestNodeComponent({ data, selected }: NodeProps<NodeData>) {
         selected ? 'border-blue-500' : 'border-gray-300'
       }`}
     >
-      <Handle type="target" position={Position.Left} className="w-3 h-3" />
+      <Handle type="target" position={Position.Left} />
 
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
@@ -74,7 +74,7 @@ function HttpRequestNodeComponent({ data, selected }: NodeProps<NodeData>) {
         </div>
       </div>
 
-      <Handle type="source" position={Position.Right} className="w-3 h-3" />
+      <Handle type="source" position={Position.Right} />
     </div>
   );
 }

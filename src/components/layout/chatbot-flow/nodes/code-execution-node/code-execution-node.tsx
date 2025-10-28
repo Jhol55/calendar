@@ -14,8 +14,6 @@ export const CodeExecutionNode = memo(({ data }: NodeProps<NodeData>) => {
     switch (language) {
       case 'javascript':
         return '🟨';
-      case 'typescript':
-        return '🔷';
       case 'python':
         return '🐍';
       default:
@@ -28,8 +26,6 @@ export const CodeExecutionNode = memo(({ data }: NodeProps<NodeData>) => {
     switch (language) {
       case 'javascript':
         return 'JavaScript';
-      case 'typescript':
-        return 'TypeScript';
       case 'python':
         return 'Python';
       default:
@@ -88,14 +84,6 @@ export const CodeExecutionNode = memo(({ data }: NodeProps<NodeData>) => {
               {timeout}s timeout
             </Typography>
           </div>
-
-          {/* Badge de segurança */}
-          <Typography
-            variant="span"
-            className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs font-medium inline-block"
-          >
-            🔒 Sandbox isolado
-          </Typography>
         </div>
       )}
 

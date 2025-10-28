@@ -140,7 +140,7 @@ function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} className="w-3 h-3" />
+      <Handle type="source" position={Position.Right} />
     </div>
   );
 }

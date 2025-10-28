@@ -10,7 +10,7 @@ function EndNodeComponent({ data, selected }: NodeProps<NodeData>) {
         selected ? 'ring-4 ring-red-300' : ''
       }`}
     >
-      <Handle type="target" position={Position.Left} className="w-3 h-3" />
+      <Handle type="target" position={Position.Left} />
 
       <div className="flex flex-col items-center gap-1 text-white">
         <Square className="w-6 h-6" fill="white" />
