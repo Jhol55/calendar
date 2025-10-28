@@ -42,13 +42,12 @@ export function NodeExecuteButton({
         onClick={handleClick}
         disabled={isExecuting}
         variant="default"
-        size="sm"
         className={cn(
           'h-8 w-8 p-0 rounded-full shadow-lg',
           'bg-gradient-to-br from-emerald-500 to-emerald-600',
           'hover:from-emerald-600 hover:to-emerald-700',
-          'border-2 border-white',
           'transition-all duration-200',
+          'border',
           isExecuting && 'cursor-not-allowed opacity-75',
           isHovered && 'scale-110',
         )}

@@ -49,7 +49,7 @@ function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Webhook className="w-5 h-5 text-green-500" />
+            <Webhook className="w-5 h-5 text-emerald-500" />
             <Typography variant="h5" className="text-sm">
               Webhook
             </Typography>

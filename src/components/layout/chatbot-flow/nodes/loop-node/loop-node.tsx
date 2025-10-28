@@ -10,11 +10,11 @@ export const LoopNode = memo(({ data }: NodeProps<NodeData>) => {
   const batchSize = loopConfig?.batchSize || 1;
 
   return (
-    <div className="px-4 py-3 shadow-lg rounded-lg border-2 border-purple-600 bg-white min-w-[200px] max-w-[300px]">
+    <div className="px-4 py-3 shadow-lg rounded-lg border-2 border-rose-500 bg-white min-w-[200px] max-w-[300px]">
       <Handle type="target" position={Position.Left} />
 
       <div className="flex items-center gap-2 mb-2">
-        <div className="bg-purple-500 p-2 rounded-lg text-white">
+        <div className="bg-rose-500 p-2 rounded-lg text-white">
           <Repeat className="w-4 h-4" />
         </div>
         <div className="flex-1 min-w-0">
@@ -52,7 +52,7 @@ export const LoopNode = memo(({ data }: NodeProps<NodeData>) => {
           {loopConfig.accumulateResults && (
             <Typography
               variant="span"
-              className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-medium inline-block"
+              className="px-2 py-0.5 bg-rose-50 text-rose-700 rounded text-xs font-medium inline-block"
             >
               ✅ Acumulando resultados
             </Typography>

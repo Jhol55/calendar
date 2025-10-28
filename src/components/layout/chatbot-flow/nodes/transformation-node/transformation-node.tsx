@@ -71,7 +71,7 @@ export const TransformationNode = memo(({ data }: NodeProps<NodeData>) => {
     : getTypeStyle('default');
 
   return (
-    <div className="px-4 py-3 shadow-lg rounded-lg border-2 border-amber-600 bg-white min-w-[200px] max-w-[300px]">
+    <div className="px-4 py-3 shadow-lg rounded-lg border-2 border-orange-500 bg-white min-w-[200px] max-w-[300px]">
       <Handle type="target" position={Position.Left} />
 
       <div className="flex items-center gap-2 mb-2">
@@ -98,7 +98,7 @@ export const TransformationNode = memo(({ data }: NodeProps<NodeData>) => {
         <div className="mt-2">
           <Typography
             variant="span"
-            className="px-2 py-1 bg-amber-50 text-amber-700 rounded text-xs font-medium"
+            className="px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium"
           >
             {stepCount} {stepCount === 1 ? 'transformação' : 'transformações'}
           </Typography>

@@ -46,18 +46,18 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3 h-3 !bg-purple-400 border-2 border-white"
+        className="w-3 h-3 !bg-violet-400 border-2 border-white"
       />
 
       {/* Card do Node */}
-      <div className="min-w-[240px] max-w-[280px] bg-gradient-to-br from-purple-50 to-white border-2 border-purple-400 rounded-xl shadow-lg overflow-hidden">
+      <div className="min-w-[240px] max-w-[280px] bg-gradient-to-br from-violet-50 to-white border-2 border-violet-400 rounded-xl shadow-lg overflow-hidden">
         {/* Header Compacto */}
         <div className="bg-neutral-50 px-3 py-2">
           <div className="flex items-center gap-2 justify-between">
             <div className="flex gap-2 items-center">
-              {isIfType && <GitBranch className="w-4 h-4 text-purple-600" />}
-              {isSwitchType && <Split className="w-4 h-4 text-purple-600" />}
-              {!config && <GitBranch className="w-4 h-4 text-purple-600" />}
+              {isIfType && <GitBranch className="w-4 h-4 text-violet-500" />}
+              {isSwitchType && <Split className="w-4 h-4 text-violet-500" />}
+              {!config && <GitBranch className="w-4 h-4 text-violet-500" />}
               <Typography
                 variant="span"
                 className="text-neutral-600 font-semibold text-sm"
@@ -82,7 +82,7 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
                   className="flex items-center gap-1 text-xs bg-neutral-50 rounded px-2 py-1"
                 >
                   {index > 0 && rule.logicOperator && (
-                    <span className="font-bold text-purple-600 text-[10px] bg-purple-200 px-1 rounded">
+                    <span className="font-bold text-violet-600 text-[10px] bg-violet-200 px-1 rounded">
                       {rule.logicOperator}
                     </span>
                   )}
@@ -91,7 +91,7 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
                       ? `${rule.variable.substring(0, 10)}...`
                       : rule.variable}
                   </span>
-                  <span className="text-purple-600 font-bold">
+                  <span className="text-violet-600 font-bold">
                     {getOperatorSymbol(rule.operator)}
                   </span>
                   {rule.value && (
@@ -119,7 +119,7 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
           {/* SWITCH Config Display - Melhorado */}
           {isSwitchType && config?.variable && (
             <div className="space-y-1 pr-4">
-              <div className="bg-purple-50 rounded px-2 py-1">
+              <div className="bg-violet-50 rounded px-2 py-1">
                 <Typography
                   variant="span"
                   className="text-[10px] text-gray-500 uppercase"

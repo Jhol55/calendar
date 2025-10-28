@@ -51,7 +51,7 @@ function HttpRequestNodeComponent({ data, selected }: NodeProps<NodeData>) {
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Globe className="w-5 h-5 text-green-500" />
+            <Globe className="w-5 h-5 text-teal-500" />
             <Typography variant="h3" className="font-semibold text-sm">
               HTTP Request
             </Typography>

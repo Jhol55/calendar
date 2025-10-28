@@ -83,9 +83,9 @@ export function FlowsListSidebar({
   }
 
   return (
-    <div className="w-64 min-w-64 bg-neutral-50 border-r border-gray-200 flex flex-col h-full">
+    <div className="w-64 min-w-64 bg-white border-r border-gray-200 flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Workflow className="w-5 h-5 text-neutral-600" />
@@ -136,8 +136,8 @@ export function FlowsListSidebar({
                 onClick={() => onSelectFlow(flow)}
                 className={`w-full text-left px-6 py-3 rounded-lg transition-all group hover:shadow-md ${
                   currentFlowId === flow.id
-                    ? 'bg-white border border-neutral-200 shadow-lg ring-1 ring-neutral-400'
-                    : 'border bg-neutral-50 border-neutral-200'
+                    ? 'bg-neutral-50 border border-neutral-200 shadow-lg ring-1 ring-neutral-400'
+                    : 'border bg-white border-neutral-200'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">

@@ -19,7 +19,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Sidebar } from '../../layout/chatbot-flow/sidebar';
+import { Sidebar } from './modules-sidebar';
 import { MessageNodeConfig } from './nodes/message-node/message-node-config';
 import { FlowsListSidebar } from './flows-list-sidebar';
 import {
@@ -968,7 +968,7 @@ function FlowEditorContent() {
         >
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
           <Controls />
-          {nodes.length < 50 && <MiniMap nodeColor={nodeColor} />}
+          <MiniMap nodeColor={nodeColor} />
 
           <Panel position="top-left">
             <div className="flex gap-4">
@@ -995,7 +995,7 @@ function FlowEditorContent() {
 
           <Panel
             position="top-right"
-            className="flex gap-2 m-4"
+            className="flex gap-2 p-4 !bg-transparent -translate-y-4 translate-x-4 rounded-bl-lg"
             style={panelTopRightStyle}
           >
             <div className="flex gap-4 h-fit">

@@ -15,8 +15,8 @@ export const MemoryNode = memo(({ data }: NodeProps<NodeData>) => {
     switch (action) {
       case 'save':
         return {
-          bgColor: 'bg-purple-500',
-          borderColor: 'border-purple-600',
+          bgColor: 'bg-fuchsia-500',
+          borderColor: 'border-fuchsia-600',
           icon: <Save className="w-4 h-4" />,
           label: 'Salvar',
         };
@@ -66,7 +66,7 @@ export const MemoryNode = memo(({ data }: NodeProps<NodeData>) => {
           <div className="text-xs text-gray-500 w-full overflow-hidden">
             <Typography
               variant="span"
-              className="px-2 py-1 bg-neutral-100 text-purple-600 rounded font-mono text-xs truncate block"
+              className="px-2 py-1 bg-neutral-100 text-fuchsia-600 rounded font-mono text-xs truncate block"
             >
               {memoryName}
             </Typography>

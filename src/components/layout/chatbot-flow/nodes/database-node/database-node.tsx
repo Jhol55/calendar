@@ -74,7 +74,7 @@ function DatabaseNodeComponent({ data, selected }: NodeProps<NodeData>) {
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-purple-500" />
+            <Database className="w-5 h-5 text-cyan-500" />
             <Typography variant="h3" className="font-semibold text-sm">
               Database
             </Typography>

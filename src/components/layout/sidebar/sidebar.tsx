@@ -225,8 +225,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         onMouseEnter={() => setIsHovered(!isHovered)}
         onMouseLeave={() => setIsHovered(!isHovered)}
+        style={{ zoom: 0.9 }}
         className={cn(
-          'fixed left-0 sm:top-0 top-10 h-screen bg-neutral-50 backdrop-blur-sm border-r border-neutral-200',
+          'fixed left-0 sm:top-0 top-10 flex-1 bg-white backdrop-blur-sm border-r border-neutral-200',
           'z-50 flex flex-col transition-all duration-200 ease-out',
           isOpen ? 'translate-y-0' : '-translate-y-full',
           'md:relative md:translate-x-0',
