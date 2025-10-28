@@ -46,7 +46,16 @@ function MessageNodeComponent({ data, selected }: NodeProps<NodeData>) {
           ? `${mediaLabel}: ${fileName}`
           : 'Configure a mídia...';
       case 'contact':
-        return messageConfig.contactName || 'Configure o contato...';
+        if (!messageConfig.contactName) return 'Configure o contato...';
+        const contactInfo = [];
+        contactInfo.push(`👤 ${messageConfig.contactName}`);
+        if (messageConfig.contactPhone) {
+          contactInfo.push(`📱 ${messageConfig.contactPhone}`);
+        }
+        if (messageConfig.contactOrganization) {
+          contactInfo.push(`🏢 ${messageConfig.contactOrganization}`);
+        }
+        return contactInfo.join('\n');
       case 'location':
         return messageConfig.latitude && messageConfig.longitude
           ? `${messageConfig.latitude}, ${messageConfig.longitude}`

@@ -61,6 +61,9 @@ export async function processMessageNode(
     caption,
     contactName,
     contactPhone,
+    contactOrganization,
+    contactEmail,
+    contactUrl,
     latitude,
     longitude,
     interactiveMenu,
@@ -111,6 +114,15 @@ export async function processMessageNode(
     const resolvedContactPhone = contactPhone
       ? replaceVariables(contactPhone, variableContext)
       : contactPhone;
+    const resolvedContactOrganization = contactOrganization
+      ? replaceVariables(contactOrganization, variableContext)
+      : contactOrganization;
+    const resolvedContactEmail = contactEmail
+      ? replaceVariables(contactEmail, variableContext)
+      : contactEmail;
+    const resolvedContactUrl = contactUrl
+      ? replaceVariables(contactUrl, variableContext)
+      : contactUrl;
 
     // Preparar dados baseado no tipo de mensagem
     const formData: Record<string, any> = {
@@ -137,8 +149,17 @@ export async function processMessageNode(
       case 'contact':
         if (!resolvedContactName || !resolvedContactPhone)
           throw new Error('Contact name and phone are required');
-        formData.contactName = resolvedContactName;
-        formData.contactPhone = resolvedContactPhone;
+        formData.fullName = resolvedContactName;
+        formData.phoneNumber = resolvedContactPhone;
+        if (resolvedContactOrganization) {
+          formData.organization = resolvedContactOrganization;
+        }
+        if (resolvedContactEmail) {
+          formData.email = resolvedContactEmail;
+        }
+        if (resolvedContactUrl) {
+          formData.url = resolvedContactUrl;
+        }
         break;
 
       case 'location':
@@ -443,6 +464,8 @@ export async function processMessageNode(
       endpoint = '/send/menu';
     } else if (messageType === 'media') {
       endpoint = '/send/media';
+    } else if (messageType === 'contact') {
+      endpoint = '/send/contact';
     }
 
     console.log(`🔗 Using endpoint: ${endpoint}`);

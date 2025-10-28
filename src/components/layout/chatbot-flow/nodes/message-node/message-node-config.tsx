@@ -298,6 +298,9 @@ function MessageFormFields({
         setValue('caption', config.caption || '');
         setValue('contactName', config.contactName || '');
         setValue('contactPhone', config.contactPhone || '');
+        setValue('contactOrganization', config.contactOrganization || '');
+        setValue('contactEmail', config.contactEmail || '');
+        setValue('contactUrl', config.contactUrl || '');
         setValue('latitude', config.latitude?.toString() || '');
         setValue('longitude', config.longitude?.toString() || '');
 
@@ -1300,21 +1303,62 @@ function MessageFormFields({
 
       {messageType === 'contact' && (
         <div className="space-y-3">
-          <div>
-            <FormControl variant="label">Nome do Contato</FormControl>
+          <div className="p-1">
+            <FormControl variant="label">Nome Completo *</FormControl>
             <Input
               type="text"
               fieldName="contactName"
               placeholder="João Silva"
             />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              Nome completo do contato no vCard
+            </Typography>
           </div>
-          <div>
-            <FormControl variant="label">Telefone do Contato</FormControl>
+          <div className="p-1">
+            <FormControl variant="label">Telefone(s) *</FormControl>
             <Input
-              type="tel"
+              type="text"
               fieldName="contactPhone"
-              placeholder="5511999999999"
+              placeholder="5511999999999,5511888888888"
             />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              Um ou mais números separados por vírgula
+            </Typography>
+          </div>
+          <div className="p-1">
+            <FormControl variant="label">
+              Organização/Empresa (opcional)
+            </FormControl>
+            <Input
+              type="text"
+              fieldName="contactOrganization"
+              placeholder="Empresa XYZ"
+            />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              Nome da organização ou empresa
+            </Typography>
+          </div>
+          <div className="p-1">
+            <FormControl variant="label">Email (opcional)</FormControl>
+            <Input
+              type="email"
+              fieldName="contactEmail"
+              placeholder="joao.silva@empresa.com"
+            />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              Endereço de email do contato
+            </Typography>
+          </div>
+          <div className="p-1">
+            <FormControl variant="label">URL (opcional)</FormControl>
+            <Input
+              type="url"
+              fieldName="contactUrl"
+              placeholder="https://empresa.com/joao"
+            />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              Website pessoal ou da empresa
+            </Typography>
           </div>
         </div>
       )}
@@ -2859,6 +2903,9 @@ export function MessageNodeConfig({
       caption: data.caption,
       contactName: data.contactName,
       contactPhone: data.contactPhone,
+      contactOrganization: data.contactOrganization,
+      contactEmail: data.contactEmail,
+      contactUrl: data.contactUrl,
       latitude: data.latitude ? parseFloat(data.latitude) : undefined,
       longitude: data.longitude ? parseFloat(data.longitude) : undefined,
       // Opções avançadas

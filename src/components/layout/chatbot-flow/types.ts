@@ -49,6 +49,9 @@ export interface MessageConfig {
   caption?: string;
   contactName?: string;
   contactPhone?: string;
+  contactOrganization?: string;
+  contactEmail?: string;
+  contactUrl?: string;
   latitude?: number;
   longitude?: number;
   // Configuração de menu interativo

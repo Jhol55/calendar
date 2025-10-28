@@ -19,6 +19,9 @@ const baseSchema = z.object({
   caption: z.string().optional(),
   contactName: z.string().optional(),
   contactPhone: z.string().optional(),
+  contactOrganization: z.string().optional(),
+  contactEmail: z.string().email().optional().or(z.literal('')),
+  contactUrl: z.string().url().optional().or(z.literal('')),
   latitude: z.union([z.string(), z.number()]).optional(),
   longitude: z.union([z.string(), z.number()]).optional(),
   // Campos do menu interativo
