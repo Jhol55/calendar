@@ -1606,7 +1606,8 @@ function MessageFormFields({
                         📄 Carregar Modelo de Exemplo
                       </Button>
                     </div>
-                    <textarea
+                    <Textarea
+                      fieldName="jsonConfigList"
                       value={jsonConfig}
                       onChange={(e) => {
                         setJsonConfig(e.target.value);
@@ -1614,7 +1615,7 @@ function MessageFormFields({
                       }}
                       placeholder="Cole ou edite o JSON de configuração aqui..."
                       rows={15}
-                      className="w-full rounded-md border border-gray-300 bg-white p-3 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"
+                      className="!bg-white font-mono"
                     />
                   </div>
                 ) : (
@@ -1905,7 +1906,8 @@ function MessageFormFields({
                         📄 Carregar Modelo de Exemplo
                       </Button>
                     </div>
-                    <textarea
+                    <Textarea
+                      fieldName="jsonConfigCarousel"
                       value={jsonConfig}
                       onChange={(e) => {
                         setJsonConfig(e.target.value);
@@ -1913,7 +1915,7 @@ function MessageFormFields({
                       }}
                       placeholder="Cole ou edite o JSON de configuração aqui..."
                       rows={15}
-                      className="w-full rounded-md border border-gray-300 bg-white p-3 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] font-mono text-sm"
+                      className="!bg-white font-mono"
                     />
                   </div>
                 ) : (

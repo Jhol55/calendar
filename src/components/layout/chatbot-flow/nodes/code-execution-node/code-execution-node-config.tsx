@@ -228,30 +228,6 @@ print(result)  # ✅ Para números/strings simples
             Tempo máximo de execução (1-30s). Padrão: 5s
           </Typography>
         </div>
-
-        {/* Judge0 URL Customizada */}
-        <div className="p-1">
-          <FormControl variant="label">
-            <Typography variant="span" className="text-sm">
-              Judge0 URL Customizada
-              <Typography
-                variant="span"
-                className="text-xs text-neutral-500 font-normal ml-2"
-              >
-                (opcional)
-              </Typography>
-            </Typography>
-          </FormControl>
-          <Input
-            type="text"
-            fieldName="judge0Url"
-            placeholder="http://localhost:2358"
-          />
-          <Typography variant="span" className="text-xs text-neutral-600 mt-1">
-            Deixe em branco para usar a instância local padrão
-            (http://localhost:2358)
-          </Typography>
-        </div>
       </div>
 
       {/* Seção de Configuração de Memória */}

@@ -220,7 +220,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         />
         {/* Overlay para mostrar variáveis estilizadas */}
         <div
-          className="absolute inset-0 pointer-events-none flex items-center px-2.5 text-sm overflow-hidden whitespace-nowrap"
+          className="absolute inset-0 z-50 pointer-events-none flex items-center px-2.5 text-sm overflow-hidden whitespace-nowrap"
           style={{ backgroundColor: 'transparent' }}
         >
           <div className="flex flex-wrap items-center gap-0.5">
@@ -257,7 +257,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 ? typeof resolvedValue === 'object'
                   ? JSON.stringify(resolvedValue, null, 2)
                   : String(resolvedValue)
-                : 'Execute o flow para ver o valor';
+                : 'Nenhum valor disponível';
 
               return (
                 <Tooltip
@@ -274,7 +274,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                       </div>
                       {!wasResolved && (
                         <div className="mt-2 pt-2 border-t border-neutral-500/50 text-xs text-neutral-300">
-                          💡 Dica: Execute o flow para visualizar os valores
+                          💡 Dica: Execute o fluxo para visualizar os valores
                           reais
                         </div>
                       )}

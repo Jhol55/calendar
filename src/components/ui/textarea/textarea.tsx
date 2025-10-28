@@ -223,7 +223,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
                 ? typeof resolvedValue === 'object'
                   ? JSON.stringify(resolvedValue, null, 2)
                   : String(resolvedValue)
-                : 'Execute o flow para ver o valor';
+                : 'Nenhum valor disponível';
 
               return (
                 <Tooltip
@@ -240,7 +240,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
                       </div>
                       {!wasResolved && (
                         <div className="mt-2 pt-2 border-t border-neutral-500/50 text-xs text-neutral-300">
-                          💡 Dica: Execute o flow para visualizar os valores
+                          💡 Dica: Execute o fluxo para visualizar os valores
                           reais
                         </div>
                       )}
