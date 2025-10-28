@@ -108,6 +108,7 @@ model chatbot_flows {
   token       String?
   userId      Int?
   isActive    Boolean   @default(true)
+  isTemporary Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -118,6 +119,7 @@ model chatbot_flows {
   @@index([token])
   @@index([userId])
   @@index([isActive])
+  @@index([isTemporary])
 }
 
 model flow_executions {

@@ -68,10 +68,12 @@ import { LoopNodeConfig } from './nodes/loop-node/loop-node-config';
 import { CodeExecutionNodeConfig } from './nodes/code-execution-node/code-execution-node-config';
 import { ExecutionsPanel } from './executions-panel';
 import { DatabaseSpreadsheet } from '@/components/layout/database-spreadsheet/database-spreadsheet';
+import { usePartialExecution } from '@/hooks/use-partial-execution';
+import { withExecuteButton } from './nodes/with-execute-button';
+import { getExecution } from '@/actions/executions';
 
-// Definir nodeTypes e edgeTypes FORA do componente para evitar re-criação
-// Isso garante que as referências permaneçam estáveis entre renders
-const nodeTypes = {
+// Definir nodeTypes base FORA do componente
+const baseNodeTypes = {
   end: EndNode,
   message: MessageNode,
   condition: ConditionNode,
@@ -128,6 +130,156 @@ function FlowEditorContent() {
   // Mutations
   const createWorkflowMutation = useCreateWorkflow();
   const updateWorkflowMutation = useUpdateWorkflow();
+
+  // Hook para execução parcial
+  const { isExecuting, executingNodeId, executeUntilNode } =
+    usePartialExecution();
+
+  // Função para remover handlers antes de salvar (para serialização JSON)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const removeExecutionHandlers = useCallback((nodes: any[]) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return nodes.map((node: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { onPartialExecute, isNodeExecuting, ...cleanData } = node.data;
+      return {
+        ...node,
+        data: cleanData,
+      };
+    });
+  }, []);
+
+  // Handler para execução parcial
+  const handlePartialExecute = useCallback(
+    async (targetNodeId: string) => {
+      // Buscar nodes e edges atuais do reactFlowInstance (evita stale closure)
+      if (!reactFlowInstance) {
+        alert('⚠️ Erro: Editor não está pronto. Aguarde um momento.');
+        return;
+      }
+
+      const currentNodes = reactFlowInstance.getNodes();
+      const currentEdges = reactFlowInstance.getEdges();
+
+      if (currentNodes.length === 0) {
+        alert(
+          '⚠️ Erro: Nenhum node encontrado no editor. Por favor, recarregue a página.',
+        );
+        return;
+      }
+
+      // Buscar dados da execução selecionada
+      const selectedExecutionStr = sessionStorage.getItem('selectedExecution');
+      let triggerData = {};
+
+      if (selectedExecutionStr) {
+        try {
+          const selectedExecution = JSON.parse(selectedExecutionStr);
+          triggerData =
+            selectedExecution.data || selectedExecution.triggerData || {};
+        } catch {
+          console.warn('⚠️ Could not parse selected execution data');
+        }
+      }
+
+      console.log(`🎯 Executando até node: ${targetNodeId}`);
+
+      // Remover handlers antes de enviar (não podem ser serializados)
+      const cleanNodes = removeExecutionHandlers(currentNodes);
+
+      // SEMPRE enviar o flow atual para executar sem salvar
+      const result = await executeUntilNode({
+        flowId: currentFlowId || 'temp', // ID do flow original (se existir)
+        targetNodeId,
+        executionData: triggerData,
+        // Sempre passar o flow completo para executar a versão atual (não salva)
+        flow: {
+          id: 'temp', // ID temporário para o flow inline
+          name: flowName || 'Workflow Temporário',
+          nodes: cleanNodes,
+          edges: currentEdges,
+          originalFlowId: currentFlowId, // ✅ Passar o flowId original para buscar execuções anteriores
+        },
+      });
+
+      if (result) {
+        console.log(`✅ Partial execution completed: ${result.executionId}`);
+
+        // Buscar a execução completa e selecionar automaticamente
+        try {
+          const executionResult = await getExecution(result.executionId);
+          if (executionResult.success && executionResult.execution) {
+            // Salvar execução completa no sessionStorage
+            sessionStorage.setItem(
+              'selectedExecution',
+              JSON.stringify(executionResult.execution),
+            );
+
+            // Disparar evento customizado para notificar o painel
+            window.dispatchEvent(
+              new CustomEvent('executionSelected', {
+                detail: executionResult.execution,
+              }),
+            );
+
+            console.log(
+              `✅ Execução ${result.executionId} selecionada automaticamente`,
+            );
+          } else {
+            console.warn('⚠️ Não foi possível buscar detalhes da execução');
+          }
+        } catch (err) {
+          console.error('❌ Erro ao buscar execução:', err);
+        }
+      }
+    },
+    [
+      currentFlowId,
+      executeUntilNode,
+      flowName,
+      removeExecutionHandlers,
+      reactFlowInstance,
+    ],
+  );
+
+  // Criar nodeTypes com botão de execução
+  const nodeTypes = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return Object.entries(baseNodeTypes).reduce(
+      (acc, [key, NodeComponent]) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        acc[key] = withExecuteButton(NodeComponent as any);
+        return acc;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      },
+      {} as Record<string, any>,
+    );
+  }, []);
+
+  // Verificar se um node específico está executando
+  const isNodeExecuting = useCallback(
+    (nodeId: string) => {
+      return isExecuting && executingNodeId === nodeId;
+    },
+    [isExecuting, executingNodeId],
+  );
+
+  // Função para adicionar handlers de execução aos nodes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const addExecutionHandlers = useCallback(
+    (nodes: any[]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return nodes.map((node: any) => ({
+        ...node,
+        data: {
+          ...node.data,
+          onPartialExecute: handlePartialExecute,
+          isNodeExecuting,
+        },
+      }));
+    },
+    [handlePartialExecute, isNodeExecuting],
+  );
 
   // Handler para deletar nodes selecionados
   const onNodesDelete = useCallback(
@@ -240,7 +392,7 @@ function FlowEditorContent() {
         end: 'End',
       };
 
-      const newNode: Node<NodeData> = {
+      const newNode = {
         id: generateNodeId(),
         type,
         position,
@@ -249,12 +401,15 @@ function FlowEditorContent() {
             nodeLabels[type] || type.charAt(0).toUpperCase() + type.slice(1),
           type,
           content: type === 'message' ? 'Digite aqui...' : undefined,
+          // Adicionar handlers de execução
+          onPartialExecute: handlePartialExecute,
+          isNodeExecuting,
         },
-      };
+      } as Node<NodeData>;
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [reactFlowInstance, setNodes],
+    [reactFlowInstance, setNodes, handlePartialExecute, isNodeExecuting],
   );
 
   const onDragStart = (event: React.DragEvent, nodeType: NodeType) => {
@@ -266,12 +421,15 @@ function FlowEditorContent() {
     setIsSaving(true);
 
     try {
+      // Remover handlers de execução antes de salvar (não podem ser serializados)
+      const cleanNodes = removeExecutionHandlers(nodes);
+
       if (currentFlowId) {
         // Atualizar flow existente usando mutation (sem token)
         const flowData = {
           name: flowName,
           description: '',
-          nodes: nodes,
+          nodes: cleanNodes,
           edges: edges,
           isActive: true,
         };
@@ -286,7 +444,7 @@ function FlowEditorContent() {
         const flowData = {
           name: flowName,
           description: '',
-          nodes: nodes,
+          nodes: cleanNodes,
           edges: edges,
           userId: user?.id,
           isActive: true,
@@ -311,6 +469,7 @@ function FlowEditorContent() {
     user,
     updateWorkflowMutation,
     createWorkflowMutation,
+    removeExecutionHandlers,
   ]);
 
   const clearExecutionHighlight = useCallback(() => {
@@ -460,8 +619,11 @@ function FlowEditorContent() {
               `edge_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
           }));
 
+        // Adicionar handlers de execução parcial aos nodes
+        const nodesWithHandlers = addExecutionHandlers(processedNodes);
+
         // Renderizar nodes primeiro
-        setNodes(processedNodes);
+        setNodes(nodesWithHandlers);
         setFlowName(flow.name);
         setCurrentFlowId(flow.id);
 
@@ -471,7 +633,7 @@ function FlowEditorContent() {
         }, 250);
       }, 100);
     },
-    [setNodes, setEdges],
+    [setNodes, setEdges, addExecutionHandlers],
   );
 
   const handleCreateNewFlow = useCallback(

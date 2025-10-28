@@ -11,6 +11,7 @@ import {
   useFlowExecution,
 } from '@/contexts/flow-execution/flow-execution-context';
 import { listExecutions } from '@/actions/executions';
+import { useReactFlow } from 'reactflow';
 
 interface NodeConfigLayoutProps {
   isOpen: boolean;
@@ -39,6 +40,16 @@ function NodeConfigLayoutContent({
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [localLabel, setLocalLabel] = useState(nodeLabel || '');
   const [isEditingLabel, setIsEditingLabel] = useState(false);
+
+  // ✅ Buscar edges e nodes atuais do ReactFlow (sempre usa estado atual do editor)
+  const reactFlowInstance = useReactFlow();
+  const liveEdges = reactFlowInstance?.getEdges() || [];
+  const liveNodes =
+    reactFlowInstance?.getNodes()?.map((n) => ({
+      id: n.id,
+      type: n.type,
+      data: n.data,
+    })) || [];
   const [tempLabel, setTempLabel] = useState(nodeLabel || '');
 
   // Atualizar execução no contexto quando mudar
@@ -100,6 +111,8 @@ function NodeConfigLayoutContent({
                 flowId={flowId}
                 mode="input"
                 onVariableSelect={(variable) => {}}
+                currentEdges={liveEdges} // ✅ Edges atuais do ReactFlow
+                currentNodes={liveNodes} // ✅ Nodes atuais do ReactFlow
               />
             </div>
           </div>
@@ -232,6 +245,8 @@ function NodeConfigLayoutContent({
                 onVariableSelect={(variable) => {
                   console.log('Variable selected:', variable);
                 }}
+                currentEdges={liveEdges} // ✅ Edges atuais do ReactFlow
+                currentNodes={liveNodes} // ✅ Nodes atuais do ReactFlow
               />
             </div>
           </div>

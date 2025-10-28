@@ -404,6 +404,9 @@ export interface NodeData {
     type: string;
     params: Record<string, any>;
   }>;
+  // Handlers para execução parcial (não são serializados)
+  onPartialExecute?: (nodeId: string) => void | Promise<void>;
+  isNodeExecuting?: (nodeId: string) => boolean;
 }
 
 export interface FlowData {

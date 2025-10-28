@@ -58,6 +58,7 @@ export interface WebhookJobData {
   flowId: string;
   nodeId: string;
   config: any;
+  stopAtNodeId?: string; // Para execução parcial: parar neste node
 }
 
 export interface FlowJobData {

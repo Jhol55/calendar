@@ -28,6 +28,12 @@ interface NodeExecutionPanelProps {
   flowId: string;
   mode: 'input' | 'output';
   onVariableSelect?: (variablePath: string) => void;
+  currentEdges?: Array<{ source: string; target: string }>; // ✅ Edges atuais do editor
+  currentNodes?: Array<{
+    id: string;
+    type?: string;
+    data?: { label?: string };
+  }>; // ✅ Nodes atuais do editor
 }
 
 // Componente para dropdown de node anterior
@@ -162,6 +168,8 @@ export function NodeExecutionPanel({
   flowId,
   mode,
   onVariableSelect,
+  currentEdges,
+  currentNodes,
 }: NodeExecutionPanelProps) {
   const [executionData, setExecutionData] = useState<ExecutionData | null>(
     null,
@@ -209,18 +217,39 @@ export function NodeExecutionPanel({
         const previousNodesOutputs: Record<string, PreviousNodeOutput> = {};
 
         try {
-          const flowResult = await getFlow(flowId);
-          if (flowResult.success && flowResult.flow) {
-            const edges = (flowResult.flow.edges || []) as Array<{
-              source: string;
-              target: string;
-            }>;
-            const nodes = (flowResult.flow.nodes || []) as Array<{
-              id: string;
-              type?: string;
-              data?: { label?: string };
-            }>;
+          // ✅ Usar edges e nodes atuais do editor se disponíveis, senão buscar do banco
+          let edges: Array<{ source: string; target: string }> = [];
+          let nodes: Array<{
+            id: string;
+            type?: string;
+            data?: { label?: string };
+          }> = [];
 
+          if (currentEdges && currentNodes) {
+            // Usar dados do editor (suporta nodes não salvos)
+            console.log(
+              '🔄 Usando edges/nodes do editor (suporta mudanças não salvas)',
+            );
+            edges = currentEdges;
+            nodes = currentNodes;
+          } else {
+            // Buscar do banco (fallback)
+            console.log('🔄 Buscando edges/nodes do banco');
+            const flowResult = await getFlow(flowId);
+            if (flowResult.success && flowResult.flow) {
+              edges = (flowResult.flow.edges || []) as Array<{
+                source: string;
+                target: string;
+              }>;
+              nodes = (flowResult.flow.nodes || []) as Array<{
+                id: string;
+                type?: string;
+                data?: { label?: string };
+              }>;
+            }
+          }
+
+          if (edges.length > 0 && nodes.length > 0) {
             // Função recursiva para encontrar TODOS os nodes anteriores na cadeia
             const findAllPreviousNodes = (
               currentNodeId: string,
@@ -272,7 +301,7 @@ export function NodeExecutionPanel({
                 };
               }
             });
-          }
+          } // ✅ Fecha o if (edges.length > 0)
         } catch (error) {
           console.error('Error fetching flow data:', error);
         }

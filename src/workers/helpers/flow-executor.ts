@@ -195,6 +195,12 @@ async function processNodeChain(
     throw error;
   }
 
+  // 🎯 VERIFICAR SE DEVE PARAR NESTE NODE (execução parcial)
+  if (webhookData.stopAtNodeId && currentNodeId === webhookData.stopAtNodeId) {
+    console.log(`🎯 Execution stopped at target node: ${currentNodeId}`);
+    return; // Parar a execução aqui
+  }
+
   // Encontrar próximos nós conectados
   let nextEdges = edges.filter((edge) => edge.source === currentNodeId);
 
@@ -473,7 +479,7 @@ async function processTransformationNode(
     throw new Error('Transformation configuration not found');
   }
 
-  const { operation, type, ...operationConfig } = transformationConfig;
+  const { operation, type } = transformationConfig;
 
   // Delegar para o helper de transformações (cada operação tem sua própria assinatura)
   const transformationFn =

@@ -92,8 +92,42 @@ export function ExecutionsPanel({
   useEffect(() => {
     if (isOpen && flowId) {
       fetchExecutions();
+
+      // Verificar se há uma execução selecionada no sessionStorage
+      const selectedExecutionStr = sessionStorage.getItem('selectedExecution');
+      if (selectedExecutionStr) {
+        try {
+          const execution = JSON.parse(selectedExecutionStr);
+          setSelectedExecution(execution);
+          if (onExecutionSelect) {
+            onExecutionSelect(execution);
+          }
+        } catch (err) {
+          console.warn('⚠️ Could not parse selected execution');
+        }
+      }
     }
   }, [isOpen, flowId]);
+
+  // Detectar quando uma execução é selecionada (evento customizado)
+  useEffect(() => {
+    const handleExecutionSelected = (event: any) => {
+      const execution = event.detail;
+      console.log('🎯 Nova execução detectada:', execution.id);
+      setSelectedExecution(execution);
+      if (onExecutionSelect) {
+        onExecutionSelect(execution);
+      }
+      // Atualizar lista de execuções para incluir a nova
+      fetchExecutions();
+    };
+
+    window.addEventListener('executionSelected', handleExecutionSelected);
+
+    return () => {
+      window.removeEventListener('executionSelected', handleExecutionSelected);
+    };
+  }, [onExecutionSelect]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
