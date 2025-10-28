@@ -1208,14 +1208,14 @@ export function DatabaseSpreadsheet({
           className="flex flex-col gap-4 flex-1 overflow-hidden"
           style={{ zoom: 0.9 }}
         >
-          <div className="flex items-center gap-3">
+          {/* <div className="flex items-center gap-3">
             <Typography
               variant="h2"
               className="text-neutral-600 flex items-center gap-2"
             >
               📦 Banco de Dados
             </Typography>
-          </div>
+          </div> */}
 
           <div className="flex gap-4 flex-1 overflow-hidden">
             {/* Sidebar de tabelas */}
@@ -1379,27 +1379,6 @@ export function DatabaseSpreadsheet({
                   )}
                 </div>
               </div>
-
-              {selectedTable && (
-                <div className="text-sm text-neutral-600 bg-neutral-50 p-3 rounded-lg border border-neutral-200">
-                  <Typography variant="span" className="text-sm">
-                    💡 <strong>Dica:</strong> Duplo clique para editar célula.
-                    Use{' '}
-                    <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded shadow-sm font-mono text-sm">
-                      Ctrl
-                    </kbd>{' '}
-                    para selecionar múltiplas linhas,{' '}
-                    <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded shadow-sm font-mono text-sm">
-                      Shift
-                    </kbd>{' '}
-                    para selecionar intervalo, e{' '}
-                    <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded shadow-sm font-mono text-sm">
-                      Delete
-                    </kbd>{' '}
-                    para apagar linhas selecionadas.
-                  </Typography>
-                </div>
-              )}
 
               {selectedTable && tableSchema && (
                 <div className="flex-1 overflow-auto rounded-lg border-neutral-200 border">
@@ -1760,6 +1739,27 @@ export function DatabaseSpreadsheet({
                   )}
                 </div>
               )}
+
+              {/* {selectedTable && (
+                <div className="text-sm text-neutral-600 bg-neutral-50 p-3 rounded-lg border border-neutral-200">
+                  <Typography variant="span" className="text-sm">
+                    💡 <strong>Dica:</strong> Duplo clique para editar célula.
+                    Use{' '}
+                    <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded shadow-sm font-mono text-sm">
+                      Ctrl
+                    </kbd>{' '}
+                    para selecionar múltiplas linhas,{' '}
+                    <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded shadow-sm font-mono text-sm">
+                      Shift
+                    </kbd>{' '}
+                    para selecionar intervalo, e{' '}
+                    <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded shadow-sm font-mono text-sm">
+                      Delete
+                    </kbd>{' '}
+                    para apagar linhas selecionadas.
+                  </Typography>
+                </div>
+              )} */}
 
               {!selectedTable && (
                 <div className="flex-1 flex items-center justify-center">

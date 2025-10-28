@@ -12,6 +12,10 @@ const baseSchema = z.object({
   ]),
   text: z.string().optional(),
   mediaUrl: z.string().url().optional().or(z.literal('')),
+  mediaType: z
+    .enum(['image', 'video', 'document', 'audio', 'myaudio', 'ptt', 'sticker'])
+    .optional(),
+  docName: z.string().optional(),
   caption: z.string().optional(),
   contactName: z.string().optional(),
   contactPhone: z.string().optional(),
@@ -50,7 +54,7 @@ export const messageConfigSchema = baseSchema.refine(
       return data.text && data.text.length > 0;
     }
     if (data.messageType === 'media') {
-      return data.mediaUrl && data.mediaUrl.length > 0;
+      return data.mediaUrl && data.mediaUrl.length > 0 && data.mediaType;
     }
     if (data.messageType === 'contact') {
       return data.contactName && data.contactPhone;
@@ -133,6 +137,9 @@ export const messageConfigSchema = baseSchema.refine(
       return { message: 'Digite uma mensagem', path: ['text'] };
     }
     if (data.messageType === 'media') {
+      if (!data.mediaType) {
+        return { message: 'Selecione o tipo de mídia', path: ['mediaType'] };
+      }
       return { message: 'Digite uma URL válida', path: ['mediaUrl'] };
     }
     if (data.messageType === 'contact') {

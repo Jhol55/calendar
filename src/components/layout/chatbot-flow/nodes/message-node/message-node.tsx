@@ -20,6 +20,19 @@ function MessageNodeComponent({ data, selected }: NodeProps<NodeData>) {
       : 'Texto';
   };
 
+  const getMediaTypeLabel = (mediaType?: string) => {
+    const types: Record<string, string> = {
+      image: '🖼️ Imagem',
+      video: '🎥 Vídeo',
+      document: '📄 Documento',
+      audio: '🎵 Áudio',
+      myaudio: '🎤 Mensagem de Voz',
+      ptt: '🎙️ PTT',
+      sticker: '😄 Sticker',
+    };
+    return mediaType ? types[mediaType] || 'Mídia' : 'Mídia';
+  };
+
   const getPreviewContent = () => {
     if (!messageConfig) return 'Duplo clique para configurar...';
 
@@ -27,7 +40,11 @@ function MessageNodeComponent({ data, selected }: NodeProps<NodeData>) {
       case 'text':
         return messageConfig.text || 'Digite a mensagem...';
       case 'media':
-        return messageConfig.mediaUrl || 'Configure a URL da mídia...';
+        const mediaLabel = getMediaTypeLabel(messageConfig.mediaType);
+        const fileName = messageConfig.docName || 'arquivo';
+        return messageConfig.mediaUrl
+          ? `${mediaLabel}: ${fileName}`
+          : 'Configure a mídia...';
       case 'contact':
         return messageConfig.contactName || 'Configure o contato...';
       case 'location':

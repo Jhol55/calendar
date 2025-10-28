@@ -71,3 +71,55 @@ export async function sendMessage({
     };
   }
 }
+
+export async function sendMediaMessage({
+  token,
+  formData,
+}: {
+  token: string;
+  formData: object;
+}): Promise<UazapiResponse> {
+  try {
+    const session = (await getSession()) as SessionUser | null;
+    const email = session?.user?.email;
+
+    if (!email || !token) {
+      return {
+        success: false,
+        message: 'Unauthorized',
+        code: 401,
+      };
+    }
+
+    const response = await fetch(
+      `http://localhost:3000/api/uazapi/user/message/media`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          token,
+          formData,
+        }),
+      },
+    );
+
+    const data = await response.json();
+
+    return {
+      success: response.ok,
+      message: response.ok ? 'Mídia enviada com sucesso' : response.statusText,
+      code: response.status,
+      data: data,
+    };
+  } catch (error) {
+    console.error('Erro ao enviar mídia:', error);
+    return {
+      success: false,
+      message: 'Erro ao enviar mídia',
+      code: 500,
+    };
+  }
+}

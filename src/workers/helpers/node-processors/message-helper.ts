@@ -56,6 +56,8 @@ export async function processMessageNode(
     text,
     messageType,
     mediaUrl,
+    mediaType,
+    docName,
     caption,
     contactName,
     contactPhone,
@@ -110,13 +112,6 @@ export async function processMessageNode(
       ? replaceVariables(contactPhone, variableContext)
       : contactPhone;
 
-    console.log(`📝 Original text: ${text}`);
-    console.log(`📝 Resolved text: ${resolvedText}`);
-    console.log(`📝 Resolved phone: ${resolvedPhoneNumber}`);
-    if (resolvedText && resolvedText !== text) {
-      console.log(`📝 Variables replaced in text`);
-    }
-
     // Preparar dados baseado no tipo de mensagem
     const formData: Record<string, any> = {
       number: resolvedPhoneNumber,
@@ -130,8 +125,13 @@ export async function processMessageNode(
 
       case 'media':
         if (!resolvedMediaUrl) throw new Error('Media URL is required');
-        formData.mediaUrl = resolvedMediaUrl;
-        if (resolvedCaption) formData.caption = resolvedCaption;
+        if (!mediaType) throw new Error('Media type is required');
+        formData.type = mediaType;
+        formData.file = resolvedMediaUrl;
+        if (resolvedCaption) formData.text = resolvedCaption;
+        if (docName && mediaType === 'document') {
+          formData.docName = replaceVariables(docName, variableContext);
+        }
         break;
 
       case 'contact':
@@ -381,30 +381,35 @@ export async function processMessageNode(
     }
 
     // Adicionar opções avançadas ao formData (se fornecidas)
-    if (linkPreview !== undefined) {
-      formData.linkPreview = linkPreview;
+    // Link preview é apenas para mensagens de texto
+    if (messageType === 'text') {
+      if (linkPreview !== undefined) {
+        formData.linkPreview = linkPreview;
+      }
+      if (linkPreviewTitle) {
+        formData.linkPreviewTitle = replaceVariables(
+          linkPreviewTitle,
+          variableContext,
+        );
+      }
+      if (linkPreviewDescription) {
+        formData.linkPreviewDescription = replaceVariables(
+          linkPreviewDescription,
+          variableContext,
+        );
+      }
+      if (linkPreviewImage) {
+        formData.linkPreviewImage = replaceVariables(
+          linkPreviewImage,
+          variableContext,
+        );
+      }
+      if (linkPreviewLarge !== undefined) {
+        formData.linkPreviewLarge = linkPreviewLarge;
+      }
     }
-    if (linkPreviewTitle) {
-      formData.linkPreviewTitle = replaceVariables(
-        linkPreviewTitle,
-        variableContext,
-      );
-    }
-    if (linkPreviewDescription) {
-      formData.linkPreviewDescription = replaceVariables(
-        linkPreviewDescription,
-        variableContext,
-      );
-    }
-    if (linkPreviewImage) {
-      formData.linkPreviewImage = replaceVariables(
-        linkPreviewImage,
-        variableContext,
-      );
-    }
-    if (linkPreviewLarge !== undefined) {
-      formData.linkPreviewLarge = linkPreviewLarge;
-    }
+
+    // Opções comuns a todos os tipos de mensagem
     if (replyId) {
       formData.replyid = replaceVariables(replyId, variableContext);
     }
@@ -433,8 +438,12 @@ export async function processMessageNode(
     console.log('📦 FormData:', formData);
 
     // Determinar endpoint baseado no tipo de mensagem
-    const endpoint =
-      messageType === 'interactive_menu' ? '/send/menu' : '/send/text';
+    let endpoint = '/send/text';
+    if (messageType === 'interactive_menu') {
+      endpoint = '/send/menu';
+    } else if (messageType === 'media') {
+      endpoint = '/send/media';
+    }
 
     console.log(`🔗 Using endpoint: ${endpoint}`);
 

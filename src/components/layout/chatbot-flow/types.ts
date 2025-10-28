@@ -37,6 +37,15 @@ export interface MessageConfig {
   messageType: MessageType;
   text?: string;
   mediaUrl?: string;
+  mediaType?:
+    | 'image'
+    | 'video'
+    | 'document'
+    | 'audio'
+    | 'myaudio'
+    | 'ptt'
+    | 'sticker';
+  docName?: string;
   caption?: string;
   contactName?: string;
   contactPhone?: string;

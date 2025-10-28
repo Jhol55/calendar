@@ -293,6 +293,8 @@ function MessageFormFields({
         setValue('messageType', config.messageType || 'text');
         setValue('text', config.text || '');
         setValue('mediaUrl', config.mediaUrl || '');
+        setValue('mediaType', config.mediaType || 'image');
+        setValue('docName', config.docName || '');
         setValue('caption', config.caption || '');
         setValue('contactName', config.contactName || '');
         setValue('contactPhone', config.contactPhone || '');
@@ -1232,20 +1234,66 @@ function MessageFormFields({
       {messageType === 'media' && (
         <div className="space-y-3">
           <div className="p-1">
-            <FormControl variant="label">URL da Mídia</FormControl>
-            <Input
-              type="url"
-              fieldName="mediaUrl"
-              placeholder="https://exemplo.com/imagem.jpg"
+            <FormControl variant="label">Tipo de Mídia *</FormControl>
+            <FormSelect
+              fieldName="mediaType"
+              placeholder="Selecione o tipo"
+              options={[
+                { value: 'image', label: '🖼️ Imagem (JPG, PNG)' },
+                { value: 'video', label: '🎥 Vídeo (MP4)' },
+                { value: 'document', label: '📄 Documento (PDF, DOCX, etc)' },
+                { value: 'audio', label: '🎵 Áudio (MP3, OGG)' },
+                {
+                  value: 'myaudio',
+                  label: '🎤 Mensagem de Voz (alternativa ao PTT)',
+                },
+                { value: 'ptt', label: '🎙️ Mensagem de Voz (Push-to-Talk)' },
+                { value: 'sticker', label: '😄 Figurinha/Sticker' },
+              ]}
+              className="w-full"
             />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              Selecione o tipo de arquivo que será enviado
+            </Typography>
           </div>
           <div className="p-1">
-            <FormControl variant="label">Legenda (opcional)</FormControl>
+            <FormControl variant="label">URL da Mídia ou Base64 *</FormControl>
+            <Input
+              type="text"
+              fieldName="mediaUrl"
+              placeholder="https://exemplo.com/imagem.jpg ou data:image/jpeg;base64,..."
+            />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              URL pública do arquivo ou conteúdo em base64
+            </Typography>
+          </div>
+          {form.mediaType === 'document' && (
+            <div className="p-1">
+              <FormControl variant="label">
+                Nome do Arquivo (opcional)
+              </FormControl>
+              <Input
+                type="text"
+                fieldName="docName"
+                placeholder="relatorio.pdf"
+              />
+              <Typography variant="span" className="text-xs text-gray-500 mt-1">
+                Nome que será exibido para o documento
+              </Typography>
+            </div>
+          )}
+          <div className="p-1">
+            <FormControl variant="label">
+              Legenda/Caption (opcional)
+            </FormControl>
             <Textarea
               fieldName="caption"
-              placeholder="Legenda da mídia..."
+              placeholder="Texto descritivo da mídia..."
               rows={3}
             />
+            <Typography variant="span" className="text-xs text-gray-500 mt-1">
+              Texto que acompanha a mídia (suporta variáveis)
+            </Typography>
           </div>
         </div>
       )}
@@ -2798,6 +2846,16 @@ export function MessageNodeConfig({
       messageType: data.messageType as MessageType,
       text: data.text,
       mediaUrl: data.mediaUrl,
+      mediaType: data.mediaType as
+        | 'image'
+        | 'video'
+        | 'document'
+        | 'audio'
+        | 'myaudio'
+        | 'ptt'
+        | 'sticker'
+        | undefined,
+      docName: data.docName,
       caption: data.caption,
       contactName: data.contactName,
       contactPhone: data.contactPhone,
