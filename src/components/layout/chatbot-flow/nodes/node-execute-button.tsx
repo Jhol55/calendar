@@ -31,7 +31,7 @@ export function NodeExecuteButton({
   return (
     <div
       className={cn(
-        'absolute -top-6 -right-0 z-50',
+        'absolute -top-6 -right-3 z-50',
         'transition-all duration-200',
         className,
       )}

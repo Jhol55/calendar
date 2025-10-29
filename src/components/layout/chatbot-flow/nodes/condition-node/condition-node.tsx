@@ -40,6 +40,19 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
   const switchCases = config?.cases || [];
   const hasDefaultCase = config?.useDefaultCase ?? true;
 
+  // Calcular altura dinâmica para Switch e IF
+  const totalOutputs = isSwitchType
+    ? switchCases.length + (hasDefaultCase ? 1 : 0)
+    : 0;
+
+  // Altura base + espaço para cada saída (mínimo 40px por handle)
+  let minHeight: number | undefined;
+  if (isSwitchType && totalOutputs > 0) {
+    minHeight = Math.max(160, 100 + totalOutputs * 40);
+  } else if (isIfType) {
+    minHeight = 100;
+  }
+
   return (
     <div className="relative">
       {/* Handle de Entrada (esquerda) */}
@@ -50,7 +63,10 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
       />
 
       {/* Card do Node */}
-      <div className="min-w-[240px] max-w-[280px] bg-gradient-to-br from-violet-50 to-white border-2 border-violet-400 rounded-xl shadow-lg overflow-hidden">
+      <div
+        className={`min-w-[240px] max-w-[280px] bg-gradient-to-br from-violet-50 to-white border-2 border-violet-400 rounded-xl shadow-lg overflow-hidden ${isSwitchType && totalOutputs > 3 ? 'flex flex-col' : ''}`}
+        style={minHeight ? { minHeight: `${minHeight}px` } : undefined}
+      >
         {/* Header Compacto */}
         <div className="bg-neutral-50 px-3 py-2">
           <div className="flex items-center gap-2 justify-between">
@@ -72,7 +88,9 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
         </div>
 
         {/* Body Minimalista */}
-        <div className="px-3 py-2 w-full">
+        <div
+          className={`px-3 py-2 w-full ${isSwitchType && totalOutputs > 3 ? 'flex-1' : ''}`}
+        >
           {/* IF Config Display - Melhorado */}
           {isIfType && config?.rules && (
             <div className="space-y-1">
@@ -171,7 +189,7 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
         {!isSwitchType && (
           <>
             {/* Handle True */}
-            <div className="absolute right-[-4px] top-[15%] flex items-center gap-1">
+            <div className="absolute right-[-4px] top-[30%] flex items-center gap-1">
               {isIfType && (
                 <div className="text-white px-2 py-0.5 rounded-l-md mr-1">
                   <Typography
@@ -191,7 +209,7 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
             </div>
 
             {/* Handle False */}
-            <div className="absolute right-[-4px] bottom-[15%] flex items-center gap-1">
+            <div className="absolute right-[-4px] bottom-[30%] flex items-center gap-1">
               {isIfType && (
                 <div className="text-white px-2 py-0.5 rounded-l-md mr-1">
                   <Typography
@@ -214,62 +232,59 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
 
         {/* SWITCH Type - Lista na lateral direita */}
         {isSwitchType && (
-          <div className="absolute right-[-4px] top-[50%] -translate-y-1/2 flex flex-col gap-2">
-            {/* Handles para cada caso - TODOS os casos */}
-            {switchCases.length > 0 ? (
-              switchCases.map((caseItem) => (
-                <div
-                  key={caseItem.id}
-                  className="flex items-center gap-1 relative"
-                >
-                  <Typography
-                    variant="span"
-                    className="absolute left-[calc(100%-7px)] ml-2 -top-1 -translate-y-1/2 text-[10px] font-semibold text-neutral-600 whitespace-nowrap"
+          <div className="absolute right-[-4px] top-0 bottom-0 flex flex-col justify-center py-4">
+            <div className="flex flex-col justify-around h-full">
+              {/* Handles para cada caso - TODOS os casos */}
+              {switchCases.length > 0 ? (
+                switchCases.map((caseItem) => (
+                  <div
+                    key={caseItem.id}
+                    className="flex items-center gap-1 relative"
                   >
-                    {caseItem.label.length > 12
-                      ? `${caseItem.label.substring(0, 12)}...`
-                      : caseItem.label}
-                  </Typography>
-                  <div className=" text-white px-2 py-0.5 rounded-l-md max-w-[100px] truncate">
-                    <div className="my-5"></div>
+                    <Typography
+                      variant="span"
+                      className="absolute left-[calc(100%-7px)] ml-2 -top-3 -translate-y-1/2 text-[10px] font-semibold text-neutral-600 whitespace-nowrap"
+                    >
+                      {caseItem.label.length > 12
+                        ? `${caseItem.label.substring(0, 12)}...`
+                        : caseItem.label}
+                    </Typography>
+                    <Handle
+                      type="source"
+                      position={Position.Right}
+                      id={`case_${caseItem.id}`}
+                      className="w-3 h-3 border-2 border-white shadow-lg hover:scale-125 transition-transform"
+                    />
                   </div>
-                  <Handle
-                    type="source"
-                    position={Position.Right}
-                    id={`case_${caseItem.id}`}
-                    className="w-3 h-3 border-2 border-white shadow-lg hover:scale-125 transition-transform"
-                  />
-                </div>
-              ))
-            ) : (
-              // Handle padrão se não houver casos ainda
-              <Handle
-                type="source"
-                position={Position.Right}
-                id="default"
-                className="w-3 h-3 !bg-gray-500 border-2 border-white shadow-lg hover:scale-125 transition-transform"
-              />
-            )}
-
-            {/* Handle Default - sempre renderizar se configurado */}
-            {hasDefaultCase && switchCases.length > 0 && (
-              <div className="flex items-center gap-1 mt-1 relative">
-                <div className=" text-white px-2 py-0.5 rounded-l-md">
-                  <Typography
-                    variant="span"
-                    className="absolute left-[calc(100%-7px)] ml-2 -top-2 -translate-y-1/2 text-[10px] font-semibold text-neutral-600 whitespace-nowrap"
-                  >
-                    Default
-                  </Typography>
-                </div>
+                ))
+              ) : (
+                // Handle padrão se não houver casos ainda
                 <Handle
                   type="source"
                   position={Position.Right}
                   id="default"
                   className="w-3 h-3 !bg-gray-500 border-2 border-white shadow-lg hover:scale-125 transition-transform"
                 />
-              </div>
-            )}
+              )}
+
+              {/* Handle Default - sempre renderizar se configurado */}
+              {hasDefaultCase && switchCases.length > 0 && (
+                <div className="flex items-center gap-1 relative">
+                  <Typography
+                    variant="span"
+                    className="absolute left-[calc(100%-7px)] ml-2 -top-3 -translate-y-1/2 text-[10px] font-semibold text-neutral-600 whitespace-nowrap"
+                  >
+                    Default
+                  </Typography>
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id="default"
+                    className="w-3 h-3 !bg-gray-500 border-2 border-white shadow-lg hover:scale-125 transition-transform"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
