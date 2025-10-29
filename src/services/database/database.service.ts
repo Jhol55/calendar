@@ -1068,6 +1068,49 @@ export class DatabaseService {
     // 5. Paginação
     const result = allRecords.slice(offset, offset + limit);
 
+    // 6. Converter tipos de acordo com o schema (fix: JSONB retorna números como strings)
+    const schema = partitions[0]?.schema as unknown as TableSchema;
+    if (schema && schema.columns) {
+      const typedResult: DatabaseRecord[] = result.map((record) => {
+        const typedRecord = { ...record };
+
+        // Para cada coluna do schema, converter o tipo correto
+        schema.columns.forEach((column) => {
+          const value = record[column.name];
+          if (value !== null && value !== undefined) {
+            switch (column.type) {
+              case 'number':
+                // Converter string para número
+                typedRecord[column.name] =
+                  typeof value === 'string' ? parseFloat(value) : value;
+                break;
+              case 'boolean':
+                // Converter string para boolean
+                typedRecord[column.name] =
+                  typeof value === 'string'
+                    ? value === 'true' || value === '1'
+                    : value;
+                break;
+              case 'date':
+                // Manter como string ISO ou converter para Date se necessário
+                typedRecord[column.name] = value;
+                break;
+              default:
+                // string, text, email, url, etc - manter como está
+                typedRecord[column.name] = value;
+            }
+          }
+        });
+
+        return typedRecord as DatabaseRecord;
+      });
+
+      // Registrar tempo de query
+      this.recordQueryTime(startTime);
+
+      return typedResult;
+    }
+
     // Registrar tempo de query
     this.recordQueryTime(startTime);
 

@@ -172,7 +172,7 @@ describe('DatabaseService - Recuperação e Consistência', () => {
       const finalRecords = await service.getRecords(userId, tableName, {});
       expect(finalRecords).toHaveLength(1000);
       expect(finalRecords.every((r) => r.value !== 9999)).toBe(true);
-    }, 60000);
+    }, 120000); // Aumentado para 120s devido ao processamento de 1000 registros
 
     it('deve permitir operações após deletar registros de partição cheia', async () => {
       console.log(

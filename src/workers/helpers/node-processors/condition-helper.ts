@@ -44,66 +44,71 @@ interface ConditionConfig {
  * - regex_match: Correspondência com regex
  */
 export function evaluateCondition(
-  variable: string,
+  variable: string | undefined,
   operator: string,
   value: string,
 ): boolean {
-  const varStr = String(variable || '').trim();
+  // Se a variável é undefined (não foi resolvida), tratar como string vazia
+  const varStr = variable === undefined ? '' : String(variable || '').trim();
   const valStr = String(value || '').trim();
+
+  // Se a variável ainda contém {{}}, também considerar como vazia (fallback)
+  const isUnresolved = varStr.includes('{{') && varStr.includes('}}');
+  const effectiveVarStr = isUnresolved ? '' : varStr;
 
   switch (operator) {
     case 'equals':
-      return varStr === valStr;
+      return effectiveVarStr === valStr;
 
     case 'not_equals':
-      return varStr !== valStr;
+      return effectiveVarStr !== valStr;
 
     case 'contains':
-      return varStr.includes(valStr);
+      return effectiveVarStr.includes(valStr);
 
     case 'not_contains':
-      return !varStr.includes(valStr);
+      return !effectiveVarStr.includes(valStr);
 
     case 'starts_with':
-      return varStr.startsWith(valStr);
+      return effectiveVarStr.startsWith(valStr);
 
     case 'ends_with':
-      return varStr.endsWith(valStr);
+      return effectiveVarStr.endsWith(valStr);
 
     case 'greater_than': {
-      const varNum = parseFloat(varStr);
+      const varNum = parseFloat(effectiveVarStr);
       const valNum = parseFloat(valStr);
       return !isNaN(varNum) && !isNaN(valNum) && varNum > valNum;
     }
 
     case 'less_than': {
-      const varNum = parseFloat(varStr);
+      const varNum = parseFloat(effectiveVarStr);
       const valNum = parseFloat(valStr);
       return !isNaN(varNum) && !isNaN(valNum) && varNum < valNum;
     }
 
     case 'greater_or_equal': {
-      const varNum = parseFloat(varStr);
+      const varNum = parseFloat(effectiveVarStr);
       const valNum = parseFloat(valStr);
       return !isNaN(varNum) && !isNaN(valNum) && varNum >= valNum;
     }
 
     case 'less_or_equal': {
-      const varNum = parseFloat(varStr);
+      const varNum = parseFloat(effectiveVarStr);
       const valNum = parseFloat(valStr);
       return !isNaN(varNum) && !isNaN(valNum) && varNum <= valNum;
     }
 
     case 'is_empty':
-      return varStr === '';
+      return effectiveVarStr === '';
 
     case 'is_not_empty':
-      return varStr !== '';
+      return effectiveVarStr !== '';
 
     case 'regex_match':
       try {
         const regex = new RegExp(valStr);
-        return regex.test(varStr);
+        return regex.test(effectiveVarStr);
       } catch (error) {
         console.error(`❌ Invalid regex pattern: ${valStr}`, error);
         return false;

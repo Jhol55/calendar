@@ -382,7 +382,9 @@ export async function processNodeMemory(
         }
 
         // Resolver variáveis em cada item
-        const resolvedItems: Record<string, string> = {};
+        const resolvedItems: Array<{ key: string; value: unknown }> = [];
+        const resolvedItemsObject: Record<string, unknown> = {};
+
         items.forEach((item) => {
           console.log('🔍 Resolving memory item:', {
             originalKey: item.key,
@@ -395,7 +397,15 @@ export async function processNodeMemory(
           });
 
           const resolvedKey = replaceVariables(item.key, variableContext);
-          const resolvedValue = replaceVariables(item.value, variableContext);
+          const rawResolvedValue = replaceVariables(
+            item.value,
+            variableContext,
+          );
+
+          // Se o valor não foi resolvido (undefined), manter o placeholder original
+          // IMPORTANTE: Nunca deixar undefined pois JSON.stringify remove campos undefined
+          const resolvedValue =
+            rawResolvedValue !== undefined ? rawResolvedValue : item.value;
 
           console.log('✅ Resolved memory item:', {
             resolvedKey,
@@ -439,11 +449,13 @@ export async function processNodeMemory(
             }
           }
 
-          resolvedItems[resolvedKey] = resolvedValue;
+          // Manter ambas as estruturas para compatibilidade
+          resolvedItems.push({ key: resolvedKey, value: resolvedValue });
+          resolvedItemsObject[resolvedKey] = resolvedValue;
         });
 
         // Implementar lógica de saveMode
-        let finalValue: unknown = resolvedItems;
+        let finalValue: unknown = resolvedItemsObject;
         if (saveMode === 'append') {
           // Buscar valor existente e adicionar à lista
           const existingMemory = await buscarMemoria(
@@ -455,10 +467,10 @@ export async function processNodeMemory(
             const existingArray = Array.isArray(existingMemory.value)
               ? existingMemory.value
               : [existingMemory.value];
-            finalValue = [...existingArray, resolvedItems];
+            finalValue = [...existingArray, resolvedItemsObject];
           } else {
             // Se não existe, criar nova lista
-            finalValue = [resolvedItems];
+            finalValue = [resolvedItemsObject];
           }
         }
 
@@ -473,7 +485,7 @@ export async function processNodeMemory(
         return {
           action: 'save',
           name: resolvedMemoryName,
-          items: resolvedItems,
+          items: resolvedItems, // Array para compatibilidade com testes
           saveMode: saveMode || 'overwrite',
           success: saveResult.success,
           expiresAt: saveResult.expiresAt,

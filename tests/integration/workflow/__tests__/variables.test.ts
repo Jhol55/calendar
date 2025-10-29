@@ -268,11 +268,10 @@ describe('Variables - Variável não encontrada', () => {
 
     const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Variável não resolvida deve manter o placeholder original (save retorna items[])
-    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
-    expect(memoryOutput.items[0].value).toContain(
-      '.output.message.nonExistent}}',
-    );
+    // Variável não resolvida retorna undefined
+    expect(memoryOutput?.items).toBeDefined();
+    expect(memoryOutput.items.length).toBeGreaterThan(0);
+    expect(memoryOutput.items[0].value).toBeUndefined();
   });
 });
 
@@ -281,7 +280,7 @@ describe('Variables - Variável não encontrada', () => {
 // ==============================================
 
 describe('Variables - Edge Cases (Invalid Syntax)', () => {
-  it('should keep placeholder when variable has malformed brackets', async () => {
+  it('should keep placeholder when variable has malformed brackets (not recognized as variable)', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
@@ -307,11 +306,14 @@ describe('Variables - Edge Cases (Invalid Syntax)', () => {
 
     const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Variável mal formada deve ser mantida como está (save retorna items[])
+    // Variável mal formada não é reconhecida como variável, mantém o texto original
+    expect(memoryOutput?.items).toBeDefined();
+    expect(memoryOutput.items.length).toBeGreaterThan(0);
     expect(memoryOutput.items[0].value).toContain('{{$nodes.');
+    expect(memoryOutput.items[0].value).toContain('.output.name}');
   });
 
-  it('should keep placeholder when variable has missing dots in path', async () => {
+  it('should return undefined when variable has missing dots in path', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
@@ -337,8 +339,10 @@ describe('Variables - Edge Cases (Invalid Syntax)', () => {
 
     const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Sintaxe inválida deve manter placeholder (save retorna items[])
-    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
+    // Sintaxe inválida retorna undefined
+    expect(memoryOutput?.items).toBeDefined();
+    expect(memoryOutput.items.length).toBeGreaterThan(0);
+    expect(memoryOutput.items[0].value).toBeUndefined();
   });
 });
 
@@ -347,7 +351,7 @@ describe('Variables - Edge Cases (Invalid Syntax)', () => {
 // ==============================================
 
 describe('Variables - Edge Cases (Property Access)', () => {
-  it('should keep placeholder when accessing property on null/undefined', async () => {
+  it('should return undefined when accessing property on null/undefined', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
@@ -373,8 +377,10 @@ describe('Variables - Edge Cases (Property Access)', () => {
 
     const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Acessar propriedade de null deve manter placeholder (save retorna items[])
-    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
+    // Acessar propriedade de null retorna undefined
+    expect(memoryOutput?.items).toBeDefined();
+    expect(memoryOutput.items.length).toBeGreaterThan(0);
+    expect(memoryOutput.items[0].value).toBeUndefined();
   });
 
   it('should handle very deep object nesting (10+ levels)', async () => {
@@ -423,7 +429,7 @@ describe('Variables - Edge Cases (Property Access)', () => {
     expect(memoryOutput.items[0].value).toBe('deep value');
   });
 
-  it('should keep placeholder when array index is out of bounds', async () => {
+  it('should return undefined when array index is out of bounds', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
@@ -451,11 +457,13 @@ describe('Variables - Edge Cases (Property Access)', () => {
 
     const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Índice fora do limite deve manter placeholder (save retorna items[])
-    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
+    // Índice fora do limite retorna undefined
+    expect(memoryOutput?.items).toBeDefined();
+    expect(memoryOutput.items.length).toBeGreaterThan(0);
+    expect(memoryOutput.items[0].value).toBeUndefined();
   });
 
-  it('should keep placeholder when using negative array index', async () => {
+  it('should return undefined when using negative array index', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
@@ -483,11 +491,13 @@ describe('Variables - Edge Cases (Property Access)', () => {
 
     const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Índice negativo deve manter placeholder (save retorna items[])
-    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
+    // Índice negativo retorna undefined
+    expect(memoryOutput?.items).toBeDefined();
+    expect(memoryOutput.items.length).toBeGreaterThan(0);
+    expect(memoryOutput.items[0].value).toBeUndefined();
   });
 
-  it('should keep placeholder when treating string as object', async () => {
+  it('should return undefined when treating string as object', async () => {
     const webhookId = generateTestId('webhook');
     const messageId = generateTestId('message');
 
@@ -513,8 +523,10 @@ describe('Variables - Edge Cases (Property Access)', () => {
 
     const memoryOutput = await getNodeOutput(executionId, messageId);
 
-    // Acessar propriedade de string deve manter placeholder (save retorna items[])
-    expect(memoryOutput.items[0].value).toContain('{{$nodes.');
+    // Acessar propriedade de string retorna undefined
+    expect(memoryOutput?.items).toBeDefined();
+    expect(memoryOutput.items.length).toBeGreaterThan(0);
+    expect(memoryOutput.items[0].value).toBeUndefined();
   });
 });
 

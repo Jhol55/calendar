@@ -136,20 +136,61 @@ export async function processLoopNode(params: ProcessLoopNodeParams): Promise<{
     `📦 Processing batch: items ${startIndex} to ${endIndex - 1} (${batch.length} items)`,
   );
 
+  // Se o batch está vazio, significa que já processamos tudo
+  if (batch.length === 0) {
+    console.log(
+      `✅ Loop completed! All ${loopState.items.length} items processed`,
+    );
+
+    // Limpar estado do loop
+    delete loopStates[nodeId];
+    await prisma.flow_executions.update({
+      where: { id: executionId },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: { loopStates: loopStates as any },
+    });
+
+    return {
+      batch: [],
+      hasMore: false,
+      selectedHandle: 'done',
+      loopVariable: {
+        [config.outputVariable || 'loopItem']: null,
+        index: startIndex,
+        total: loopState.items.length,
+        isLast: true,
+      },
+      accumulatedResults: loopState.accumulatedResults,
+      iterationCount: loopState.iterationCount,
+    };
+  }
+
   // Atualizar índice e contador
   loopState.currentIndex = endIndex;
   loopState.iterationCount += 1;
 
-  // Verificar se ainda há mais itens
-  const hasMore = loopState.currentIndex < loopState.items.length;
+  // Verificar se ainda há mais itens APÓS este batch
+  const hasMoreAfterThis = loopState.currentIndex < loopState.items.length;
+  const isLastBatch = !hasMoreAfterThis;
 
   console.log(
     `📊 Progress: ${loopState.currentIndex}/${loopState.items.length} items processed`,
   );
-  console.log(`🔄 Iteration ${loopState.iterationCount}, Has more: ${hasMore}`);
+  console.log(
+    `🔄 Iteration ${loopState.iterationCount}, Has more after this: ${hasMoreAfterThis}, Is last batch: ${isLastBatch}`,
+  );
 
-  if (hasMore) {
-    // Salvar estado atualizado para próxima iteração
+  // Salvar acumulado se configurado
+  if (config.accumulateResults && loopState.accumulatedResults) {
+    if (config.mode === 'each') {
+      loopState.accumulatedResults.push(...batch);
+    } else {
+      loopState.accumulatedResults.push(batch);
+    }
+  }
+
+  if (hasMoreAfterThis) {
+    // Ainda há itens - salvar estado e retornar handle 'loop'
     loopStates[nodeId] = loopState;
     await prisma.flow_executions.update({
       where: { id: executionId },
@@ -182,21 +223,14 @@ export async function processLoopNode(params: ProcessLoopNodeParams): Promise<{
       iterationCount: loopState.iterationCount,
     };
   } else {
+    // Este é o último batch - processar e depois ir para 'done'
     console.log(
-      `✅ Loop completed! Total iterations: ${loopState.iterationCount}`,
+      `✅ Processing LAST batch! Total iterations: ${loopState.iterationCount}`,
     );
 
-    // Loop concluído - processar último batch e limpar estado
-    if (config.accumulateResults && loopState.accumulatedResults) {
-      if (config.mode === 'each') {
-        loopState.accumulatedResults.push(...batch);
-      } else {
-        loopState.accumulatedResults.push(batch);
-      }
-    }
-
-    // Limpar estado do loop
-    delete loopStates[nodeId];
+    // ⚠️ IMPORTANTE: Retornar 'loop' para processar último batch ANTES de done
+    // O próximo processamento detectará que não há mais itens e irá para 'done'
+    loopStates[nodeId] = loopState;
     await prisma.flow_executions.update({
       where: { id: executionId },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -205,14 +239,14 @@ export async function processLoopNode(params: ProcessLoopNodeParams): Promise<{
 
     return {
       batch: config.mode === 'each' ? batch[0] : batch,
-      hasMore: false,
-      selectedHandle: 'done',
+      hasMore: true, // ✅ Ainda precisa processar este batch!
+      selectedHandle: 'loop',
       loopVariable: {
         [config.outputVariable || 'loopItem']:
           config.mode === 'each' ? batch[0] : batch,
         index: startIndex,
         total: loopState.items.length,
-        isLast: true,
+        isLast: true, // ✅ Marcar como último
         currentBatch: batch,
       },
       accumulatedResults: loopState.accumulatedResults,

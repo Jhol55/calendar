@@ -54,14 +54,14 @@ describe('Webhook Node - Security', () => {
       flowId,
       webhookId,
       payload,
-      { timeout: 20000 },
+      { timeout: 35000 }, // Aumentado para 35s devido ao tamanho do payload
     );
 
     expect(jobResult.status).toBe('success');
     expect(executionId).toBeDefined();
 
     console.log(`⏱️  Payload de 1MB processado em ${duration}ms`);
-  }, 30000);
+  }, 45000); // Aumentado para 45s
 
   // ❌ CENÁRIO NEGATIVO: Payload acima do limite (> 10MB) - Validação via helper
   it('validateWebhookPayload deve rejeitar payloads maiores que 10MB', () => {

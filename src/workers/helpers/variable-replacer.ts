@@ -8,6 +8,9 @@ export function replaceVariables(text: string, context: any): any {
 
   console.log('🔹 [VARIABLE-REPLACER] Input:', text.substring(0, 200));
 
+  // Verificar se o texto é APENAS uma variável (sem texto ao redor)
+  const isSingleVariable = /^\{\{[^}]+\}\}$/.test(text.trim());
+
   // Encontrar todas as variáveis no formato {{path}}
   // IMPORTANTE: Substituir variáveis SEM aspas usando JSON.stringify para manter tipos
   const replaced = text.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
@@ -22,14 +25,14 @@ export function replaceVariables(text: string, context: any): any {
         if (value && typeof value === 'object' && part in value) {
           value = value[part];
         } else {
-          // Se o path não existir, retornar o match original
-          return match;
+          // Path não existe - marcar como não resolvido
+          return '__UNRESOLVED__' + match;
         }
       }
 
       // Converter para string se necessário
       if (value === null || value === undefined) {
-        return match;
+        return '__UNRESOLVED__' + match;
       }
 
       // Converter para string preservando tipos
@@ -51,14 +54,27 @@ export function replaceVariables(text: string, context: any): any {
         return String(value);
       }
     } catch {
-      return match;
+      return '__UNRESOLVED__' + match;
     }
   });
 
+  // Se era uma variável única e não foi resolvida, retornar undefined
+  if (isSingleVariable && replaced.includes('__UNRESOLVED__')) {
+    console.log(
+      '🔹 [VARIABLE-REPLACER] Variable not resolved, returning undefined',
+    );
+    return undefined;
+  }
+
+  // Remover marcadores __UNRESOLVED__ e manter a variável original
+  const finalResult = replaced.replace(/__UNRESOLVED__/g, '');
+
   console.log(
     '🔹 [VARIABLE-REPLACER] After replace:',
-    replaced.substring(0, 200),
+    typeof finalResult === 'string'
+      ? finalResult.substring(0, 200)
+      : finalResult,
   );
-  console.log('🔹 [VARIABLE-REPLACER] Returning as string');
-  return replaced;
+
+  return finalResult;
 }
