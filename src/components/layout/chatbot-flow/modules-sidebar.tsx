@@ -132,7 +132,7 @@ export const Sidebar = memo(function Sidebar({ onDragStart }: SidebarProps) {
       </div>
 
       {/* Campo de Pesquisa */}
-      <div className="px-2 pb-3">
+      <div className="px-2 pb-3" style={{ zoom: 0.9 }}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40" />
           <input
