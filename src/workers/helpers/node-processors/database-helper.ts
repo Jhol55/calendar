@@ -8,6 +8,7 @@
 import { databaseService } from '@/services/database/database.service';
 import type { DatabaseNodeConfig } from '@/services/database/database.types';
 import { parseJSONRecursively } from '../json-parser';
+import { SqlEngine } from '@/services/database/sql-engine.service';
 
 /**
  * Interface do contexto de execução
@@ -73,6 +74,9 @@ export async function executeDatabaseNode(
       case 'get':
         return await handleGet(userId, config, input, context);
 
+      case 'sql_query':
+        return await handleSqlQuery(userId, config, input, context);
+
       default:
         throw new Error(`Operação "${operation}" não suportada`);
     }
@@ -93,6 +97,10 @@ async function handleAddColumns(
   userId: string,
   config: DatabaseNodeConfig,
 ): Promise<any> {
+  if (!config.tableName) {
+    throw new Error('Nome da tabela é obrigatório para operação addColumns');
+  }
+
   if (!config.columns || config.columns.length === 0) {
     throw new Error('Nenhuma coluna especificada para adicionar');
   }
@@ -119,6 +127,10 @@ async function handleRemoveColumns(
   userId: string,
   config: DatabaseNodeConfig,
 ): Promise<any> {
+  if (!config.tableName) {
+    throw new Error('Nome da tabela é obrigatório para operação removeColumns');
+  }
+
   if (!config.columnsToRemove || config.columnsToRemove.length === 0) {
     throw new Error('Nenhuma coluna especificada para remover');
   }
@@ -147,6 +159,10 @@ async function handleInsert(
   input: any,
   context: ExecutionContext,
 ): Promise<any> {
+  if (!config.tableName) {
+    throw new Error('Nome da tabela é obrigatório para operação insert');
+  }
+
   if (!config.record) {
     throw new Error('Nenhum registro especificado para inserir');
   }
@@ -201,6 +217,10 @@ async function handleUpdate(
   input: any,
   context: ExecutionContext,
 ): Promise<any> {
+  if (!config.tableName) {
+    throw new Error('Nome da tabela é obrigatório para operação update');
+  }
+
   if (!config.filters) {
     throw new Error('Nenhum filtro especificado para atualização');
   }
@@ -247,6 +267,10 @@ async function handleDelete(
   input: any,
   context: ExecutionContext,
 ): Promise<any> {
+  if (!config.tableName) {
+    throw new Error('Nome da tabela é obrigatório para operação delete');
+  }
+
   if (!config.filters) {
     throw new Error('Nenhum filtro especificado para exclusão');
   }
@@ -281,6 +305,10 @@ async function handleGet(
   input: any,
   context: ExecutionContext,
 ): Promise<any> {
+  if (!config.tableName) {
+    throw new Error('Nome da tabela é obrigatório para operação get');
+  }
+
   // Resolve variáveis nos filtros
   let filterConfig = undefined;
   if (config.filters) {
@@ -592,6 +620,45 @@ function resolveValue(path: string, data: any, depth: number = 0): any {
   }
 
   return current;
+}
+
+/**
+ * Handler: sql_query - Executa query SQL contra tabelas JSONB virtuais
+ */
+async function handleSqlQuery(
+  userId: string,
+  config: DatabaseNodeConfig,
+  input: any,
+  context: Record<string, any>,
+): Promise<any> {
+  console.log(`🔷 [DATABASE-HELPER] Executing SQL Query for user ${userId}`);
+
+  if (!config.sqlQuery) {
+    throw new Error('Query SQL não fornecida');
+  }
+
+  // Criar instância do SQL Engine com configurações personalizadas
+  const sqlEngine = new SqlEngine({
+    MAX_RECORDS_PER_TABLE: config.maxRecordsPerTable || 10000,
+    MAX_RESULT_SIZE: 50000,
+    MAX_JOIN_TABLES: 5,
+    ENABLE_COMPLEX_QUERIES: config.enableComplexQueries ?? true,
+  });
+
+  // Executar SQL query
+  const result = await sqlEngine.execute(config.sqlQuery, userId, context);
+
+  if (!result.success) {
+    throw new Error(`Erro na execução SQL: ${result.error}`);
+  }
+
+  console.log(`✅ [DATABASE-HELPER] SQL Query executed successfully`);
+
+  return {
+    success: true,
+    data: result.data,
+    affected: result.affected,
+  };
 }
 
 /**

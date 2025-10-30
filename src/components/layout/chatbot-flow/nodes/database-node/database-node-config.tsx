@@ -18,6 +18,7 @@ import {
   getAvailableTables,
   getTableData,
 } from '@/actions/database/operations';
+import { CodeiumEditorField } from '@/components/ui/codeium-editor-field';
 
 interface DatabaseNodeConfigProps {
   isOpen: boolean;
@@ -193,6 +194,17 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
         if (config.pagination) {
           setValue('limit', config.pagination.limit?.toString() || '');
           setValue('offset', config.pagination.offset?.toString() || '');
+        }
+
+        // Para sql_query
+        if (config.sqlQuery) {
+          setValue('sqlQuery', config.sqlQuery);
+        }
+        if (config.enableComplexQueries !== undefined) {
+          setValue('enableComplexQueries', config.enableComplexQueries);
+        }
+        if (config.maxRecordsPerTable !== undefined) {
+          setValue('maxRecordsPerTable', config.maxRecordsPerTable);
         }
       }
     }, 0);
@@ -466,33 +478,6 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
 
   return (
     <>
-      {/* Nome da Tabela */}
-      <div className="p-1">
-        <FormControl variant="label">Nome da Tabela *</FormControl>
-        <FormSelect
-          fieldName="tableName"
-          placeholder={
-            loadingTables
-              ? 'Carregando tabelas...'
-              : availableTables.length === 0
-                ? 'Nenhuma tabela encontrada'
-                : 'Selecione uma tabela'
-          }
-          onValueChange={(value) => {
-            setSelectedTable(value);
-            setValue('tableName', value);
-          }}
-          options={availableTables.map((table) => ({
-            value: table,
-            label: table,
-          }))}
-          className="w-full"
-        />
-        <Typography variant="span" className="text-xs text-gray-500 mt-1">
-          Selecione uma tabela existente ou crie uma nova
-        </Typography>
-      </div>
-
       {/* Operação */}
       <div className="p-1">
         <FormControl variant="label">Operação *</FormControl>
@@ -506,10 +491,40 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
             { value: 'get', label: '🔍 Buscar Registros' },
             { value: 'update', label: '✏️ Atualizar Registros' },
             { value: 'delete', label: '🗑️ Deletar Registros' },
+            { value: 'sql_query', label: '💾 SQL Query' },
           ]}
           className="w-full"
         />
       </div>
+
+      {/* Nome da Tabela - Oculto para SQL Query */}
+      {operation !== 'sql_query' && (
+        <div className="p-1">
+          <FormControl variant="label">Nome da Tabela *</FormControl>
+          <FormSelect
+            fieldName="tableName"
+            placeholder={
+              loadingTables
+                ? 'Carregando tabelas...'
+                : availableTables.length === 0
+                  ? 'Nenhuma tabela encontrada'
+                  : 'Selecione uma tabela'
+            }
+            onValueChange={(value) => {
+              setSelectedTable(value);
+              setValue('tableName', value);
+            }}
+            options={availableTables.map((table) => ({
+              value: table,
+              label: table,
+            }))}
+            className="w-full"
+          />
+          <Typography variant="span" className="text-xs text-gray-500 mt-1">
+            Selecione uma tabela existente ou crie uma nova
+          </Typography>
+        </div>
+      )}
 
       {/* Campos específicos por operação */}
       {operation === 'addColumns' && (
@@ -1075,6 +1090,20 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
         </div>
       )}
 
+      {/* SQL Query */}
+      {operation === 'sql_query' && (
+        <div className="space-y-3 border-t pt-4">
+          <div className="space-y-2">
+            <FormControl variant="label">Query SQL *</FormControl>
+            <CodeiumEditorField
+              fieldName="sqlQuery"
+              language="javascript"
+              placeholder="SELECT * FROM tabela"
+            />
+          </div>
+        </div>
+      )}
+
       <SubmitButton variant="gradient" className="mt-4">
         Salvar Configuração
       </SubmitButton>
@@ -1138,6 +1167,12 @@ export function DatabaseNodeConfig({
           offset: data.offset ? parseInt(data.offset) : undefined,
         };
       }
+    }
+
+    if (data.operation === 'sql_query') {
+      databaseConfig.sqlQuery = data.sqlQuery;
+      databaseConfig.enableComplexQueries = data.enableComplexQueries ?? true;
+      databaseConfig.maxRecordsPerTable = data.maxRecordsPerTable ?? 10000;
     }
 
     onSave(databaseConfig);

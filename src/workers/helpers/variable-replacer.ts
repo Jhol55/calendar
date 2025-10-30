@@ -30,8 +30,11 @@ export function replaceVariables(text: string, context: any): any {
         }
       }
 
-      // Converter para string se necessário
-      if (value === null || value === undefined) {
+      // Tratar null e undefined
+      if (value === null) {
+        return 'NULL'; // NULL SQL
+      }
+      if (value === undefined) {
         return '__UNRESOLVED__' + match;
       }
 

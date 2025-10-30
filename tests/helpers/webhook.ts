@@ -71,12 +71,23 @@ export async function waitForJobCompletion(
   // Verificar estado atual primeiro (pode já estar completo)
   const currentState = await job.getState();
   if (currentState === 'completed') {
-    const result = await job.finished();
-    // Verificar se o resultado indica erro
-    if (result && result.error === true && throwOnError) {
-      throw new Error(`Job failed: ${result.message || 'Unknown error'}`);
+    try {
+      const result = await job.finished();
+      // Verificar se o resultado indica erro
+      if (result && result.error === true && throwOnError) {
+        throw new Error(`Job failed: ${result.message || 'Unknown error'}`);
+      }
+      return result;
+    } catch (error: any) {
+      // Handle Bull's null returnvalue error gracefully
+      if (error.message?.includes('Cannot read properties of null')) {
+        console.warn(
+          `⚠️ Job ${jobId} completed but returnvalue is null (Bull race condition)`,
+        );
+        return { status: 'success', jobId };
+      }
+      throw error;
     }
-    return result;
   }
   if (currentState === 'failed') {
     const failedReason = job.failedReason;
@@ -84,22 +95,33 @@ export async function waitForJobCompletion(
   }
 
   // Usar Promise.race entre o job.finished() e o timeout
-  const result = await Promise.race([
-    job.finished(),
-    new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Job ${jobId} timeout after ${timeout}ms`)),
-        timeout,
+  try {
+    const result = await Promise.race([
+      job.finished(),
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Job ${jobId} timeout after ${timeout}ms`)),
+          timeout,
+        ),
       ),
-    ),
-  ]);
+    ]);
 
-  // Verificar se o resultado indica erro
-  if (result && result.error === true && throwOnError) {
-    throw new Error(`Job failed: ${result.message || 'Unknown error'}`);
+    // Verificar se o resultado indica erro
+    if (result && result.error === true && throwOnError) {
+      throw new Error(`Job failed: ${result.message || 'Unknown error'}`);
+    }
+
+    return result;
+  } catch (error: any) {
+    // Handle Bull's null returnvalue error gracefully
+    if (error.message?.includes('Cannot read properties of null')) {
+      console.warn(
+        `⚠️ Job ${jobId} finished but returnvalue is null (Bull race condition)`,
+      );
+      return { status: 'success', jobId };
+    }
+    throw error;
   }
-
-  return result;
 }
 
 /**

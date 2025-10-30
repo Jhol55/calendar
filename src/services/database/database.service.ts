@@ -1607,10 +1607,25 @@ export class DatabaseService {
     const { condition, rules } = filters;
 
     if (condition === 'AND') {
-      return rules.every((rule) => this.matchesRule(record, rule));
+      return rules.every((rule) => this.matchesRuleOrFilter(record, rule));
     } else {
-      return rules.some((rule) => this.matchesRule(record, rule));
+      return rules.some((rule) => this.matchesRuleOrFilter(record, rule));
     }
+  }
+
+  /**
+   * Verifica se um record atende a uma regra ou filtro nested
+   */
+  private matchesRuleOrFilter(
+    record: DatabaseRecord,
+    ruleOrFilter: FilterRule | FilterConfig,
+  ): boolean {
+    // Type guard: se tem 'condition' e 'rules', é FilterConfig
+    if ('condition' in ruleOrFilter && 'rules' in ruleOrFilter) {
+      return this.matchesFilters(record, ruleOrFilter as FilterConfig);
+    }
+    // Caso contrário, é FilterRule
+    return this.matchesRule(record, ruleOrFilter as FilterRule);
   }
 
   private matchesRule(record: DatabaseRecord, rule: FilterRule): boolean {

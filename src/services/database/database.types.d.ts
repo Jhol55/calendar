@@ -59,7 +59,8 @@ export type DatabaseOperation =
   | 'insert'
   | 'update'
   | 'delete'
-  | 'get';
+  | 'get'
+  | 'sql_query';
 
 /**
  * Definição de uma coluna
@@ -89,10 +90,11 @@ export interface FilterRule {
 
 /**
  * Configuração de filtros com múltiplas regras
+ * Permite nested configs para queries complexas (OR dentro de AND, etc)
  */
 export interface FilterConfig {
   condition: FilterCondition;
-  rules: FilterRule[];
+  rules: (FilterRule | FilterConfig)[];
 }
 
 /**
@@ -125,7 +127,7 @@ export interface QueryOptions {
  */
 export interface DatabaseNodeConfig {
   operation: DatabaseOperation;
-  tableName: string;
+  tableName?: string; // Opcional para sql_query
 
   // Para addColumns
   columns?: ColumnDefinition[];
@@ -147,6 +149,11 @@ export interface DatabaseNodeConfig {
   pagination?: PaginationConfig;
   limit?: number; // Paginação simplificada
   offset?: number; // Paginação simplificada
+
+  // Para sql_query
+  sqlQuery?: string;
+  enableComplexQueries?: boolean;
+  maxRecordsPerTable?: number;
 }
 
 /**

@@ -256,7 +256,8 @@ export type DatabaseOperation =
   | 'insert'
   | 'update'
   | 'delete'
-  | 'get';
+  | 'get'
+  | 'sql_query';
 
 export type ColumnType =
   | 'string'
@@ -304,7 +305,7 @@ export interface FilterConfig {
 
 export interface DatabaseConfig {
   operation: DatabaseOperation;
-  tableName: string;
+  tableName?: string; // Opcional para sql_query
 
   // Para addColumns
   columns?: ColumnDefinition[];
@@ -330,6 +331,11 @@ export interface DatabaseConfig {
     limit?: number;
     offset?: number;
   };
+
+  // Para sql_query
+  sqlQuery?: string;
+  enableComplexQueries?: boolean;
+  maxRecordsPerTable?: number;
 }
 
 // HTTP Request Node Types

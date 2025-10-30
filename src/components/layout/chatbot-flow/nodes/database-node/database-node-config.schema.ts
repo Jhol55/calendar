@@ -8,8 +8,9 @@ const baseSchema = z.object({
     'update',
     'delete',
     'get',
+    'sql_query',
   ]),
-  tableName: z.string().min(1, 'Digite o nome da tabela'),
+  tableName: z.string().optional(), // Opcional para sql_query
 
   // Para addColumns
   columns: z.string().optional(), // JSON stringified array
@@ -31,10 +32,23 @@ const baseSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional(),
   limit: z.union([z.string(), z.number()]).optional(),
   offset: z.union([z.string(), z.number()]).optional(),
+
+  // Para sql_query
+  sqlQuery: z.string().optional(), // Raw SQL query
+  enableComplexQueries: z.boolean().optional().default(true),
+  maxRecordsPerTable: z.number().optional().default(10000),
 });
 
 export const databaseConfigSchema = baseSchema.refine(
   (data) => {
+    // tableName é obrigatório exceto para sql_query
+    if (
+      data.operation !== 'sql_query' &&
+      (!data.tableName || data.tableName.trim().length === 0)
+    ) {
+      return false;
+    }
+
     // Validar campos específicos baseado na operação
     if (data.operation === 'addColumns') {
       if (!data.columns) return false;
@@ -87,10 +101,34 @@ export const databaseConfigSchema = baseSchema.refine(
       }
     }
 
+    if (data.operation === 'sql_query') {
+      if (!data.sqlQuery || data.sqlQuery.trim().length === 0) return false;
+      // Validação básica: deve conter alguma palavra-chave SQL
+      const sqlKeywords = [
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+        'FROM',
+        'WHERE',
+      ];
+      const upperQuery = data.sqlQuery.toUpperCase();
+      return sqlKeywords.some((keyword) => upperQuery.includes(keyword));
+    }
+
     return true;
   },
   (data) => {
     // Retornar mensagem de erro apropriada
+
+    // Validar tableName primeiro (exceto para sql_query)
+    if (
+      data.operation !== 'sql_query' &&
+      (!data.tableName || data.tableName.trim().length === 0)
+    ) {
+      return { message: 'Digite o nome da tabela', path: ['tableName'] };
+    }
+
     if (data.operation === 'addColumns') {
       return { message: 'Adicione pelo menos uma coluna', path: ['columns'] };
     }
@@ -111,6 +149,9 @@ export const databaseConfigSchema = baseSchema.refine(
     }
     if (data.operation === 'delete') {
       return { message: 'Defina os filtros', path: ['filters'] };
+    }
+    if (data.operation === 'sql_query') {
+      return { message: 'Escreva uma query SQL válida', path: ['sqlQuery'] };
     }
     return { message: 'Erro de validação', path: [] };
   },
