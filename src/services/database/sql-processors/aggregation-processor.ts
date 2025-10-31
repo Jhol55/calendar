@@ -70,13 +70,21 @@ export class AggregationProcessor {
     const results: any[] = [];
 
     for (const group of groups) {
-      if (group.length === 0) continue;
+      // Se o grupo está vazio mas temos agregações, ainda precisamos retornar um resultado
+      // (por exemplo, SELECT COUNT(*) de uma tabela vazia deve retornar 0, não vazio)
+      if (group.length === 0 && groupByFields.length > 0) {
+        // Com GROUP BY, pular grupos vazios
+        continue;
+      }
 
       const result: any = {};
 
       // Incluir campos do GROUP BY (usar valores do primeiro registro)
       for (const field of groupByFields) {
-        result[field] = group[0][field];
+        // Se grupo vazio, não há valores para incluir
+        if (group.length > 0) {
+          result[field] = group[0][field];
+        }
       }
 
       // Aplicar cada agregação
@@ -105,7 +113,7 @@ export class AggregationProcessor {
   private executeAggregateFunction(
     records: any[],
     agg: AggregateFunction,
-  ): number | string | null {
+  ): number | string | any[] | null {
     switch (agg.function) {
       case 'COUNT':
         return this.count(records, agg.field, agg.distinct);
@@ -117,6 +125,15 @@ export class AggregationProcessor {
         return this.min(records, agg.field!);
       case 'MAX':
         return this.max(records, agg.field!);
+      case 'STRING_AGG':
+      case 'GROUP_CONCAT':
+        return this.stringAgg(records, agg.field!, agg.separator || ',');
+      case 'ARRAY_AGG':
+        return this.arrayAgg(records, agg.field!);
+      case 'JSON_AGG':
+        return this.jsonAgg(records, agg.field);
+      case 'JSON_OBJECT_AGG':
+        return this.jsonObjectAgg(records, agg.field!, agg.valueField!);
       default:
         throw new Error(`Unsupported aggregate function: ${agg.function}`);
     }
@@ -215,6 +232,67 @@ export class AggregationProcessor {
     return Math.max(
       ...values.map((v) => (typeof v === 'number' ? v : parseFloat(v))),
     );
+  }
+
+  /**
+   * STRING_AGG / GROUP_CONCAT - Concatena strings com separador
+   */
+  private stringAgg(records: any[], field: string, separator: string): string {
+    const values = records
+      .map((r) => r[field])
+      .filter((v) => v !== null && v !== undefined)
+      .map((v) => String(v));
+
+    return values.join(separator);
+  }
+
+  /**
+   * ARRAY_AGG - Agrupa valores em array
+   */
+  private arrayAgg(records: any[], field: string): any[] {
+    return records
+      .map((r) => r[field])
+      .filter((v) => v !== null && v !== undefined);
+  }
+
+  /**
+   * JSON_AGG - Agrupa rows como array de objetos JSON
+   */
+  private jsonAgg(records: any[], field?: string): any[] {
+    if (field) {
+      // Se especificou um campo, retornar array dos valores desse campo
+      return records.map((r) => r[field]);
+    }
+    // Sem campo específico, retornar array de objetos (rows completas)
+    return records.map((r) => {
+      // Remover campos internos (_id, etc)
+      const obj: any = {};
+      for (const [key, value] of Object.entries(r)) {
+        if (!key.startsWith('_')) {
+          obj[key] = value;
+        }
+      }
+      return obj;
+    });
+  }
+
+  /**
+   * JSON_OBJECT_AGG - Agrupa key-value pairs em objeto JSON
+   */
+  private jsonObjectAgg(
+    records: any[],
+    keyField: string,
+    valueField: string,
+  ): any {
+    const result: any = {};
+    for (const record of records) {
+      const key = record[keyField];
+      const value = record[valueField];
+      if (key !== null && key !== undefined) {
+        result[String(key)] = value;
+      }
+    }
+    return result;
   }
 
   /**

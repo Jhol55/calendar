@@ -60,7 +60,7 @@ export async function addWebhookJob(
  */
 export async function waitForJobCompletion(
   jobId: string,
-  timeout: number = 10000,
+  timeout: number = 30000,
   throwOnError: boolean = true,
 ): Promise<any> {
   const job = await webhookQueue.getJob(jobId);
@@ -345,7 +345,7 @@ export function generateWebhookPayload(overrides: any = {}): any {
  */
 export async function waitForMultipleJobs(
   jobIds: string[],
-  timeout: number = 10000,
+  timeout: number = 30000,
   throwOnError: boolean = true,
 ): Promise<any[]> {
   const promises = jobIds.map((jobId) =>

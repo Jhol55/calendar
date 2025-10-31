@@ -324,7 +324,7 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [tableColumns, config?.sort?.field, setValue]);
+  }, [tableColumns, config?.sort?.field, config?.sort, setValue]);
 
   // Inicializar FormSelects de column_type quando columns for carregado
   useEffect(() => {

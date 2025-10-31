@@ -64,8 +64,13 @@ export class FilterTranslator {
       };
     }
 
-    // LIKE / NOT LIKE (verificar ANTES de binary_expr genérico)
-    if (node.operator === 'LIKE' || node.operator === 'NOT LIKE') {
+    // LIKE / NOT LIKE / ILIKE / NOT ILIKE (verificar ANTES de binary_expr genérico)
+    if (
+      node.operator === 'LIKE' ||
+      node.operator === 'NOT LIKE' ||
+      node.operator === 'ILIKE' ||
+      node.operator === 'NOT ILIKE'
+    ) {
       const rule = this.translateLike(node);
       return {
         condition: 'AND',
@@ -161,7 +166,7 @@ export class FilterTranslator {
   }
 
   /**
-   * Traduz LIKE / NOT LIKE
+   * Traduz LIKE / NOT LIKE / ILIKE / NOT ILIKE
    */
   private translateLike(node: any): FilterRule {
     const field = this.extractFieldName(node.left);
@@ -172,6 +177,10 @@ export class FilterTranslator {
     // LIKE '%test' → endsWith 'test'
     // LIKE '%test%' → contains 'test'
     const likePattern = String(value);
+    const isCaseInsensitive =
+      node.operator === 'ILIKE' ||
+      node.operator === 'NOT ILIKE' ||
+      node._ilike === true;
 
     let operator: string;
     let cleanValue: string;
@@ -191,8 +200,8 @@ export class FilterTranslator {
       cleanValue = likePattern;
     }
 
-    // NOT LIKE inverte o operador
-    if (node.operator === 'NOT LIKE') {
+    // NOT LIKE/ILIKE inverte o operador
+    if (node.operator === 'NOT LIKE' || node.operator === 'NOT ILIKE') {
       const notOperatorMap: Record<string, string> = {
         contains: 'notContains',
         startsWith: 'notContains', // Aproximação
@@ -200,6 +209,19 @@ export class FilterTranslator {
         equals: 'notEquals',
       };
       operator = notOperatorMap[operator] || 'notContains';
+    }
+
+    // Para case-insensitive, converter valor para lowercase
+    // O DatabaseService.matchesRule precisa ser atualizado para suportar case-insensitive
+    if (isCaseInsensitive) {
+      cleanValue = cleanValue.toLowerCase();
+      // Adicionar flag especial para indicar case-insensitive
+      return {
+        field,
+        operator: operator as FilterOperator,
+        value: cleanValue,
+        caseInsensitive: true,
+      } as any;
     }
 
     return {

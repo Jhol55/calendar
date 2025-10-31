@@ -111,6 +111,12 @@ export const databaseConfigSchema = baseSchema.refine(
         'DELETE',
         'FROM',
         'WHERE',
+        'CREATE',
+        'DROP',
+        'ALTER',
+        'WITH',
+        'UNION',
+        'JOIN',
       ];
       const upperQuery = data.sqlQuery.toUpperCase();
       return sqlKeywords.some((keyword) => upperQuery.includes(keyword));

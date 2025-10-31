@@ -16,6 +16,7 @@ export class CteProcessor {
       cteContext: Map<string, any[]>,
     ) => Promise<any[]>,
     isRecursive: boolean = false,
+    maxIterations: number = 1000,
   ): Promise<Map<string, any[]>> {
     const cteResults = new Map<string, any[]>();
 
@@ -44,6 +45,7 @@ export class CteProcessor {
             userId,
             executeQuery,
             cteResults,
+            maxIterations,
           );
           cteResults.set(cteName, results);
           console.log(
@@ -78,8 +80,9 @@ export class CteProcessor {
       cteContext: Map<string, any[]>,
     ) => Promise<any[]>,
     cteContext: Map<string, any[]>,
+    maxIterations: number = 1000,
   ): Promise<any[]> {
-    const MAX_ITERATIONS = 1000; // Limite de segurança
+    const MAX_ITERATIONS = maxIterations;
     let iteration = 0;
     let allResults: any[] = [];
     let previousResults: any[] = [];

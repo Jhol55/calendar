@@ -219,11 +219,33 @@ describe('DatabaseService - Validação', () => {
       ).resolves.toBeDefined();
     });
 
-    it('❌ boolean: "true" (string) deve falhar', async () => {
-      console.log('    ✓ Teste: ❌ boolean: "true" (string) deve falhar');
-      await expectErrorCode(
+    it('✅ boolean: "true" (string) deve passar com conversão', async () => {
+      console.log(
+        '    ✓ Teste: ✅ boolean: "true" (string) deve passar com conversão',
+      );
+      await expect(
         service.insertRecord(userId, 'types_test', {
           bool_field: 'true',
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('✅ boolean: "false" (string) deve passar com conversão', async () => {
+      console.log(
+        '    ✓ Teste: ✅ boolean: "false" (string) deve passar com conversão',
+      );
+      await expect(
+        service.insertRecord(userId, 'types_test', {
+          bool_field: 'false',
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('❌ boolean: "invalid" (string) deve falhar', async () => {
+      console.log('    ✓ Teste: ❌ boolean: "invalid" (string) deve falhar');
+      await expectErrorCode(
+        service.insertRecord(userId, 'types_test', {
+          bool_field: 'invalid',
         }),
         'INVALID_FIELD_TYPE',
       );

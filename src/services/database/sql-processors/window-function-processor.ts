@@ -11,11 +11,23 @@ export interface WindowFunction {
     | 'AVG'
     | 'COUNT'
     | 'MIN'
-    | 'MAX';
-  field?: string; // Campo para agregações (SUM, AVG, etc)
+    | 'MAX'
+    | 'LEAD'
+    | 'LAG'
+    | 'FIRST_VALUE'
+    | 'LAST_VALUE'
+    | 'NTH_VALUE'
+    | 'NTILE'
+    | 'CUME_DIST'
+    | 'PERCENT_RANK';
+  field?: string; // Campo para agregações/LAG/LEAD/etc
   alias: string;
   partitionBy?: string[]; // PARTITION BY columns
   orderBy?: Array<{ field: string; order: 'ASC' | 'DESC' }>;
+  offset?: number; // Para LEAD/LAG
+  defaultValue?: any; // Para LEAD/LAG
+  nth?: number; // Para NTH_VALUE
+  buckets?: number; // Para NTILE
 }
 
 export class WindowFunctionProcessor {
@@ -170,6 +182,50 @@ export class WindowFunctionProcessor {
         this.applyRunningMinMax(partitionRecords, wf.alias, wf.field!, 'MAX');
         break;
 
+      case 'LEAD':
+        this.applyLead(
+          partitionRecords,
+          wf.alias,
+          wf.field!,
+          wf.offset || 1,
+          wf.defaultValue,
+        );
+        break;
+
+      case 'LAG':
+        this.applyLag(
+          partitionRecords,
+          wf.alias,
+          wf.field!,
+          wf.offset || 1,
+          wf.defaultValue,
+        );
+        break;
+
+      case 'FIRST_VALUE':
+        this.applyFirstValue(partitionRecords, wf.alias, wf.field!);
+        break;
+
+      case 'LAST_VALUE':
+        this.applyLastValue(partitionRecords, wf.alias, wf.field!);
+        break;
+
+      case 'NTH_VALUE':
+        this.applyNthValue(partitionRecords, wf.alias, wf.field!, wf.nth ?? 1);
+        break;
+
+      case 'NTILE':
+        this.applyNtile(partitionRecords, wf.alias, wf.buckets ?? 4);
+        break;
+
+      case 'CUME_DIST':
+        this.applyCumeDist(partitionRecords, wf.alias, wf.orderBy || []);
+        break;
+
+      case 'PERCENT_RANK':
+        this.applyPercentRank(partitionRecords, wf.alias, wf.orderBy || []);
+        break;
+
       default:
         throw new Error(`Unsupported window function: ${wf.function}`);
     }
@@ -279,6 +335,187 @@ export class WindowFunctionProcessor {
     records.forEach((record) => {
       record[alias] = result;
     });
+  }
+
+  /**
+   * LEAD() - Valor de N linhas à frente
+   */
+  private applyLead(
+    records: any[],
+    alias: string,
+    field: string,
+    offset: number,
+    defaultValue: any = null,
+  ): void {
+    records.forEach((record, index) => {
+      const targetIndex = index + offset;
+      if (targetIndex < records.length) {
+        record[alias] = records[targetIndex][field];
+      } else {
+        record[alias] = defaultValue;
+      }
+    });
+  }
+
+  /**
+   * LAG() - Valor de N linhas atrás
+   */
+  private applyLag(
+    records: any[],
+    alias: string,
+    field: string,
+    offset: number,
+    defaultValue: any = null,
+  ): void {
+    records.forEach((record, index) => {
+      const targetIndex = index - offset;
+      if (targetIndex >= 0) {
+        record[alias] = records[targetIndex][field];
+      } else {
+        record[alias] = defaultValue;
+      }
+    });
+  }
+
+  /**
+   * FIRST_VALUE() - Primeiro valor da janela
+   */
+  private applyFirstValue(records: any[], alias: string, field: string): void {
+    const firstValue = records.length > 0 ? records[0][field] : null;
+    records.forEach((record) => {
+      record[alias] = firstValue;
+    });
+  }
+
+  /**
+   * LAST_VALUE() - Último valor da janela
+   */
+  private applyLastValue(records: any[], alias: string, field: string): void {
+    const lastValue =
+      records.length > 0 ? records[records.length - 1][field] : null;
+    records.forEach((record) => {
+      record[alias] = lastValue;
+    });
+  }
+
+  /**
+   * NTH_VALUE() - N-ésimo valor da janela
+   */
+  private applyNthValue(
+    records: any[],
+    alias: string,
+    field: string,
+    nth: number,
+  ): void {
+    const nthValue =
+      nth > 0 && nth <= records.length ? records[nth - 1][field] : null;
+    records.forEach((record) => {
+      record[alias] = nthValue;
+    });
+  }
+
+  /**
+   * NTILE() - Dividir em N grupos (buckets)
+   */
+  private applyNtile(records: any[], alias: string, buckets: number): void {
+    const totalRecords = records.length;
+    const bucketSize = Math.ceil(totalRecords / buckets);
+
+    records.forEach((record, index) => {
+      const bucket = Math.min(Math.floor(index / bucketSize) + 1, buckets);
+      record[alias] = bucket;
+    });
+  }
+
+  /**
+   * CUME_DIST() - Distribuição cumulativa (0 a 1)
+   */
+  private applyCumeDist(
+    records: any[],
+    alias: string,
+    orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
+  ): void {
+    const totalRecords = records.length;
+
+    records.forEach((record, index) => {
+      // Número de linhas com valor <= valor atual
+      const currentValues = orderBy.map((o) => record[o.field]);
+      let countLessOrEqual = 0;
+
+      for (let i = 0; i < records.length; i++) {
+        const compareValues = orderBy.map((o) => records[i][o.field]);
+        const comparison = this.compareValues(
+          currentValues,
+          compareValues,
+          orderBy,
+        );
+        if (comparison >= 0) {
+          // currentValues >= compareValues
+          countLessOrEqual++;
+        }
+      }
+
+      record[alias] = totalRecords > 0 ? countLessOrEqual / totalRecords : 0;
+    });
+  }
+
+  /**
+   * PERCENT_RANK() - Rank percentual (0 a 1)
+   */
+  private applyPercentRank(
+    records: any[],
+    alias: string,
+    orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
+  ): void {
+    const totalRecords = records.length;
+
+    if (totalRecords <= 1) {
+      records.forEach((record) => {
+        record[alias] = 0;
+      });
+      return;
+    }
+
+    // Primeiro, aplicar RANK
+    let currentRank = 1;
+    let previousValues: any[] = [];
+    const ranks: number[] = [];
+
+    records.forEach((record, index) => {
+      const currentValues = orderBy.map((o) => record[o.field]);
+
+      if (index > 0 && !this.arraysEqual(currentValues, previousValues)) {
+        currentRank = index + 1;
+      }
+
+      ranks.push(currentRank);
+      previousValues = currentValues;
+    });
+
+    // Calcular PERCENT_RANK = (rank - 1) / (total_rows - 1)
+    records.forEach((record, index) => {
+      record[alias] = (ranks[index] - 1) / (totalRecords - 1);
+    });
+  }
+
+  /**
+   * Compara valores considerando ORDER BY
+   */
+  private compareValues(
+    a: any[],
+    b: any[],
+    orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
+  ): number {
+    for (let i = 0; i < a.length; i++) {
+      const aVal = a[i];
+      const bVal = b[i];
+
+      if (aVal === bVal) continue;
+
+      const comparison = aVal < bVal ? -1 : 1;
+      return orderBy[i].order === 'ASC' ? comparison : -comparison;
+    }
+    return 0;
   }
 
   /**
