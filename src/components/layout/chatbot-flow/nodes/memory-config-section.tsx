@@ -59,7 +59,7 @@ export function MemoryConfigSection({
 
   return (
     <div className="border-t pt-4 mt-4">
-      <div className="space-y-4 p-4 rounded-lg bg-gray-50">
+      <div className="space-y-4 p-4 rounded-lg bg-gray-50/40">
         <Typography variant="h5" className="font-semibold mb-3">
           🧠 Configurações de Memória (Opcional)
         </Typography>
@@ -160,7 +160,7 @@ export function MemoryConfigSection({
                     {memoryItems.map((item, index) => (
                       <div
                         key={index}
-                        className="flex gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200 items-center"
+                        className="flex gap-2 p-3 bg-gray-50/40 rounded-lg border border-gray-200 items-center"
                       >
                         <div className="flex-1 space-y-2">
                           <Input

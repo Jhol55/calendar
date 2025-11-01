@@ -1286,7 +1286,7 @@ function MessageFormFields({
             </div>
 
             {/* Rastreamento */}
-            <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
+            <div className="space-y-3 p-3 bg-gray-50/40 rounded-lg">
               <Typography variant="span" className="text-sm font-medium">
                 Rastreamento
               </Typography>
@@ -2424,7 +2424,7 @@ function MessageFormFields({
             </div>
 
             {/* Checkboxes de leitura */}
-            <div className="space-y-2 p-3 bg-gray-50 rounded-lg">
+            <div className="space-y-2 p-3 bg-gray-50/40 rounded-lg">
               <div className="flex items-center gap-2">
                 <Input
                   type="checkbox"

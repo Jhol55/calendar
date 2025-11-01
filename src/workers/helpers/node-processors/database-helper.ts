@@ -463,7 +463,35 @@ function resolveVariables(
   context: ExecutionContext,
 ): any {
   if (typeof obj === 'string') {
-    return resolveString(obj, input, context);
+    const resolvedString = resolveString(obj, input, context);
+
+    // Tentar fazer parse de strings JSON (arrays e objetos)
+    if (
+      typeof resolvedString === 'string' &&
+      resolvedString.trim().length > 0
+    ) {
+      const trimmed = resolvedString.trim();
+      // Detectar se é um JSON válido (array ou object)
+      if (
+        (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+        (trimmed.startsWith('{') && trimmed.endsWith('}'))
+      ) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          // Só retornar o parsed se for realmente um array ou object
+          if (
+            Array.isArray(parsed) ||
+            (typeof parsed === 'object' && parsed !== null)
+          ) {
+            return parsed;
+          }
+        } catch {
+          // Se falhar o parse, retornar a string original
+        }
+      }
+    }
+
+    return resolvedString;
   }
 
   if (Array.isArray(obj)) {

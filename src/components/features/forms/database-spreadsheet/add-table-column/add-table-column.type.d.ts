@@ -10,4 +10,5 @@ export interface Column {
   type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
   required: boolean;
   default: string;
+  unique?: boolean;
 }

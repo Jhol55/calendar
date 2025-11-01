@@ -90,7 +90,7 @@ function WebhookNodeComponent({ data, selected }: NodeProps<NodeData>) {
 
         {/* Só mostrar URL se for Manual */}
         {webhookConfig?.serviceType === 'manual' && (
-          <div className="mt-3 bg-gray-50 p-2 rounded border border-gray-200">
+          <div className="mt-3 bg-gray-50/40 p-2 rounded border border-gray-200">
             <div className="flex items-center justify-between mb-1">
               <Typography variant="span" className="text-xs text-gray-700">
                 URL:

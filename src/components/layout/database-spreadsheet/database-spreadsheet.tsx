@@ -24,6 +24,8 @@ import {
   reorderColumns,
   renameTable,
   deleteTable,
+  checkDuplicatesForUniqueColumn,
+  removeDuplicates,
 } from '@/actions/database/operations';
 import { CreateTableDialog } from '../../features/forms/database-spreadsheet/create-database-table/create-database-table';
 import { AddColumnDialog } from '../../features/forms/database-spreadsheet/add-table-column/add-table-column';
@@ -52,6 +54,7 @@ interface TableSchema {
     type: string;
     default: unknown;
     required: boolean;
+    unique?: boolean;
   }>;
 }
 
@@ -88,6 +91,7 @@ export function DatabaseSpreadsheet({
       type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
       required: boolean;
       default: string;
+      unique?: boolean;
     }>;
     columnDeletions: Array<string>;
     columnReorder: boolean;
@@ -132,8 +136,14 @@ export function DatabaseSpreadsheet({
     type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
     required: boolean;
     default: string;
+    unique?: boolean;
   } | null>(null);
   const [showDeleteColumnDialog, setShowDeleteColumnDialog] = useState(false);
+  const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
+  const [duplicatesData, setDuplicatesData] = useState<{
+    columnName: string;
+    duplicates: Array<{ value: any; count: number; ids: string[] }>;
+  } | null>(null);
   const [deletingColumn, setDeletingColumn] = useState<string>('');
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -407,6 +417,7 @@ export function DatabaseSpreadsheet({
             type: metadata.type,
             required: metadata.required,
             default: metadata.default,
+            unique: metadata.unique,
           },
         );
         if (!response.success) {
@@ -449,6 +460,7 @@ export function DatabaseSpreadsheet({
         );
         if (!response.success) {
           console.error('Erro ao atualizar célula:', response.message);
+          alert(`Erro ao atualizar célula: ${response.message}`);
         }
       }
 
@@ -457,6 +469,7 @@ export function DatabaseSpreadsheet({
         const response = await addRow(selectedTable, addition);
         if (!response.success) {
           console.error('Erro ao adicionar linha:', response.message);
+          alert(`Erro ao adicionar linha: ${response.message}`);
         }
       }
 
@@ -812,6 +825,7 @@ export function DatabaseSpreadsheet({
     type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
     required: boolean;
     default: string;
+    unique?: boolean;
   }) => {
     if (!editingColumnData) return;
 
@@ -827,6 +841,33 @@ export function DatabaseSpreadsheet({
       if (columnExists) {
         alert('Já existe uma coluna com esse nome');
         throw new Error('Já existe uma coluna com esse nome');
+      }
+    }
+
+    // Se ativou UNIQUE, verificar duplicatas
+    const wasUnique = (editingColumnData as any).unique || false;
+    const isNowUnique = updatedColumn.unique || false;
+
+    if (isNowUnique && !wasUnique) {
+      const response = await checkDuplicatesForUniqueColumn(
+        selectedTable,
+        oldName,
+      );
+
+      if (
+        response.success &&
+        response.data &&
+        (response.data as any[]).length > 0
+      ) {
+        // Mostrar modal de confirmação
+        setDuplicatesData({
+          columnName: oldName,
+          duplicates: response.data as any[],
+        });
+        setShowDuplicatesDialog(true);
+        // Guardar updatedColumn temporariamente para usar após confirmação
+        (window as any).__pendingColumnUpdate = updatedColumn;
+        return; // Aguardar decisão do usuário
       }
     }
 
@@ -854,11 +895,13 @@ export function DatabaseSpreadsheet({
       }
     }
 
-    // Se tipo, required ou default mudaram, adicionar/atualizar metadados
+    // Se tipo, required, default ou unique mudaram, adicionar/atualizar metadados
     if (
       updatedColumn.type !== editingColumnData.type ||
       updatedColumn.required !== editingColumnData.required ||
-      updatedColumn.default !== editingColumnData.default
+      updatedColumn.default !== editingColumnData.default ||
+      (updatedColumn.unique || false) !==
+        ((editingColumnData as any).unique || false)
     ) {
       const existingMetadataIndex =
         pendingChanges.columnMetadataUpdates.findIndex(
@@ -870,6 +913,7 @@ export function DatabaseSpreadsheet({
         type: updatedColumn.type,
         required: updatedColumn.required,
         default: updatedColumn.default,
+        unique: updatedColumn.unique,
       };
 
       if (existingMetadataIndex >= 0) {
@@ -901,6 +945,7 @@ export function DatabaseSpreadsheet({
                 type: updatedColumn.type,
                 required: updatedColumn.required,
                 default: updatedColumn.default,
+                unique: updatedColumn.unique,
               }
             : col,
         ),
@@ -911,6 +956,47 @@ export function DatabaseSpreadsheet({
     setHasUnsavedChanges(true);
     setShowEditColumnDialog(false);
     setEditingColumnData(null);
+  };
+
+  // Handler para remover duplicatas ao ativar UNIQUE
+  const handleRemoveDuplicates = async () => {
+    if (!duplicatesData) return;
+
+    // Manter apenas o primeiro ID de cada grupo, remover os demais
+    const idsToRemove: string[] = [];
+
+    for (const dup of duplicatesData.duplicates) {
+      idsToRemove.push(...dup.ids.slice(1)); // Remove todos exceto o primeiro
+    }
+
+    const response = await removeDuplicates(
+      selectedTable,
+      duplicatesData.columnName,
+      idsToRemove,
+    );
+
+    if (response.success) {
+      // Continuar com a atualização da coluna
+      const pendingUpdate = (window as any).__pendingColumnUpdate;
+      if (pendingUpdate) {
+        delete (window as any).__pendingColumnUpdate;
+        // Chamar handleEditColumn novamente, mas agora sem duplicatas
+        await handleEditColumn(pendingUpdate);
+      }
+
+      await loadTableData();
+      setShowDuplicatesDialog(false);
+      setDuplicatesData(null);
+    } else {
+      alert(`Erro ao remover duplicatas: ${response.message}`);
+    }
+  };
+
+  // Handler para cancelar remoção de duplicatas
+  const handleCancelRemoveDuplicates = () => {
+    setShowDuplicatesDialog(false);
+    setDuplicatesData(null);
+    delete (window as any).__pendingColumnUpdate;
   };
 
   // Funções de drag and drop
@@ -1440,6 +1526,7 @@ export function DatabaseSpreadsheet({
                                     | 'object',
                                   required: column.required,
                                   default: String(column.default || ''),
+                                  unique: (column as any).unique || false,
                                 });
                                 setShowEditColumnDialog(true);
                               }
@@ -1906,6 +1993,71 @@ export function DatabaseSpreadsheet({
         tableName={deletingTable}
         onConfirm={handleDeleteTable}
       />
+
+      {/* Modal de Duplicatas */}
+      <Dialog
+        open={showDuplicatesDialog}
+        onOpenChange={setShowDuplicatesDialog}
+      >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
+            <Typography variant="h3" className="mb-4">
+              Duplicatas Encontradas
+            </Typography>
+
+            {duplicatesData && (
+              <>
+                <Typography className="mb-4">
+                  A coluna <strong>{duplicatesData.columnName}</strong> contém
+                  valores duplicados. Para ativar o constraint UNIQUE, os
+                  registros duplicados precisam ser removidos.
+                </Typography>
+
+                <div className="mb-4 p-4 bg-gray-50/40 rounded max-h-60 overflow-auto">
+                  {duplicatesData.duplicates.map((dup, index) => (
+                    <div
+                      key={index}
+                      className="mb-3 pb-3 border-b last:border-b-0"
+                    >
+                      <Typography className="font-semibold">
+                        Valor: {String(dup.value)}
+                      </Typography>
+                      <Typography className="text-sm text-gray-600">
+                        {dup.count} registros com este valor (será mantido
+                        apenas 1, removendo {dup.count - 1})
+                      </Typography>
+                    </div>
+                  ))}
+                </div>
+
+                <Typography className="mb-6 text-sm text-gray-600">
+                  <strong>Total:</strong>{' '}
+                  {duplicatesData.duplicates.reduce(
+                    (sum, d) => sum + (d.count - 1),
+                    0,
+                  )}{' '}
+                  registros serão removidos
+                </Typography>
+
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelRemoveDuplicates}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleRemoveDuplicates}
+                  >
+                    Remover Duplicatas e Ativar UNIQUE
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </Dialog>
     </>
   );
 }

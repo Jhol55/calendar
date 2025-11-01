@@ -290,6 +290,7 @@ export interface ColumnDefinition {
   type: ColumnType;
   required?: boolean;
   default?: any;
+  unique?: boolean;
 }
 
 export interface FilterRule {

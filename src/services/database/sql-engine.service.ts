@@ -1308,11 +1308,15 @@ export class SqlEngine {
         }
 
         const isRequired = colDef.nullable?.type === 'not null';
+        // O parser coloca UNIQUE em colDef.unique (não em unique_or_primary)
+        const isUnique =
+          colDef.unique === 'unique' || colDef.unique_or_primary === 'unique';
 
         columns.push({
           name: columnName,
           type: columnType,
           required: isRequired,
+          unique: isUnique,
           default: colDef.default_val?.value?.value || '',
         });
       }
@@ -1931,9 +1935,7 @@ export class SqlEngine {
    * Busca recursivamente por funções de agregação em uma expressão
    * (pode estar aninhada dentro de ROUND, etc)
    */
-  private findAggregateInExpression(
-    expr: any,
-  ): {
+  private findAggregateInExpression(expr: any): {
     function: string;
     field?: string;
     separator?: string;

@@ -327,7 +327,7 @@ export function ExecutionsPanel({
                     <Typography variant="h5" className="mb-2">
                       Informações
                     </Typography>
-                    <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
+                    <div className="bg-gray-50/40 p-3 rounded-lg space-y-1 text-sm">
                       <div>
                         <strong>ID:</strong> {selectedExecution.id}
                       </div>
@@ -357,7 +357,7 @@ export function ExecutionsPanel({
                       <Typography variant="h5" className="mb-2">
                         Dados de Entrada
                       </Typography>
-                      <pre className="bg-gray-50 p-3 rounded-lg text-xs overflow-x-auto">
+                      <pre className="bg-gray-50/40 p-3 rounded-lg text-xs overflow-x-auto">
                         {JSON.stringify(selectedExecution.data, null, 2)}
                       </pre>
                     </div>
@@ -369,7 +369,7 @@ export function ExecutionsPanel({
                       <Typography variant="h5" className="mb-2">
                         Resultado
                       </Typography>
-                      <pre className="bg-gray-50 p-3 rounded-lg text-xs overflow-x-auto">
+                      <pre className="bg-gray-50/40 p-3 rounded-lg text-xs overflow-x-auto">
                         {JSON.stringify(selectedExecution.result, null, 2)}
                       </pre>
                     </div>
@@ -393,7 +393,7 @@ export function ExecutionsPanel({
                       <Typography variant="h5" className="mb-2">
                         Execução dos Nós
                       </Typography>
-                      <pre className="bg-gray-50 p-3 rounded-lg text-xs overflow-x-auto">
+                      <pre className="bg-gray-50/40 p-3 rounded-lg text-xs overflow-x-auto">
                         {JSON.stringify(
                           selectedExecution.nodeExecutions,
                           null,

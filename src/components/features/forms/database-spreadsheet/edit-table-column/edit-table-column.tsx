@@ -77,6 +77,7 @@ function FormContent({
       setValue('column_name', columnData.name);
       setValue('column_type', columnData.type);
       setValue('column_required', columnData.required);
+      setValue('column_unique', columnData.unique || false);
       setValue('column_default', columnData.default);
     }, 100);
   }, [columnData, setValue]);
@@ -148,6 +149,25 @@ function FormContent({
         </div>
         <Typography variant="span" className="text-xs text-neutral-500 -mt-2">
           Se marcado, este campo não pode ficar vazio
+        </Typography>
+
+        {/* Valor único (UNIQUE) */}
+        <div className="flex items-center gap-2">
+          <Input
+            type="checkbox"
+            fieldName="column_unique"
+            checked={columnData.unique || false}
+            onChange={(e) => updateColumn('unique', e.target.checked)}
+            className="bg-neutral-200"
+          />
+          <FormControl variant="label">
+            <Typography variant="span" className="text-sm cursor-pointer">
+              Valor único (UNIQUE)
+            </Typography>
+          </FormControl>
+        </div>
+        <Typography variant="span" className="text-xs text-neutral-500 -mt-2">
+          Garante que não haja valores duplicados nesta coluna
         </Typography>
 
         {/* Valor padrão */}

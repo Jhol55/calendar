@@ -90,7 +90,7 @@ function DatabaseNodeComponent({ data, selected }: NodeProps<NodeData>) {
           </div>
         )}
 
-        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded line-clamp-2">
+        <div className="text-xs text-gray-600 bg-gray-50/40 p-2 rounded line-clamp-2">
           {getPreviewContent()}
         </div>
       </div>

@@ -94,7 +94,7 @@ function MessageNodeComponent({ data, selected }: NodeProps<NodeData>) {
           </div>
         )}
 
-        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded line-clamp-3">
+        <div className="text-xs text-gray-600 bg-gray-50/40 p-2 rounded line-clamp-3">
           {getPreviewContent()}
         </div>
       </div>

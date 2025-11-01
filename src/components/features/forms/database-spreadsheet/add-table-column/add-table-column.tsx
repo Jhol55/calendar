@@ -48,7 +48,7 @@ function AddColumnForm({
     const newIndex = columns.length;
     setColumns([
       ...columns,
-      { name: '', type: 'string', required: false, default: '' },
+      { name: '', type: 'string', required: false, default: '', unique: false },
     ]);
     // Expandir a nova coluna automaticamente
     setExpandedColumns((prev) => new Set([...Array.from(prev), newIndex]));
@@ -94,7 +94,15 @@ function AddColumnForm({
     try {
       await onSubmit(validColumns);
       // Reset form
-      setColumns([{ name: '', type: 'string', required: false, default: '' }]);
+      setColumns([
+        {
+          name: '',
+          type: 'string',
+          required: false,
+          default: '',
+          unique: false,
+        },
+      ]);
       setExpandedColumns(new Set([0]));
       onClose();
     } catch (error) {
@@ -280,6 +288,24 @@ function FormContent({
                       </div>
                     </div>
 
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="checkbox"
+                          fieldName={`column_unique_${index}`}
+                          checked={column.unique || false}
+                          onChange={(e) =>
+                            updateColumn(index, 'unique', e.target.checked)
+                          }
+                        />
+                        <FormControl variant="label">
+                          <Typography variant="span" className="text-sm">
+                            Valor único (UNIQUE)
+                          </Typography>
+                        </FormControl>
+                      </div>
+                    </div>
+
                     <div>
                       <FormControl variant="label">
                         <Typography variant="span" className="text-sm">
@@ -324,7 +350,7 @@ export function AddColumnDialog({
   tableName,
 }: AddColumnDialogProps) {
   const [columns, setColumns] = useState<Column[]>([
-    { name: '', type: 'string', required: false, default: '' },
+    { name: '', type: 'string', required: false, default: '', unique: false },
   ]);
 
   // Estado para controlar quais colunas estão expandidas

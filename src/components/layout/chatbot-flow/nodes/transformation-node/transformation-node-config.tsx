@@ -286,7 +286,7 @@ function TransformationFormFields({
           {steps.map((step, index) => (
             <div
               key={step.id}
-              className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+              className="p-3 bg-gray-50/40 rounded-lg border border-gray-200"
             >
               <div className="flex items-center justify-between">
                 <Typography variant="span" className="font-medium text-sm">

@@ -945,6 +945,14 @@ export class DatabaseService {
               ...convertedRecord,
             };
 
+            // 4.1. Validar constraints UNIQUE (após ter _id gerado)
+            await this.validateUniqueConstraints(
+              tableName,
+              userId,
+              newRecordData,
+              schema,
+            );
+
             // 5. Adiciona na partição (ainda dentro da transaction)
             const currentData = partition.data as DatabaseRecord[];
             const updatedData = [...currentData, newRecordData];
@@ -1183,6 +1191,12 @@ export class DatabaseService {
           let totalUpdated = 0;
           const updatedRecords: DatabaseRecord[] = [];
 
+          // Obter schema para validação de UNIQUE
+          const schema =
+            partitions.length > 0
+              ? (partitions[0].schema as unknown as TableSchema)
+              : null;
+
           // Atualiza em cada partição
           for (const partition of partitions) {
             let records = partition.data as DatabaseRecord[];
@@ -1190,20 +1204,33 @@ export class DatabaseService {
             const currentCount = partition.recordCount;
 
             // Filtra e atualiza registros que atendem condições
-            records = records.map((record) => {
-              if (this.matchesFilters(record, filters)) {
-                modified = true;
-                totalUpdated++;
-                const updatedRecord = {
-                  ...record,
-                  ...convertedUpdates,
-                  _updatedAt: new Date().toISOString(),
-                };
-                updatedRecords.push(updatedRecord);
-                return updatedRecord;
-              }
-              return record;
-            });
+            records = await Promise.all(
+              records.map(async (record) => {
+                if (this.matchesFilters(record, filters)) {
+                  // Validar UNIQUE antes de aplicar update
+                  if (schema) {
+                    await this.validateUniqueConstraints(
+                      tableName,
+                      userId,
+                      { ...record, ...convertedUpdates },
+                      schema,
+                      record._id, // excludeRecordId
+                    );
+                  }
+
+                  modified = true;
+                  totalUpdated++;
+                  const updatedRecord = {
+                    ...record,
+                    ...convertedUpdates,
+                    _updatedAt: new Date().toISOString(),
+                  };
+                  updatedRecords.push(updatedRecord);
+                  return updatedRecord;
+                }
+                return record;
+              }),
+            );
 
             // Salva apenas se houve mudança (com optimistic locking)
             if (modified) {
@@ -1456,6 +1483,97 @@ export class DatabaseService {
         }
       }
     }
+  }
+
+  /**
+   * Valida constraints UNIQUE em todas as partições
+   * Lança erro se encontrar valor duplicado
+   */
+  private async validateUniqueConstraints(
+    tableName: string,
+    userId: string,
+    record: Record<string, any>,
+    schema: TableSchema,
+    excludeRecordId?: string,
+  ): Promise<void> {
+    const uniqueColumns = schema.columns.filter((col) => col.unique);
+
+    if (uniqueColumns.length === 0) {
+      return;
+    }
+
+    // Buscar em todas as partições de forma otimizada
+    const partitions = await prisma.dataTable.findMany({
+      where: {
+        userId,
+        tableName,
+      },
+      select: {
+        data: true,
+      },
+    });
+
+    for (const uniqueCol of uniqueColumns) {
+      const value = record[uniqueCol.name];
+
+      // Skip se valor é null/undefined (permitido para unique, padrão SQL)
+      if (value === null || value === undefined) continue;
+
+      // Buscar duplicatas em todas as partições
+      for (const partition of partitions) {
+        const records = partition.data as DatabaseRecord[];
+
+        for (const existing of records) {
+          // Skip se for o mesmo registro (caso de update)
+          if (excludeRecordId && existing._id === excludeRecordId) {
+            continue;
+          }
+
+          if (existing[uniqueCol.name] === value) {
+            throw this.createError(
+              'UNIQUE_CONSTRAINT_VIOLATION',
+              `O valor "${value}" já existe na coluna "${uniqueCol.name}". Esta coluna requer valores únicos.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Encontra duplicatas existentes em uma coluna
+   * Usado ao ativar constraint UNIQUE em coluna existente
+   */
+  async findDuplicatesForUniqueColumn(
+    userId: string,
+    tableName: string,
+    columnName: string,
+  ): Promise<Array<{ value: any; count: number; ids: string[] }>> {
+    const partitions = await prisma.dataTable.findMany({
+      where: { userId, tableName },
+      select: { data: true },
+    });
+
+    const valueMap = new Map<any, { count: number; ids: string[] }>();
+
+    for (const partition of partitions) {
+      const records = partition.data as DatabaseRecord[];
+
+      for (const record of records) {
+        const value = record[columnName];
+
+        if (value !== null && value !== undefined) {
+          const existing = valueMap.get(value) || { count: 0, ids: [] };
+          existing.count++;
+          existing.ids.push(record._id);
+          valueMap.set(value, existing);
+        }
+      }
+    }
+
+    return Array.from(valueMap.entries())
+      .filter(([, data]) => data.count > 1)
+      .map(([value, data]) => ({ value, ...data }));
   }
 
   private validateFilterTypes(

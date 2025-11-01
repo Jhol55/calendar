@@ -325,7 +325,7 @@ function ObjectEditor({
           </Typography>
         </FormControl>
 
-        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="p-4 bg-gray-50/40 rounded-lg border border-gray-200">
           <div className="flex items-center justify-between">
             <Typography variant="span" className="text-sm text-neutral-600">
               {pairCount === 0
@@ -424,7 +424,7 @@ function ArrayEditor({
           </Typography>
         </FormControl>
 
-        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="p-4 bg-gray-50/40 rounded-lg border border-gray-200">
           <div className="flex items-center justify-between">
             <Typography variant="span" className="text-sm text-neutral-600">
               {nestedArray.length === 0
@@ -768,7 +768,7 @@ function FormContent({
                 )}
 
                 {item.type === 'null' && (
-                  <div className="text-center py-4 text-neutral-500 bg-gray-50 rounded border border-dashed">
+                  <div className="text-center py-4 text-neutral-500 bg-gray-50/40 rounded border border-dashed">
                     <Typography variant="span" className="text-sm">
                       Este valor será <strong>null</strong> (vazio)
                     </Typography>

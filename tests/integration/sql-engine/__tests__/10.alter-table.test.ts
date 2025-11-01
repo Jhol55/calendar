@@ -401,4 +401,257 @@ describe('SQL Engine - ALTER TABLE', () => {
       }
     });
   });
+
+  // ============================================
+  // 10.11. CREATE TABLE with UNIQUE
+  // ============================================
+  describe('CREATE TABLE with UNIQUE', () => {
+    console.log('  📂 Grupo: CREATE TABLE with UNIQUE');
+
+    it('✅ Query 1: CREATE TABLE com coluna UNIQUE', async () => {
+      console.log('    ✓ Teste: ✅ Query 1: CREATE TABLE com coluna UNIQUE');
+
+      const { userId, cleanup } = await setupTestUser();
+      try {
+        await executeSql(
+          userId,
+          `CREATE TABLE users (
+            id INT,
+            email VARCHAR(255) UNIQUE,
+            username VARCHAR(100) UNIQUE,
+            age INT
+          )`,
+        );
+
+        // Inserir primeiro registro
+        await executeSql(
+          userId,
+          `INSERT INTO users VALUES (1, 'test@example.com', 'testuser', 25)`,
+        );
+
+        const records = await getAllRecords(userId, 'users');
+        expect(records).toHaveLength(1);
+        expect(records[0].email).toBe('test@example.com');
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('❌ Query 2: INSERT deve falhar com valor UNIQUE duplicado', async () => {
+      console.log(
+        '    ✓ Teste: ❌ Query 2: INSERT deve falhar com valor UNIQUE duplicado',
+      );
+
+      const { userId, cleanup } = await setupTestUser();
+      try {
+        await executeSql(
+          userId,
+          `CREATE TABLE users (
+            id INT,
+            email VARCHAR(255) UNIQUE,
+            username VARCHAR(100)
+          )`,
+        );
+
+        await executeSql(
+          userId,
+          `INSERT INTO users VALUES (1, 'test@example.com', 'user1')`,
+        );
+
+        // Tentar inserir email duplicado
+        await expectSqlError(
+          userId,
+          `INSERT INTO users VALUES (2, 'test@example.com', 'user2')`,
+        );
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('❌ Query 3: UPDATE deve falhar ao criar duplicata UNIQUE', async () => {
+      console.log(
+        '    ✓ Teste: ❌ Query 3: UPDATE deve falhar ao criar duplicata UNIQUE',
+      );
+
+      const { userId, cleanup } = await setupTestUser();
+      try {
+        await executeSql(
+          userId,
+          `CREATE TABLE users (
+            id INT,
+            email VARCHAR(255) UNIQUE,
+            username VARCHAR(100)
+          )`,
+        );
+
+        await executeSql(
+          userId,
+          `INSERT INTO users VALUES (1, 'user1@example.com', 'user1')`,
+        );
+        await executeSql(
+          userId,
+          `INSERT INTO users VALUES (2, 'user2@example.com', 'user2')`,
+        );
+
+        // Tentar atualizar para email duplicado
+        await expectSqlError(
+          userId,
+          `UPDATE users SET email = 'user1@example.com' WHERE username = 'user2'`,
+        );
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('✅ Query 4: NULL permitido em coluna UNIQUE (múltiplos NULLs)', async () => {
+      console.log(
+        '    ✓ Teste: ✅ Query 4: NULL permitido em coluna UNIQUE (múltiplos NULLs)',
+      );
+
+      const { userId, cleanup } = await setupTestUser();
+      try {
+        await executeSql(
+          userId,
+          `CREATE TABLE users (
+            id INT,
+            email VARCHAR(255) UNIQUE,
+            username VARCHAR(100)
+          )`,
+        );
+
+        await executeSql(userId, `INSERT INTO users VALUES (1, NULL, 'user1')`);
+        await executeSql(userId, `INSERT INTO users VALUES (2, NULL, 'user2')`);
+
+        const records = await getAllRecords(userId, 'users');
+        expect(records).toHaveLength(2);
+        expect(records[0].email).toBeNull();
+        expect(records[1].email).toBeNull();
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('✅ Query 5: Valores diferentes permitidos em coluna UNIQUE', async () => {
+      console.log(
+        '    ✓ Teste: ✅ Query 5: Valores diferentes permitidos em coluna UNIQUE',
+      );
+
+      const { userId, cleanup } = await setupTestUser();
+      try {
+        await executeSql(
+          userId,
+          `CREATE TABLE users (
+            id INT,
+            email VARCHAR(255) UNIQUE
+          )`,
+        );
+
+        for (let i = 1; i <= 10; i++) {
+          await executeSql(
+            userId,
+            `INSERT INTO users VALUES (${i}, 'user${i}@example.com')`,
+          );
+        }
+
+        const records = await getAllRecords(userId, 'users');
+        expect(records).toHaveLength(10);
+
+        // Verificar que todos os emails são únicos
+        const emails = records.map((r: any) => r.email);
+        const uniqueEmails = new Set(emails);
+        expect(uniqueEmails.size).toBe(10);
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('✅ Query 6: UPDATE do mesmo registro não viola UNIQUE', async () => {
+      console.log(
+        '    ✓ Teste: ✅ Query 6: UPDATE do mesmo registro não viola UNIQUE',
+      );
+
+      const { userId, cleanup } = await setupTestUser();
+      try {
+        await executeSql(
+          userId,
+          `CREATE TABLE users (
+            id INT,
+            email VARCHAR(255) UNIQUE,
+            age INT
+          )`,
+        );
+
+        await executeSql(
+          userId,
+          `INSERT INTO users VALUES (1, 'test@example.com', 25)`,
+        );
+
+        // Atualizar outro campo, mantendo email igual
+        await executeSql(
+          userId,
+          `UPDATE users SET age = 26 WHERE email = 'test@example.com'`,
+        );
+
+        const records = await getAllRecords(userId, 'users');
+        expect(records).toHaveLength(1);
+        expect(records[0].age).toBe(26);
+        expect(records[0].email).toBe('test@example.com');
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('✅ Query 7: Múltiplas colunas UNIQUE independentes', async () => {
+      console.log(
+        '    ✓ Teste: ✅ Query 7: Múltiplas colunas UNIQUE independentes',
+      );
+
+      const { userId, cleanup } = await setupTestUser();
+      try {
+        await executeSql(
+          userId,
+          `CREATE TABLE users (
+            id INT,
+            email VARCHAR(255) UNIQUE,
+            username VARCHAR(100) UNIQUE,
+            phone VARCHAR(20) UNIQUE
+          )`,
+        );
+
+        await executeSql(
+          userId,
+          `INSERT INTO users VALUES (1, 'user1@example.com', 'user1', '1111111111')`,
+        );
+
+        // Deve falhar se duplicar email
+        await expectSqlError(
+          userId,
+          `INSERT INTO users VALUES (2, 'user1@example.com', 'user2', '2222222222')`,
+        );
+
+        // Deve falhar se duplicar username
+        await expectSqlError(
+          userId,
+          `INSERT INTO users VALUES (3, 'user3@example.com', 'user1', '3333333333')`,
+        );
+
+        // Deve falhar se duplicar phone
+        await expectSqlError(
+          userId,
+          `INSERT INTO users VALUES (4, 'user4@example.com', 'user4', '1111111111')`,
+        );
+
+        // Deve funcionar com todos valores únicos
+        await executeSql(
+          userId,
+          `INSERT INTO users VALUES (5, 'user5@example.com', 'user5', '5555555555')`,
+        );
+
+        const records = await getAllRecords(userId, 'users');
+        expect(records).toHaveLength(2);
+      } finally {
+        await cleanup();
+      }
+    });
+  });
 });

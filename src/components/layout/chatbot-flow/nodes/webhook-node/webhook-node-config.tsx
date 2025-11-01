@@ -247,7 +247,7 @@ function WebhookFormFields({
           )}
 
           {/* Webhook URL com Path Editável */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-4">
+          <div className="bg-gray-50/40 p-4 rounded-lg border border-gray-200 mt-4">
             <FormControl variant="label">URL do Webhook</FormControl>
 
             {/* Campo hidden para sincronizar com form */}

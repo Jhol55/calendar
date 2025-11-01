@@ -203,7 +203,12 @@ export async function updateCell(
     }
 
     const schema = schemaPartition.schema as {
-      columns: Array<{ name: string; type: string }>;
+      columns: Array<{
+        name: string;
+        type: string;
+        unique?: boolean;
+        required?: boolean;
+      }>;
     };
     const columnDef = schema.columns.find((col) => col.name === column);
 
@@ -217,6 +222,34 @@ export async function updateCell(
           code: 400,
         };
       }
+
+      // VALIDAÇÃO DE UNIQUE ANTES DE ATUALIZAR
+      if (columnDef.unique && value && value.trim() !== '') {
+        // Converter o valor para o tipo correto da coluna antes de validar
+        let typedValue: any = value;
+        if (columnDef.type === 'number') {
+          typedValue = Number(value);
+        } else if (columnDef.type === 'boolean') {
+          typedValue = value === 'true' || value === true;
+        }
+
+        // Verificar se já existe outro registro com esse valor
+        for (const record of dataRecords) {
+          const data = record.data as Array<Record<string, unknown>>;
+          for (const row of data) {
+            // Skip o próprio registro que está sendo atualizado
+            if (row._id === rowId) continue;
+
+            if (row[column] === typedValue) {
+              return {
+                success: false,
+                message: `O valor "${value}" já existe na coluna "${column}". Esta coluna requer valores únicos.`,
+                code: 400,
+              };
+            }
+          }
+        }
+      }
     }
 
     // Encontrar a partição que contém o registro
@@ -225,8 +258,18 @@ export async function updateCell(
       const rowIndex = data.findIndex((row) => row._id === rowId);
 
       if (rowIndex !== -1) {
-        // Atualizar o registro
-        data[rowIndex][column] = value;
+        // Converter o valor para o tipo correto da coluna antes de salvar
+        let typedValue: any = value;
+        if (columnDef.type === 'number') {
+          typedValue = value.trim() === '' ? null : Number(value);
+        } else if (columnDef.type === 'boolean') {
+          typedValue = value === 'true' || value === true;
+        } else if (columnDef.type === 'date') {
+          typedValue = value.trim() === '' ? null : value;
+        }
+
+        // Atualizar o registro com o valor tipado
+        data[rowIndex][column] = typedValue;
         data[rowIndex]._updatedAt = new Date().toISOString();
 
         // Salvar de volta no banco
@@ -389,7 +432,12 @@ export async function addRow(
     }
 
     const schema = schemaPartition.schema as {
-      columns: Array<{ name: string; type: string }>;
+      columns: Array<{
+        name: string;
+        type: string;
+        unique?: boolean;
+        required?: boolean;
+      }>;
     };
 
     // VALIDAÇÃO DE TIPOS PARA CADA CAMPO
@@ -404,6 +452,43 @@ export async function addRow(
             message: `Campo "${column.name}": ${validationError}`,
             code: 400,
           };
+        }
+      }
+    }
+
+    // VALIDAÇÃO DE UNIQUE PARA CADA CAMPO
+    for (const column of schema.columns) {
+      if (column.unique) {
+        const value = data[column.name];
+
+        // Skip se valor é null/undefined (permitido para unique)
+        if (
+          value === null ||
+          value === undefined ||
+          String(value).trim() === ''
+        )
+          continue;
+
+        // Converter o valor para o tipo correto da coluna antes de validar
+        let typedValue: any = value;
+        if (column.type === 'number') {
+          typedValue = Number(value);
+        } else if (column.type === 'boolean') {
+          typedValue = value === 'true' || value === true;
+        }
+
+        // Verificar se já existe em todas as partições
+        for (const record of dataRecords) {
+          const existingData = record.data as Array<Record<string, unknown>>;
+          for (const row of existingData) {
+            if (row[column.name] === typedValue) {
+              return {
+                success: false,
+                message: `O valor "${value}" já existe na coluna "${column.name}". Esta coluna requer valores únicos.`,
+                code: 400,
+              };
+            }
+          }
         }
       }
     }
@@ -423,8 +508,25 @@ export async function addRow(
     const currentData =
       (activePartition.data as Array<Record<string, unknown>>) || [];
 
-    // Adicionar novo registro
-    currentData.push(data);
+    // Converter os valores para os tipos corretos antes de adicionar
+    const typedData: Record<string, unknown> = { ...data };
+    for (const column of schema.columns) {
+      const value = typedData[column.name];
+      if (
+        value !== undefined &&
+        value !== null &&
+        String(value).trim() !== ''
+      ) {
+        if (column.type === 'number') {
+          typedData[column.name] = Number(value);
+        } else if (column.type === 'boolean') {
+          typedData[column.name] = value === 'true' || value === true;
+        }
+      }
+    }
+
+    // Adicionar novo registro com valores tipados
+    currentData.push(typedData);
 
     // Verificar se atingiu o limite
     const isFull = currentData.length >= DATABASE_CONFIG.MAX_PARTITION_SIZE;
@@ -730,6 +832,7 @@ export async function updateColumnMetadata(
     type?: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
     required?: boolean;
     default?: unknown;
+    unique?: boolean;
   },
 ): Promise<DatabaseResponse> {
   try {
@@ -795,6 +898,7 @@ export async function updateColumnMetadata(
               ...(metadata.default !== undefined && {
                 default: metadata.default,
               }),
+              ...(metadata.unique !== undefined && { unique: metadata.unique }),
             }
           : col,
       ),
@@ -1270,6 +1374,88 @@ export async function deleteTable(
     return {
       success: false,
       message: 'Erro ao deletar tabela',
+      code: 500,
+    };
+  }
+}
+
+/**
+ * Verifica se há duplicatas em uma coluna
+ * Usado ao ativar constraint UNIQUE
+ */
+export async function checkDuplicatesForUniqueColumn(
+  tableName: string,
+  columnName: string,
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+    if (!userId) {
+      return { success: false, message: 'Unauthorized', code: 401 };
+    }
+
+    const { DatabaseService } = await import(
+      '@/services/database/database.service'
+    );
+    const service = new DatabaseService();
+    const duplicates = await service.findDuplicatesForUniqueColumn(
+      userId,
+      tableName,
+      columnName,
+    );
+
+    return {
+      success: true,
+      data: duplicates,
+      code: 200,
+    };
+  } catch (error) {
+    console.error('Error checking duplicates:', error);
+    return {
+      success: false,
+      message: String(error),
+      code: 500,
+    };
+  }
+}
+
+/**
+ * Remove registros duplicados de uma coluna
+ * Usado ao ativar constraint UNIQUE após confirmação do usuário
+ */
+export async function removeDuplicates(
+  tableName: string,
+  columnName: string,
+  idsToRemove: string[],
+): Promise<DatabaseResponse> {
+  try {
+    const userId = await getUserIdFromSession();
+    if (!userId) {
+      return { success: false, message: 'Unauthorized', code: 401 };
+    }
+
+    const { DatabaseService } = await import(
+      '@/services/database/database.service'
+    );
+    const service = new DatabaseService();
+
+    // Deletar cada ID duplicado
+    for (const id of idsToRemove) {
+      await service.deleteRecords(userId, tableName, {
+        condition: 'AND',
+        rules: [{ field: '_id', operator: 'equals', value: id }],
+      });
+    }
+
+    return {
+      success: true,
+      message: `${idsToRemove.length} registros duplicados removidos`,
+      code: 200,
+    };
+  } catch (error) {
+    console.error('Error removing duplicates:', error);
+    return {
+      success: false,
+      message: String(error),
       code: 500,
     };
   }

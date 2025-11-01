@@ -19,6 +19,7 @@ import {
   getTableData,
 } from '@/actions/database/operations';
 import { CodeiumEditorField } from '@/components/ui/codeium-editor-field';
+import { SmartFieldInput } from './smart-field-input';
 
 interface DatabaseNodeConfigProps {
   isOpen: boolean;
@@ -34,6 +35,15 @@ interface Column {
   type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
   required: boolean;
   default: string;
+  unique?: boolean;
+}
+
+interface TableColumn {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+  required?: boolean;
+  default?: unknown;
+  unique?: boolean;
 }
 
 interface RecordField {
@@ -55,6 +65,9 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
   const [availableTables, setAvailableTables] = useState<string[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [tableColumns, setTableColumns] = useState<string[]>([]);
+  const [tableColumnsSchema, setTableColumnsSchema] = useState<TableColumn[]>(
+    [],
+  );
   const [loadingTables, setLoadingTables] = useState(false);
   const [loadingColumns, setLoadingColumns] = useState(false);
 
@@ -102,6 +115,7 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
     const loadColumns = async () => {
       if (!selectedTable) {
         setTableColumns([]);
+        setTableColumnsSchema([]);
         return;
       }
 
@@ -110,10 +124,12 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
         const response = await getTableData(selectedTable);
         if (response.success && response.data) {
           const data = response.data as {
-            schema?: { columns?: Array<{ name: string }> };
+            schema?: { columns?: Array<TableColumn> };
           };
-          const cols = data.schema?.columns?.map((col) => col.name) || [];
+          const columnsSchema = data.schema?.columns || [];
+          const cols = columnsSchema.map((col) => col.name);
           setTableColumns(cols);
+          setTableColumnsSchema(columnsSchema);
         }
       } catch (error) {
         console.error('Error loading columns:', error);
@@ -165,7 +181,8 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
         if (config.record) {
           const fields = Object.entries(config.record).map(([key, value]) => ({
             key,
-            value: String(value),
+            value:
+              typeof value === 'object' ? JSON.stringify(value) : String(value),
           }));
           setRecordFields(fields);
           setValue('record', JSON.stringify(config.record));
@@ -174,7 +191,8 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
         if (config.updates) {
           const fields = Object.entries(config.updates).map(([key, value]) => ({
             key,
-            value: String(value),
+            value:
+              typeof value === 'object' ? JSON.stringify(value) : String(value),
           }));
           setUpdateFields(fields);
           setValue('updates', JSON.stringify(config.updates));
@@ -243,6 +261,8 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
           if (field.key) {
             setValue(`record_key_${index}`, field.key);
           }
+          // Sincronizar o valor também
+          setValue(`record_value_${index}`, field.value);
         });
       }, 100);
       return () => clearTimeout(timer);
@@ -268,6 +288,8 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
           if (field.key) {
             setValue(`update_key_${index}`, field.key);
           }
+          // Sincronizar o valor também
+          setValue(`update_value_${index}`, field.value);
         });
       }, 100);
       return () => clearTimeout(timer);
@@ -349,6 +371,14 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
       return () => clearTimeout(timer);
     }
   }, [filterCondition, setValue]);
+
+  // Helper para obter o tipo de uma coluna
+  const getColumnType = (
+    columnName: string,
+  ): 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object' => {
+    const column = tableColumnsSchema.find((col) => col.name === columnName);
+    return column?.type || 'string';
+  };
 
   // Funções para gerenciar columns
   const addColumn = () => {
@@ -546,7 +576,7 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
             {columns.map((column, index) => (
               <div
                 key={index}
-                className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2"
+                className="p-3 border border-gray-200 rounded-lg bg-gray-50/40 space-y-2"
               >
                 <div className="flex items-center justify-between mb-2">
                   <Typography variant="span" className="text-sm font-medium">
@@ -719,10 +749,13 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
             {recordFields.map((field, index) => (
               <div
                 key={index}
-                className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2"
+                className="p-3 border border-gray-200 rounded-lg bg-gray-50/40/40 space-y-2"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <Typography variant="span" className="text-sm font-medium">
+                  <Typography
+                    variant="span"
+                    className="text-sm font-medium whitespace-nowrap"
+                  >
                     Campo {index + 1}
                   </Typography>
                   {recordFields.length > 1 && (
@@ -730,7 +763,7 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
                       type="button"
                       variant="ghost"
                       onClick={() => removeRecordField(index)}
-                      className="text-red-500 hover:text-red-700 p-1 h-fit"
+                      className="text-red-500 hover:text-red-700 p-1 h-fit w-fit"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -771,13 +804,13 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
                       Valor *
                     </Typography>
                   </FormControl>
-                  <Input
-                    type="text"
+                  <SmartFieldInput
                     fieldName={`record_value_${index}`}
                     value={field.value}
-                    onChange={(e) =>
-                      updateRecordField(index, 'value', e.target.value)
+                    onChange={(value) =>
+                      updateRecordField(index, 'value', value)
                     }
+                    columnType={getColumnType(field.key)}
                     placeholder="Ex: {{input.name}} ou valor fixo"
                   />
                   <Typography
@@ -840,7 +873,7 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
             {filterRules.map((rule, index) => (
               <div
                 key={index}
-                className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2"
+                className="p-3 border border-gray-200 rounded-lg bg-gray-50/40 space-y-2"
               >
                 <div className="flex items-center justify-between mb-2">
                   <Typography variant="span" className="text-sm font-medium">
@@ -950,7 +983,7 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
             {updateFields.map((field, index) => (
               <div
                 key={index}
-                className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2"
+                className="p-3 border border-gray-200 rounded-lg bg-gray-50/40 space-y-2"
               >
                 <div className="flex items-center justify-between mb-2">
                   <Typography variant="span" className="text-sm font-medium">
@@ -1002,13 +1035,13 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
                       Novo Valor *
                     </Typography>
                   </FormControl>
-                  <Input
-                    type="text"
+                  <SmartFieldInput
                     fieldName={`update_value_${index}`}
                     value={field.value}
-                    onChange={(e) =>
-                      updateUpdateField(index, 'value', e.target.value)
+                    onChange={(value) =>
+                      updateUpdateField(index, 'value', value)
                     }
+                    columnType={getColumnType(field.key)}
                     placeholder="Ex: {{input.newStatus}} ou 'qualified'"
                   />
                   <Typography

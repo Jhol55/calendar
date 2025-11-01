@@ -213,7 +213,7 @@ function HttpRequestFormFields({
           {headers.map((header, index) => (
             <div
               key={index}
-              className="flex gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200 items-center"
+              className="flex gap-2 p-3 bg-gray-50/40 rounded-lg border border-gray-200 items-center"
             >
               <div className="flex-1 space-y-2">
                 <Input
