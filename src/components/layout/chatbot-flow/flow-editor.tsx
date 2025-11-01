@@ -136,10 +136,8 @@ function FlowEditorContent() {
     usePartialExecution();
 
   // Função para remover handlers antes de salvar (para serialização JSON)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const removeExecutionHandlers = useCallback((nodes: any[]) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return nodes.map((node: any) => {
+  const removeExecutionHandlers = useCallback((nodes: Node<NodeData>[]) => {
+    return nodes.map((node) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { onPartialExecute, isNodeExecuting, ...cleanData } = node.data;
       return {
@@ -245,14 +243,12 @@ function FlowEditorContent() {
   // Criar nodeTypes com botão de execução
   const nodeTypes = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return Object.entries(baseNodeTypes).reduce(
+    return Object.entries(baseNodeTypes).reduce<Record<string, any>>(
       (acc, [key, NodeComponent]) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        acc[key] = withExecuteButton(NodeComponent as any);
+        acc[key] = withExecuteButton(NodeComponent);
         return acc;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       },
-      {} as Record<string, any>,
+      {},
     );
   }, []);
 
@@ -265,11 +261,9 @@ function FlowEditorContent() {
   );
 
   // Função para adicionar handlers de execução aos nodes
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const addExecutionHandlers = useCallback(
-    (nodes: any[]) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return nodes.map((node: any) => ({
+    (nodes: Node<NodeData>[]) => {
+      return nodes.map((node) => ({
         ...node,
         data: {
           ...node.data,
@@ -557,13 +551,14 @@ function FlowEditorContent() {
       setTimeout(() => {
         // Garantir que os nodes tenham IDs únicos e válidos
         const processedNodes = (flow.nodes || []).map(
-          (node: Node<NodeData>) => ({
+          (node: Node<NodeData>): Node<NodeData> => ({
             ...node,
             id: node.id || generateNodeId(), // Garantir que tenha ID
+            type: (node.type || node.data?.type) as NodeType,
             data: {
               ...node.data,
               // Garantir que o tipo esteja correto
-              type: node.type || node.data?.type,
+              type: (node.type || node.data?.type) as NodeType,
             },
           }),
         );

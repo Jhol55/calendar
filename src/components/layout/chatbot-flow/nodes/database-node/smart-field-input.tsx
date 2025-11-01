@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { FormSelect } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Typography } from '@/components/ui/typography';
 import { EditArrayDialog } from '@/components/layout/database-spreadsheet/edit-array';
 import { EditObjectDialog } from '@/components/layout/database-spreadsheet/edit-object';
 

@@ -417,11 +417,19 @@ async function processNode(
       if (execution) {
         const nodeExecutions =
           (execution.nodeExecutions as unknown as NodeExecutionsRecord) || {};
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+
         nodeExecutions[node.id] = {
           ...nodeExecutions[node.id],
           status: 'error',
           endTime: new Date().toISOString(),
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: errorMessage,
+          result: {
+            success: false,
+            error: true,
+            message: errorMessage,
+          },
         };
 
         await prisma.flow_executions.update({

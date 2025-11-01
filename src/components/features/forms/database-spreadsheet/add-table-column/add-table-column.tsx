@@ -10,7 +10,6 @@ import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
 import { FormSelect } from '@/components/ui/select';
 import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
-import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { addColumnSchema } from './add-table-column.schema';
 import { AddColumnDialogProps, Column } from './add-table-column.type';
@@ -70,7 +69,7 @@ function AddColumnForm({
     setColumns(newColumns);
   };
 
-  const handleSubmit = async (data: FieldValues) => {
+  const handleSubmit = async () => {
     // Validação manual das colunas
     const validColumns = columns.filter((col) => col.name.trim() !== '');
 
@@ -133,9 +132,7 @@ function AddColumnForm({
 // Componente que usa useForm dentro do Form
 function FormContent({
   columns,
-  setColumns,
   expandedColumns,
-  setExpandedColumns,
   addColumn,
   removeColumn,
   updateColumn,
@@ -367,7 +364,7 @@ export function AddColumnDialog({
     >
       <div className="p-6" style={{ zoom: 0.9 }}>
         <Typography variant="h2" className="whitespace-nowrap truncate mb-6">
-          ➕ Adicionar Colunas à Tabela "{tableName}"
+          ➕ Adicionar Colunas à Tabela &quot;{tableName}&quot;
         </Typography>
 
         <AddColumnForm
