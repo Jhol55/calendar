@@ -659,11 +659,19 @@ async function handleSqlQuery(
   input: any,
   context: Record<string, any>,
 ): Promise<any> {
-  console.log(`🔷 [DATABASE-HELPER] Executing SQL Query for user ${userId}`);
-
   if (!config.sqlQuery) {
     throw new Error('Query SQL não fornecida');
   }
+
+  // Construir variableContext para o SQL Engine
+  // O context pode ter a estrutura { variables: { $nodes, $memory, ... }, ... }
+  // ou diretamente { $nodes, $memory, ... }
+  const variables = context.variables || context;
+
+  const variableContext: Record<string, any> = {
+    input: input || {},
+    ...variables, // Isso inclui $nodes, $memory, etc.
+  };
 
   // Criar instância do SQL Engine com configurações personalizadas
   const sqlEngine = new SqlEngine({
@@ -673,8 +681,12 @@ async function handleSqlQuery(
     ENABLE_COMPLEX_QUERIES: config.enableComplexQueries ?? true,
   });
 
-  // Executar SQL query
-  const result = await sqlEngine.execute(config.sqlQuery, userId, context);
+  // Executar SQL query com o contexto de variáveis
+  const result = await sqlEngine.execute(
+    config.sqlQuery,
+    userId,
+    variableContext,
+  );
 
   if (!result.success) {
     throw new Error(`Erro na execução SQL: ${result.error}`);

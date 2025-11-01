@@ -22,6 +22,73 @@ import type {
 import { DEFAULT_SQL_CONFIG } from './sql-types';
 import { replaceVariables } from '@/workers/helpers/variable-replacer';
 
+/**
+ * Substitui variáveis em SQL garantindo formato válido
+ * Similar ao replaceVariablesInJSON do code-execution-helper, mas formatado para SQL
+ */
+function replaceVariablesInSQL(sqlTemplate: string, context: any): string {
+  return sqlTemplate.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+    try {
+      const cleanPath = path.trim();
+      const parts = cleanPath.split('.');
+
+      let value: any = context;
+      for (const part of parts) {
+        if (value && typeof value === 'object') {
+          // Tentar acessar como índice numérico primeiro (para arrays)
+          const numericIndex = parseInt(part, 10);
+          if (
+            !isNaN(numericIndex) &&
+            Array.isArray(value) &&
+            numericIndex >= 0 &&
+            numericIndex < value.length
+          ) {
+            value = value[numericIndex];
+          } else if (part in value) {
+            value = value[part];
+          } else {
+            // Variável não encontrada - manter original
+            return match;
+          }
+        } else {
+          // Variável não encontrada - manter original
+          return match;
+        }
+      }
+
+      if (value === null) {
+        return 'NULL'; // NULL SQL
+      }
+
+      if (value === undefined) {
+        return match;
+      }
+
+      // Converter baseado no tipo - ADICIONAR ASPAS SIMPLES para SQL
+      if (typeof value === 'string') {
+        // Strings: adicionar aspas simples e escapar aspas internas
+        return `'${value.replace(/'/g, "''")}'`;
+      }
+
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+      }
+
+      // Arrays e Objects: JSON.stringify e adicionar aspas simples para SQL
+      try {
+        const jsonString = JSON.stringify(value);
+        // Escapar aspas simples dentro do JSON
+        const escapedJson = jsonString.replace(/'/g, "''");
+        return `'${escapedJson}'`;
+      } catch {
+        return match;
+      }
+    } catch {
+      return match;
+    }
+  });
+}
+
 export class SqlEngine {
   private parser: Parser;
   private filterTranslator: FilterTranslator;
@@ -153,7 +220,7 @@ export class SqlEngine {
       );
 
       // 1. Resolver variáveis dinâmicas {{...}}
-      const resolvedSql = replaceVariables(sql, variableContext);
+      const resolvedSql = replaceVariablesInSQL(sql, variableContext);
       console.log(`   Resolved SQL: ${resolvedSql.substring(0, 200)}`);
 
       // Validar SQL resolvido vazio

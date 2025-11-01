@@ -22,8 +22,22 @@ export function replaceVariables(text: string, context: any): any {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let value: any = context;
       for (const part of parts) {
-        if (value && typeof value === 'object' && part in value) {
-          value = value[part];
+        if (value && typeof value === 'object') {
+          // Tentar acessar como índice numérico primeiro (para arrays)
+          const numericIndex = parseInt(part, 10);
+          if (
+            !isNaN(numericIndex) &&
+            Array.isArray(value) &&
+            numericIndex >= 0 &&
+            numericIndex < value.length
+          ) {
+            value = value[numericIndex];
+          } else if (part in value) {
+            value = value[part];
+          } else {
+            // Path não existe - marcar como não resolvido
+            return '__UNRESOLVED__' + match;
+          }
         } else {
           // Path não existe - marcar como não resolvido
           return '__UNRESOLVED__' + match;
@@ -39,7 +53,7 @@ export function replaceVariables(text: string, context: any): any {
       }
 
       // Converter para string preservando tipos
-      // - Strings: retornar direto (SEM aspas extras)
+      // - Strings: retornar direto (SEM aspas extras) - cada contexto adiciona aspas se necessário
       // - Numbers/Booleans: converter para string
       // - Arrays/Objects: usar JSON.stringify
       if (typeof value === 'string') {
