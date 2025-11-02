@@ -41,7 +41,9 @@ export function InstanceCard({ instance }: InstanceCardProps) {
   const [qrCode, setQrCode] = useState<string | ''>('');
   const [pairCode, setPairCode] = useState<string | ''>('');
   const [showQrModal, setShowQrModal] = useState(false);
-  const { handleUpdate, instances } = useUser();
+  const { handleUpdate } = useUser();
+  // Este componente recebe a instância como prop, não precisa buscar todas
+  // Removido uso de instances do contexto para evitar buscas desnecessárias
 
   const handleConnect = useCallback(async (token: string) => {
     const response = await connectInstance(token);
@@ -60,7 +62,8 @@ export function InstanceCard({ instance }: InstanceCardProps) {
   useEffect(() => {
     if (instanceStatus === 'connected') return;
 
-    if (!instances.find((inst) => inst.token === instance.token)) return;
+    // Removida verificação de instances.find - não é mais necessária
+    // A instância já é passada como prop
 
     console.log('aqui');
 
@@ -114,7 +117,7 @@ export function InstanceCard({ instance }: InstanceCardProps) {
         clearInterval(intervalId);
       }
     };
-  }, [handleUpdate, instance.token, instanceStatus, instances]);
+  }, [handleUpdate, instance.token, instanceStatus]);
 
   const getStatusText = (status: string) => {
     switch (status.toLowerCase()) {

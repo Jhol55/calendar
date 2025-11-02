@@ -820,6 +820,38 @@ export class DatabaseService {
     await this.verifyTableOwnership(userId, tableName);
     await this.checkRateLimit(userId);
 
+    // Verificar limite de armazenamento antes de inserir
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (user) {
+        const { canUseStorage } = await import(
+          '@/services/subscription/subscription.service'
+        );
+        // Estimar tamanho do registro em MB (JSON stringified)
+        const recordSizeBytes = Buffer.byteLength(
+          JSON.stringify(record),
+          'utf8',
+        );
+        const recordSizeMB = recordSizeBytes / (1024 * 1024);
+        const check = await canUseStorage(user.id, recordSizeMB);
+        if (!check.allowed) {
+          throw this.createError(
+            'STORAGE_LIMIT',
+            check.message || 'Limite de armazenamento atingido',
+          );
+        }
+      }
+    } catch (error: any) {
+      if (error.code === 'STORAGE_LIMIT') {
+        throw error;
+      }
+      // Ignorar outros erros
+    }
+
     // Tentar validar com schema em cache primeiro (otimização)
     const cachedSchema = await this.getCachedSchema(userId, tableName);
     if (cachedSchema) {
@@ -1983,6 +2015,35 @@ export class DatabaseService {
         'TABLE_LIMIT',
         `Limite de tabelas atingido (${effectiveMax})`,
       );
+    }
+
+    // Verificar limite de armazenamento do plano
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (user) {
+        const { canUseStorage } = await import(
+          '@/services/subscription/subscription.service'
+        );
+        // Estimar tamanho aproximado (schema pequeno, ~1KB)
+        const estimatedSizeMB = 0.001;
+        const check = await canUseStorage(user.id, estimatedSizeMB);
+        if (!check.allowed) {
+          throw this.createError(
+            'STORAGE_LIMIT',
+            check.message || 'Limite de armazenamento atingido',
+          );
+        }
+      }
+    } catch (error: any) {
+      // Se erro for do nosso sistema, relançar
+      if (error.code === 'STORAGE_LIMIT') {
+        throw error;
+      }
+      // Ignorar outros erros (usuário não encontrado, etc)
     }
   }
 

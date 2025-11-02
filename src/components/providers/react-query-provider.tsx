@@ -5,7 +5,6 @@
  * - Configuração otimizada
  * - Error handling
  * - Persistent cache (opcional)
- * - DevTools em desenvolvimento
  * - Cross-tab synchronization
  */
 
@@ -13,7 +12,6 @@
 
 import React, { useEffect } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient } from '@/lib/react-query/config';
 import {
@@ -108,17 +106,7 @@ export function ReactQueryProvider({
 
   return (
     <ErrorBoundary>
-      <Provider storageType={storageType}>
-        {children}
-        {/* DevTools apenas em desenvolvimento */}
-        {process.env.NODE_ENV === 'development' && (
-          <ReactQueryDevtools
-            initialIsOpen={false}
-            position="bottom"
-            buttonPosition="bottom-left"
-          />
-        )}
-      </Provider>
+      <Provider storageType={storageType}>{children}</Provider>
     </ErrorBoundary>
   );
 }

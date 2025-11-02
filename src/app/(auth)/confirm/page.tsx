@@ -4,10 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { ConfirmEmailForm } from '@/components/features/forms/confirm-email';
 import { useUser } from '@/hooks/use-user';
+import { useEffect } from 'react';
 import Image from 'next/image';
 
 export default function Confirm() {
-  const { user } = useUser();
+  const { user, handleUpdate } = useUser();
+
+  // Invalidar cache quando a página carregar para garantir dados atualizados
+  useEffect(() => {
+    handleUpdate();
+  }, [handleUpdate]);
 
   return (
     <main className="relative flex justify-center items-center w-screen h-screen overflow-hidden p-6 md:p-10 bg-gradient-to-br from-slate-50 via-white to-blue-50 text-slate-800">

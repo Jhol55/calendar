@@ -13,7 +13,7 @@ export default function RootLayout({
 
   return (
     <>
-      {pathname !== '/confirm' && (
+      {pathname !== '/confirm' && pathname !== '/plans' && (
         <Sidebar noExpandedRoutes={noExpandedRoutes} />
       )}
       {children}

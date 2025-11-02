@@ -3,6 +3,7 @@
 import { generateValidationCodeFromEmail } from '@/utils/security/auth';
 import { prisma } from '@/services/prisma';
 import { confirmEmailFormSchema } from '@/components/features/forms/confirm-email/confirm-email.schema';
+import { updateSessionWithPlanStatus } from '@/utils/security/session';
 
 type ConfirmEmailResponse = {
   success: boolean;
@@ -43,10 +44,41 @@ export async function confirmEmail(
   }
 
   try {
-    await prisma.user.update({
+    const user = await prisma.user.update({
       where: { email: data.email as string },
       data: { confirmed: true },
+      select: {
+        id: true,
+        planId: true,
+        subscription: {
+          select: {
+            status: true,
+            trialEndsAt: true,
+            cancelAtPeriodEnd: true,
+          },
+        },
+      },
     });
+
+    // Calcular hasPlan
+    let hasPlan = false;
+    if (user.subscription) {
+      const now = new Date();
+      const isTrialing =
+        user.subscription.status === 'trialing' ||
+        (user.subscription.trialEndsAt && user.subscription.trialEndsAt > now);
+      hasPlan =
+        user.subscription.status === 'active' ||
+        isTrialing ||
+        (user.subscription.status === 'past_due' &&
+          !user.subscription.cancelAtPeriodEnd);
+    }
+    if (!hasPlan && user.planId !== null && user.planId !== undefined) {
+      hasPlan = true;
+    }
+
+    // Atualizar sessão com confirmed: true e hasPlan
+    await updateSessionWithPlanStatus(data.email as string, true, hasPlan);
 
     return {
       success: true,

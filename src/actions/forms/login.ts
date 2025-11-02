@@ -31,7 +31,18 @@ export async function login(formData: FormData): Promise<LoginResponse> {
 
   const user = await prisma.user.findUnique({
     where: { email: data.email as string },
-    select: { password: true },
+    select: {
+      password: true,
+      confirmed: true,
+      planId: true,
+      subscription: {
+        select: {
+          status: true,
+          trialEndsAt: true,
+          cancelAtPeriodEnd: true,
+        },
+      },
+    },
   });
 
   if (!user) {
@@ -46,10 +57,33 @@ export async function login(formData: FormData): Promise<LoginResponse> {
   const success = await verifyPassword(data.password as string, user.password);
 
   if (success) {
-    await createSession({
-      email: data.email as string,
-      remember: data.remember as boolean,
-    });
+    // Calcular hasPlan
+    let hasPlan = false;
+    if (user.subscription) {
+      const now = new Date();
+      const isTrialing =
+        user.subscription.status === 'trialing' ||
+        (user.subscription.trialEndsAt && user.subscription.trialEndsAt > now);
+      hasPlan =
+        user.subscription.status === 'active' ||
+        isTrialing ||
+        (user.subscription.status === 'past_due' &&
+          !user.subscription.cancelAtPeriodEnd);
+    }
+    if (!hasPlan && user.planId !== null && user.planId !== undefined) {
+      hasPlan = true;
+    }
+
+    await createSession(
+      {
+        email: data.email as string,
+        remember: data.remember as boolean,
+      },
+      {
+        confirmed: user.confirmed ?? false,
+        hasPlan,
+      },
+    );
 
     return {
       success: true,

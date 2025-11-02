@@ -75,11 +75,17 @@ export async function register(formData: FormData): Promise<RegisterResponse> {
 
   await deleteSession();
 
-  const sessionData = {
-    email: data.email as string,
-    remember: true,
-  };
-  await createSession(sessionData);
+  // Novo usuário não tem plano ainda (confirmed: false, hasPlan: false)
+  await createSession(
+    {
+      email: data.email as string,
+      remember: true,
+    },
+    {
+      confirmed: false,
+      hasPlan: false,
+    },
+  );
 
   console.log(await generateValidationCodeFromEmail(data.email as string));
 

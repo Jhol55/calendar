@@ -237,7 +237,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 );
               }
 
-              // Resolver o valor da variável
+              // Resolver o valor da variável (com JavaScript aplicado se houver)
               const resolvedValue = part.path
                 ? (() => {
                     try {

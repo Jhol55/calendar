@@ -33,10 +33,14 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   // safeQueryFn já extrai o .data automaticamente, então recebemos diretamente os dados
   const { data: user, error: userError } = useUserQuery();
 
+  // Instâncias são buscadas sob demanda, não automaticamente
+  // Isso evita queries desnecessárias quando o usuário não está na página de instâncias
   const {
     data: instances = [], // Array de instâncias, com default []
     error: instancesError,
-  } = useInstancesQuery();
+  } = useInstancesQuery({
+    enabled: false, // Desabilitado por padrão, será habilitado apenas quando necessário
+  });
 
   const { invalidateProfile, invalidateInstances } = useInvalidateUser();
 

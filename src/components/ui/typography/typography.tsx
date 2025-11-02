@@ -19,7 +19,7 @@ export const Typography = forwardRef<HTMLParagraphElement, TypographyProps>(
       p: `text-sm font-medium`,
       b: 'text-sm font-semibold',
       span: `text-sm font-medium`,
-      h1: `text-3xl font-bold`,
+      h1: `text-2xl font-bold`,
       h2: `text-2xl font-semibold`,
       h3: `text-xl font-medium`,
       h4: `text-lg font-medium`,

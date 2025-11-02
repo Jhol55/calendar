@@ -67,6 +67,16 @@ export function DatabaseSpreadsheet({
   const [tableData, setTableData] = useState<TableData[]>([]);
   const [tableSchema, setTableSchema] = useState<TableSchema | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pagination, setPagination] = useState<{
+    offset: number;
+    totalCount: number;
+    hasMore: boolean;
+  }>({
+    offset: 0,
+    totalCount: 0,
+    hasMore: false,
+  });
   const [editingCell, setEditingCell] = useState<{
     rowId: string;
     column: string;
@@ -170,6 +180,7 @@ export function DatabaseSpreadsheet({
       setEditingCell(null);
       setEditingValue('');
       setHasUnsavedChanges(false);
+      setPagination({ offset: 0, totalCount: 0, hasMore: false });
       setPendingChanges({
         updates: [],
         additions: [],
@@ -222,6 +233,8 @@ export function DatabaseSpreadsheet({
       setColumnFilters({});
       setColumnConditions({});
       setSortConfig(null);
+      // Resetar paginação
+      setPagination({ offset: 0, totalCount: 0, hasMore: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTable]);
@@ -244,28 +257,85 @@ export function DatabaseSpreadsheet({
     }
   };
 
-  const loadTableData = async () => {
+  const loadTableData = async (append = false) => {
     try {
-      setLoading(true);
-      const response = await getTableData(selectedTable);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setTableData([]);
+        setPagination({ offset: 0, totalCount: 0, hasMore: false });
+      }
+
+      const currentOffset = append ? pagination.offset : 0;
+      const response = await getTableData(selectedTable, {
+        offset: currentOffset,
+        limit: 100,
+      });
+
       if (response.success && response.data) {
         const tableResponse = response.data as {
           data: TableData[];
           schema: TableSchema | null;
+          totalCount?: number;
+          hasMore?: boolean;
         };
-        setTableData(tableResponse.data || []);
-        setTableSchema(tableResponse.schema || null);
+
+        if (append) {
+          // Adicionar novos dados aos existentes
+          setTableData((prev) => [...prev, ...(tableResponse.data || [])]);
+        } else {
+          // Primeira carga - substituir dados
+          setTableData(tableResponse.data || []);
+          setTableSchema(tableResponse.schema || null);
+        }
+
+        // Atualizar estado de paginação
+        setPagination({
+          offset: currentOffset + (tableResponse.data?.length || 0),
+          totalCount: tableResponse.totalCount || 0,
+          hasMore: tableResponse.hasMore || false,
+        });
+
+        // Atualizar schema apenas na primeira carga
+        if (!append && tableResponse.schema) {
+          setTableSchema(tableResponse.schema);
+        }
       } else {
         console.error('Erro ao carregar dados:', response.message);
-        setTableData([]);
-        setTableSchema(null);
+        if (!append) {
+          setTableData([]);
+          setTableSchema(null);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      setTableData([]);
-      setTableSchema(null);
+      if (!append) {
+        setTableData([]);
+        setTableSchema(null);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Handler para scroll infinito
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
+
+    // Carregar mais quando estiver a 200px do final
+    const threshold = 200;
+    if (
+      scrollHeight - scrollTop - clientHeight < threshold &&
+      pagination.hasMore &&
+      !loadingMore &&
+      !loading
+    ) {
+      loadTableData(true);
     }
   };
 
@@ -493,7 +563,8 @@ export function DatabaseSpreadsheet({
       });
       setHasUnsavedChanges(false);
 
-      // Recarregar dados da tabela para sincronizar
+      // Recarregar dados da tabela para sincronizar (resetar paginação)
+      setPagination({ offset: 0, totalCount: 0, hasMore: false });
       await loadTableData();
     } catch (error) {
       console.error('Erro ao salvar mudanças:', error);
@@ -1467,7 +1538,10 @@ export function DatabaseSpreadsheet({
               </div>
 
               {selectedTable && tableSchema && (
-                <div className="flex-1 overflow-auto rounded-lg border-neutral-200 border">
+                <div
+                  className="flex-1 overflow-auto rounded-lg border-neutral-200 border"
+                  onScroll={handleScroll}
+                >
                   <table className="w-full border-collapse">
                     <thead className="bg-neutral-100 sticky top-0 z-10">
                       <tr className="bg-neutral-100 whitespace-nowrap">
@@ -1811,19 +1885,81 @@ export function DatabaseSpreadsheet({
                           </tr>
                         );
                       })}
+
+                      {/* Indicador de carregamento ao rolar */}
+                      {loadingMore && (
+                        <tr>
+                          <td
+                            colSpan={
+                              tableSchema ? tableSchema.columns.length + 3 : 100
+                            }
+                            className="border p-4 text-center bg-neutral-50"
+                          >
+                            <div className="flex items-center justify-center gap-2">
+                              <RefreshCw className="w-4 h-4 animate-spin text-neutral-500" />
+                              <Typography
+                                variant="span"
+                                className="text-sm text-neutral-500"
+                              >
+                                Carregando mais registros... ({tableData.length}{' '}
+                                /{' '}
+                                {pagination.totalCount > 0
+                                  ? pagination.totalCount
+                                  : '?'}
+                                )
+                              </Typography>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Indicador de fim dos dados */}
+                      {!pagination.hasMore &&
+                        !loadingMore &&
+                        tableData.length > 0 && (
+                          <tr>
+                            <td
+                              colSpan={
+                                tableSchema
+                                  ? tableSchema.columns.length + 3
+                                  : 100
+                              }
+                              className="border p-3 text-center bg-neutral-50"
+                            >
+                              <Typography
+                                variant="span"
+                                className="text-sm text-neutral-500"
+                              >
+                                Todas as {pagination.totalCount} linhas foram
+                                carregadas
+                              </Typography>
+                            </td>
+                          </tr>
+                        )}
+
+                      {/* Mensagem quando não há dados */}
+                      {filteredAndSortedData.length === 0 && !loading && (
+                        <tr>
+                          <td
+                            colSpan={
+                              tableSchema ? tableSchema.columns.length + 3 : 100
+                            }
+                            className="border p-12 text-center"
+                          >
+                            <Typography
+                              variant="p"
+                              className="text-neutral-500"
+                            >
+                              {Object.keys(columnFilters).length > 0 ||
+                              Object.keys(columnConditions).length > 0
+                                ? 'Nenhum registro corresponde aos filtros aplicados.'
+                                : 'Nenhum dado encontrado. Adicione uma linha para começar.'}
+                            </Typography>
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
-
-                  {filteredAndSortedData.length === 0 && (
-                    <div className="text-center py-12">
-                      <Typography variant="p" className="text-neutral-500">
-                        {Object.keys(columnFilters).length > 0 ||
-                        Object.keys(columnConditions).length > 0
-                          ? 'Nenhum registro corresponde aos filtros aplicados.'
-                          : 'Nenhum dado encontrado. Adicione uma linha para começar.'}
-                      </Typography>
-                    </div>
-                  )}
                 </div>
               )}
 

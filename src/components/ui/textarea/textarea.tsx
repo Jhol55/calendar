@@ -205,6 +205,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
                 );
               }
 
+              // Resolver o valor da variável (com JavaScript aplicado se houver)
               const resolvedValue = part.path
                 ? (() => {
                     try {
@@ -215,6 +216,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
                   })()
                 : part.text;
 
+              // Verificar se a variável foi resolvida ou não
               const wasResolved =
                 resolvedValue !== part.text &&
                 !String(resolvedValue).includes('{{');

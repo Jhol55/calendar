@@ -132,7 +132,7 @@ export const databaseConfigSchema = baseSchema.refine(
       data.operation !== 'sql_query' &&
       (!data.tableName || data.tableName.trim().length === 0)
     ) {
-      return { message: 'Digite o nome da tabela', path: ['tableName'] };
+      return { message: 'Selecione uma tabela', path: ['tableName'] };
     }
 
     if (data.operation === 'addColumns') {

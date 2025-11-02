@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useCallback, memo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useCallback, memo, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
@@ -76,6 +76,7 @@ const MenuItemComponent = memo(
     onToggle,
     onClick,
     menuItemClassName,
+    activeItemId,
   }: {
     item: MenuItem;
     level: number;
@@ -85,6 +86,7 @@ const MenuItemComponent = memo(
     onToggle: () => void;
     onClick: () => void;
     menuItemClassName?: string;
+    activeItemId?: string;
   }) => {
     const hasSubItems = item.subItems && item.subItems.length > 0;
 
@@ -95,10 +97,10 @@ const MenuItemComponent = memo(
           className={cn(
             'relative w-full gap-3 h-12 text-left transition-all duration-200',
             isHovered ? 'justify-start px-4' : 'justify-center px-0',
-            isActive && isHovered && '!bg-neutral-200 shadow-lg rounded-full',
+            isActive && isHovered && '!bg-neutral-200 shadow-md rounded-full',
             'hover:bg-neutral-200 rounded-full',
             level > 0 && isHovered && 'ml-4 text-sm h-10 w-[calc(100%-1rem)]',
-            'bg-transparent border-none shadow-none',
+            'bg-transparent border-none',
             menuItemClassName,
           )}
           onClick={() => {
@@ -110,14 +112,14 @@ const MenuItemComponent = memo(
           }}
         >
           {isActive && !isHovered && (
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !h-10 !w-10 inset-0 rounded-full bg-neutral-200 -z-50 border" />
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !h-10 !w-10 inset-0 rounded-full shadow-md bg-neutral-200 -z-50 border" />
           )}
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3 min-w-0">
               <div
                 className={cn(
                   'flex-shrink-0',
-                  isActive ? 'text-neutral-700' : 'text-neutral-500',
+                  isActive ? 'text-neutral-700' : 'text-neutral-600',
                 )}
               >
                 {item.icon}
@@ -127,7 +129,7 @@ const MenuItemComponent = memo(
                   variant="span"
                   className={cn(
                     'whitespace-nowrap overflow-hidden',
-                    isActive ? 'text-neutral-700' : 'text-neutral-500',
+                    isActive ? 'text-neutral-700' : 'text-neutral-600',
                   )}
                   style={{
                     transition: 'opacity 0.15s ease-out',
@@ -165,11 +167,12 @@ const MenuItemComponent = memo(
                   item={subItem}
                   level={level + 1}
                   isExpanded={false}
-                  isActive={false}
+                  isActive={activeItemId === subItem.id}
                   isHovered={isHovered}
                   onToggle={() => {}}
                   onClick={onClick}
                   menuItemClassName={menuItemClassName}
+                  activeItemId={activeItemId}
                 />
               ))}
             </div>
@@ -196,6 +199,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [activeItem, setActiveItem] = useState<string>('');
   const [isHovered, setIsHovered] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Função para encontrar o item ativo baseado na rota atual
+  const findActiveItem = useCallback(
+    (path: string): { itemId: string; parentId?: string } | null => {
+      // Primeiro verifica subItems
+      for (const item of menuItems) {
+        if (item.subItems) {
+          for (const subItem of item.subItems) {
+            if (subItem.href && path === subItem.href) {
+              return { itemId: subItem.id, parentId: item.id };
+            }
+          }
+        }
+        // Depois verifica itens principais
+        if (item.href && path === item.href) {
+          return { itemId: item.id };
+        }
+      }
+      return null;
+    },
+    [],
+  );
+
+  // Atualizar item ativo quando a rota mudar
+  useEffect(() => {
+    if (pathname) {
+      const result = findActiveItem(pathname);
+      if (result) {
+        setActiveItem(result.itemId);
+        // Expandir o item pai quando um subItem está ativo
+        if (result.parentId) {
+          setExpandedItems((prev) => new Set(prev).add(result.parentId!));
+        }
+      }
+    }
+  }, [pathname, findActiveItem]);
 
   const toggleExpanded = useCallback((itemId: string) => {
     setExpandedItems((prev) => {
@@ -292,6 +332,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onToggle={() => toggleExpanded(item.id)}
                 onClick={() => handleItemClick(item.id, item.href)}
                 menuItemClassName={menuItemClassName}
+                activeItemId={activeItem}
               />
             ))}
           </nav>

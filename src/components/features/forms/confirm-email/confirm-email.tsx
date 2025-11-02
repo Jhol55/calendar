@@ -18,9 +18,16 @@ export const ConfirmEmailForm = () => {
     data: FieldValues,
     setError: UseFormSetError<FieldValues>,
   ) => {
+    if (!user?.email) {
+      setError('validationCode', {
+        message: 'Email não encontrado. Por favor, registre-se novamente.',
+      });
+      return;
+    }
+
     const formData = new FormData();
 
-    formData.append('email', user?.email || '');
+    formData.append('email', user.email);
     formData.append('validationCode', data.validationCode);
 
     const response = await confirmEmail(formData);
@@ -32,7 +39,7 @@ export const ConfirmEmailForm = () => {
       return;
     }
 
-    router.push('/index');
+    router.push('/plans');
   };
 
   return (

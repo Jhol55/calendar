@@ -9,6 +9,7 @@ import {
 } from '../../types';
 import { Typography } from '@/components/ui/typography';
 import { useUser } from '@/hooks/use-user';
+import { useInstances } from '@/lib/react-query/hooks/use-user';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
@@ -2793,7 +2794,10 @@ export function MessageNodeConfig({
   nodeLabel,
   onNodeLabelChange,
 }: MessageNodeConfigProps) {
-  const { instances } = useUser();
+  // Buscar instâncias sob demanda apenas quando este componente for montado
+  const { data: instances = [] } = useInstances({
+    enabled: true,
+  });
 
   // Estados para configuração de memória
   const [memoryItems, setMemoryItems] = useState<MemoryItem[]>([

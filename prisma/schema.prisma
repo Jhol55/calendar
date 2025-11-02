@@ -1,48 +1,52 @@
 generator client {
   provider = "prisma-client-js"
-  output = "../generated/prisma"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model user {
-  id                  Int      @id @default(autoincrement())
-  email               String   @unique
-  password            String
-  name                String?
-  phone               String?
-  company             String?
-  avatar              String?
-  confirmed           Boolean  @default(false)
-  role                String   @default("user")
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String?
+  phone     String?
+  company   String?
+  avatar    String?
+  confirmed Boolean  @default(false)
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  chatbot_flows       chatbot_flows[]
+  chatbot_flows chatbot_flows[]
+  subscription  subscription?
+  planId        Int?              @db.Integer
+  plan          Plan?             @relation(fields: [planId], references: [id])
+  planLimits    user_plan_limits?
 }
 
 model licenses {
-  id                          Int      @id @default(autoincrement())
-  apikey                      String   @unique @db.VarChar(255)
-  subdomain                   String?  @db.VarChar(255)
-  ip                          String?  @db.VarChar(45)
-  url                         String?  @db.VarChar(255)
+  id                          Int       @id @default(autoincrement())
+  apikey                      String    @unique @db.VarChar(255)
+  subdomain                   String?   @db.VarChar(255)
+  ip                          String?   @db.VarChar(45)
+  url                         String?   @db.VarChar(255)
   port                        Int?
-  ssl_path                    String?  @db.Text
-  redis_enabled               Boolean  @default(false)
-  instance_count              Int      @default(0)
-  is_valid                    Boolean  @default(true)
+  ssl_path                    String?   @db.Text
+  redis_enabled               Boolean   @default(false)
+  instance_count              Int       @default(0)
+  is_valid                    Boolean   @default(true)
   expires_at                  DateTime?
-  last_validation             DateTime @default(now())
-  validation_interval_seconds Int      @default(86400)
-  last_update_version         Int      @default(647)
-  created_at                  DateTime @default(now())
-  updated_at                  DateTime @default(now()) @updatedAt
-  
-  validation_logs             license_validation_logs[]
+  last_validation             DateTime  @default(now())
+  validation_interval_seconds Int       @default(86400)
+  last_update_version         Int       @default(647)
+  created_at                  DateTime  @default(now())
+  updated_at                  DateTime  @default(now()) @updatedAt
+
+  validation_logs license_validation_logs[]
 
   @@index([apikey])
   @@index([subdomain])
@@ -50,23 +54,23 @@ model licenses {
 }
 
 model license_validation_logs {
-  id                Int       @id @default(autoincrement())
+  id                Int      @id @default(autoincrement())
   license_id        Int?
-  apikey            String    @db.VarChar(255)
-  ip                String?   @db.VarChar(45)
+  apikey            String   @db.VarChar(255)
+  ip                String?  @db.VarChar(45)
   validation_result Boolean?
-  error_message     String?   @db.Text
-  validated_at      DateTime  @default(now())
-  
-  license           licenses? @relation(fields: [license_id], references: [id])
+  error_message     String?  @db.Text
+  validated_at      DateTime @default(now())
+
+  license licenses? @relation(fields: [license_id], references: [id])
 
   @@index([license_id])
   @@index([apikey])
 }
 
 model instances {
-  id                         String   @id
-  token                      String   @unique
+  id                         String  @id
+  token                      String  @unique
   status                     String
   paircode                   String
   qrcode                     String
@@ -74,7 +78,7 @@ model instances {
   webhook                    String
   profileName                String
   profilePicUrl              String
-  isBusiness                 Boolean  @default(false)
+  isBusiness                 Boolean @default(false)
   plataform                  String
   systemName                 String
   owner                      String
@@ -84,37 +88,37 @@ model instances {
   adminField01               String
   adminField02               String
   openai_apikey              String
-  chatbot_enabled            Boolean  @default(false)
-  chatbot_ignoreGroups       Boolean  @default(false)
+  chatbot_enabled            Boolean @default(false)
+  chatbot_ignoreGroups       Boolean @default(false)
   chatbot_stopConversation   String
-  chatbot_stopMinutes        Int      @default(0)
-  chatbot_stopWhenYouSendMsg Int      @default(0)
+  chatbot_stopMinutes        Int     @default(0)
+  chatbot_stopWhenYouSendMsg Int     @default(0)
   created                    String
   updated                    String
   currentTime                String
 
-  chatbot_flows              chatbot_flows[]
+  chatbot_flows chatbot_flows[]
 
   @@index([owner])
   @@index([status])
 }
 
 model chatbot_flows {
-  id          String    @id @default(uuid())
-  name        String    @db.VarChar(255)
-  description String?   @db.Text
-  nodes       Json      @db.JsonB
-  edges       Json      @db.JsonB
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  nodes       Json     @db.JsonB
+  edges       Json     @db.JsonB
   token       String?
   userId      Int?
-  isActive    Boolean   @default(true)
-  isTemporary Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive    Boolean  @default(true)
+  isTemporary Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  instance    instances? @relation(fields: [token], references: [token])
-  user        user?      @relation(fields: [userId], references: [id])
-  executions  flow_executions[]
+  instance   instances?        @relation(fields: [token], references: [token])
+  user       user?             @relation(fields: [userId], references: [id])
+  executions flow_executions[]
 
   @@index([token])
   @@index([userId])
@@ -123,24 +127,24 @@ model chatbot_flows {
 }
 
 model flow_executions {
-  id          String    @id @default(uuid())
-  flowId      String    @db.VarChar(255)
-  status      String    @default("running") // running, success, error, stopped
-  triggerType String    @default("webhook") // webhook, manual, schedule
-  triggerData Json?     @db.JsonB // Dados que dispararam a execução
-  startTime   DateTime  @default(now())
-  endTime     DateTime?
-  duration    Int?      // Duração em milissegundos
-  error       String?   @db.Text
-  data        Json?     @db.JsonB // Dados de entrada
-  result      Json?     @db.JsonB // Dados de saída
-  nodeExecutions Json?  @db.JsonB // Execução de cada nó
-  loopStates  Json?     @db.JsonB // Estado dos loops ativos {[nodeId]: {currentIndex, items, etc}}
-  
-  flow        chatbot_flows @relation(fields: [flowId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id             String    @id @default(uuid())
+  flowId         String    @db.VarChar(255)
+  status         String    @default("running") // running, success, error, stopped
+  triggerType    String    @default("webhook") // webhook, manual, schedule
+  triggerData    Json?     @db.JsonB // Dados que dispararam a execução
+  startTime      DateTime  @default(now())
+  endTime        DateTime?
+  duration       Int? // Duração em milissegundos
+  error          String?   @db.Text
+  data           Json?     @db.JsonB // Dados de entrada
+  result         Json?     @db.JsonB // Dados de saída
+  nodeExecutions Json?     @db.JsonB // Execução de cada nó
+  loopStates     Json?     @db.JsonB // Estado dos loops ativos {[nodeId]: {currentIndex, items, etc}}
+
+  flow chatbot_flows @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([flowId])
   @@index([status])
@@ -152,7 +156,7 @@ model chatbot_memories {
   id        String    @id @default(uuid())
   userId    String    @db.VarChar(255) // Email do usuário logado
   chave     String    @db.VarChar(255) // Nome da memória
-  valor     Json      @db.JsonB        // Valor (JSON flexível)
+  valor     Json      @db.JsonB // Valor (JSON flexível)
   expiresAt DateTime? // TTL - null = nunca expira
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -163,19 +167,19 @@ model chatbot_memories {
 }
 
 model DataTable {
-  id          String   @id @default(uuid())
-  userId      String   @db.VarChar(255) // Email do usuário logado
-  tableName   String   @db.VarChar(255) // Nome da tabela virtual (ex: "leads", "customers")
-  partition   Int      @default(0)      // Número da partição (0, 1, 2, 3...)
-  
-  schema      Json     @db.JsonB        // Definição das colunas
-  data        Json     @db.JsonB        // Array de registros (max 1000 por partição)
-  
-  recordCount Int      @default(0)      // Quantidade de registros nesta partição
-  isFull      Boolean  @default(false)  // true quando atingir MAX_PARTITION_SIZE
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String @id @default(uuid())
+  userId    String @db.VarChar(255) // Email do usuário logado
+  tableName String @db.VarChar(255) // Nome da tabela virtual (ex: "leads", "customers")
+  partition Int    @default(0) // Número da partição (0, 1, 2, 3...)
+
+  schema Json @db.JsonB // Definição das colunas
+  data   Json @db.JsonB // Array de registros (max 1000 por partição)
+
+  recordCount Int     @default(0) // Quantidade de registros nesta partição
+  isFull      Boolean @default(false) // true quando atingir MAX_PARTITION_SIZE
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, tableName, partition])
   @@index([userId, tableName])
@@ -183,25 +187,82 @@ model DataTable {
 }
 
 model agent_conversations {
-  id            String   @id @default(uuid())
-  userId        String   @db.VarChar(255)  // ID do usuário final (WhatsApp, etc)
-  flowId        String?  @db.VarChar(255)  // ID do fluxo (opcional)
-  nodeId        String?  @db.VarChar(255)  // ID do node agent (opcional)
-  
-  messages      Json     @db.JsonB         // Array de mensagens [{role, content, timestamp}]
-  
-  maxLength     Int      @default(10)      // Máximo de mensagens a manter
-  lastMessageAt DateTime @default(now())   // Última mensagem adicionada
-  expiresAt     DateTime?                  // TTL opcional
-  
-  metadata      Json?    @db.JsonB         // Metadados extras (tokens usados, etc)
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id     String  @id @default(uuid())
+  userId String  @db.VarChar(255) // ID do usuário final (WhatsApp, etc)
+  flowId String? @db.VarChar(255) // ID do fluxo (opcional)
+  nodeId String? @db.VarChar(255) // ID do node agent (opcional)
+
+  messages Json @db.JsonB // Array de mensagens [{role, content, timestamp}]
+
+  maxLength     Int       @default(10) // Máximo de mensagens a manter
+  lastMessageAt DateTime  @default(now()) // Última mensagem adicionada
+  expiresAt     DateTime? // TTL opcional
+
+  metadata Json? @db.JsonB // Metadados extras (tokens usados, etc)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, flowId, nodeId])
   @@index([userId])
   @@index([flowId])
   @@index([lastMessageAt])
   @@index([expiresAt])
+}
+
+model Plan {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  slug         String   @unique @db.VarChar(100)
+  description  String?  @db.Text
+  maxStorageMB Int      @default(100) // Armazenamento em MB
+  maxInstances Int      @default(1) // Número máximo de instâncias (-1 = ilimitado)
+  priceMonthly Decimal  @db.Decimal(10, 2)
+  priceYearly  Decimal  @db.Decimal(10, 2)
+  features     Json?    @db.JsonB // Array de features em JSON
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users         user[]
+  subscriptions subscription[]
+
+  @@index([slug])
+  @@index([isActive])
+}
+
+model subscription {
+  id                   Int       @id @default(autoincrement())
+  userId               Int       @unique
+  planId               Int
+  stripeSubscriptionId String?   @unique @db.VarChar(255)
+  stripeCustomerId     String?   @db.VarChar(255)
+  status               String    @db.VarChar(50) // active, trialing, past_due, canceled, incomplete, etc
+  billingPeriod        String    @db.VarChar(20) // monthly, yearly
+  trialEndsAt          DateTime?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  canceledAt           DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+  @@index([trialEndsAt])
+}
+
+model user_plan_limits {
+  userId           Int      @id
+  currentStorageMB Int      @default(0) // Armazenamento usado em MB
+  currentInstances Int      @default(0) // Número de instâncias criadas
+  updatedAt        DateTime @updatedAt
+
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

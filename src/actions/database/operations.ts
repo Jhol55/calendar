@@ -77,6 +77,10 @@ export async function getAvailableTables(): Promise<DatabaseResponse> {
 
 export async function getTableData(
   tableName: string,
+  options?: {
+    offset?: number;
+    limit?: number;
+  },
 ): Promise<DatabaseResponse> {
   try {
     const userId = await getUserIdFromSession();
@@ -97,6 +101,10 @@ export async function getTableData(
       };
     }
 
+    // Parâmetros de paginação
+    const offset = options?.offset || 0;
+    const limit = options?.limit || 100;
+
     // Buscar todas as partições da tabela
     const dataRecords = await prisma.dataTable.findMany({
       where: {
@@ -116,6 +124,8 @@ export async function getTableData(
         data: {
           data: [],
           schema: null,
+          totalCount: 0,
+          hasMore: false,
         },
       };
     }
@@ -132,13 +142,22 @@ export async function getTableData(
       }
     });
 
+    // Calcular total e verificar se há mais dados
+    const totalCount = allData.length;
+    const hasMore = offset + limit < totalCount;
+
+    // Aplicar paginação
+    const paginatedData = allData.slice(offset, offset + limit);
+
     return {
       success: true,
       message: 'Table data loaded successfully',
       code: 200,
       data: {
-        data: allData,
+        data: paginatedData,
         schema,
+        totalCount,
+        hasMore,
       },
     };
   } catch (error) {

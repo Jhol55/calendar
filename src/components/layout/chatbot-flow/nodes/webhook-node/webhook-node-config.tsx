@@ -12,6 +12,7 @@ import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
 import { useUser } from '@/hooks/use-user';
+import { useInstances } from '@/lib/react-query/hooks/use-user';
 import { NodeConfigLayout } from '../node-config-layout';
 import { getInstanceWebhook } from '@/actions/uazapi/instance';
 import { Copy, CheckCircle } from 'lucide-react';
@@ -60,7 +61,11 @@ function WebhookFormFields({
   setPathError: (error: string | null) => void;
 }) {
   const { form, setValue } = useForm();
-  const { instances, user } = useUser();
+  const { user } = useUser();
+  // Buscar instâncias sob demanda apenas quando este componente for montado
+  const { data: instances = [] } = useInstances({
+    enabled: true,
+  });
   const [selectedMethods, setSelectedMethods] = useState<HttpMethod[]>([
     'POST',
   ]);

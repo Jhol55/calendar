@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
   Play,
@@ -144,21 +146,6 @@ export function ExecutionsPanel({
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'running':
-        return 'bg-blue-100 text-blue-800';
-      case 'success':
-        return 'bg-green-100 text-green-800';
-      case 'error':
-        return 'bg-red-100 text-red-800';
-      case 'stopped':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const formatDuration = (duration?: number) => {
     if (!duration) return '-';
     if (duration < 1000) return `${duration}ms`;
@@ -169,16 +156,27 @@ export function ExecutionsPanel({
     return new Date(dateString).toLocaleString('pt-BR');
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[80vh] flex flex-col">
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      contentClassName="max-w-[95vw] w-full max-h-[90vh] h-screen flex flex-col"
+    >
+      <div className="flex flex-col h-full" style={{ zoom: 0.9 }}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className="flex items-center justify-between p-6 border-b bg-white">
           <div className="flex items-center gap-3">
-            <Play className="w-6 h-6 text-blue-500" />
-            <Typography variant="h3">Execuções do Fluxo</Typography>
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Play className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <Typography variant="h3" className="font-semibold">
+                Execuções do Fluxo
+              </Typography>
+              <Typography variant="span" className="text-sm text-neutral-600">
+                Histórico e detalhes de execuções
+              </Typography>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -190,102 +188,159 @@ export function ExecutionsPanel({
               <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
               Atualizar
             </Button>
-            <Button variant="default" onClick={onClose}>
-              Fechar
-            </Button>
           </div>
         </div>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden bg-neutral-50">
           {/* Lista de Execuções */}
-          <div className="w-1/2 border-r overflow-y-auto">
-            <div className="p-4">
-              <Typography variant="h4" className="mb-4">
-                Histórico de Execuções ({executions.length})
-              </Typography>
+          <div className="w-full bg-white overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <Typography variant="h4" className="font-semibold">
+                  Histórico de Execuções
+                </Typography>
+                <Badge variant="secondary" className="text-xs">
+                  {executions.length}
+                </Badge>
+              </div>
 
               {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-                  <Typography variant="p" className="ml-2">
-                    Carregando...
+                <div className="flex flex-col items-center justify-center py-16">
+                  <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mb-3" />
+                  <Typography variant="p" className="text-neutral-600">
+                    Carregando execuções...
                   </Typography>
                 </div>
               ) : executions.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Play className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <Typography variant="p">
+                <div className="flex flex-col items-center justify-center py-16 text-neutral-500">
+                  <div className="p-4 bg-neutral-100 rounded-full mb-4">
+                    <Play className="w-8 h-8 text-neutral-400" />
+                  </div>
+                  <Typography variant="h5" className="mb-2">
                     Nenhuma execução encontrada
+                  </Typography>
+                  <Typography variant="span" className="text-sm">
+                    Execute o fluxo para ver o histórico aqui
                   </Typography>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {executions.map((execution) => (
                     <div
                       key={execution.id}
                       className={cn(
-                        'p-4 border rounded-lg cursor-pointer transition-colors',
+                        'p-4 border-2 rounded-xl cursor-pointer transition-all bg-white',
                         selectedExecution?.id === execution.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300',
+                          ? 'border-blue-500 bg-blue-50/50 shadow-md'
+                          : 'border-neutral-200 hover:border-neutral-300 hover:shadow-sm',
                       )}
                       onClick={() => setSelectedExecution(execution)}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(execution.status)}
-                          <Typography
-                            variant="span"
-                            className="font-mono text-sm"
-                          >
-                            {execution.id.substring(0, 8)}...
-                          </Typography>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {execution.status === 'running' && (
-                            <Button
-                              variant="ghost"
-                              onClick={(e) =>
-                                handleStopExecution(execution.id, e)
-                              }
-                              className="h-6 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              title="Parar execução"
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="p-2 bg-neutral-100 rounded-lg">
+                            {getStatusIcon(execution.status)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <Typography
+                              variant="span"
+                              className="font-mono text-xs text-neutral-500 block truncate"
                             >
-                              <StopCircle className="w-4 h-4" />
-                            </Button>
-                          )}
-                          <span
-                            className={cn(
-                              'px-2 py-1 rounded-full text-xs font-semibold',
-                              getStatusColor(execution.status),
-                            )}
-                          >
-                            {execution.status}
-                          </span>
+                              {execution.id.substring(0, 12)}...
+                            </Typography>
+                            <Badge
+                              variant={
+                                execution.status === 'success'
+                                  ? 'default'
+                                  : execution.status === 'error'
+                                    ? 'destructive'
+                                    : execution.status === 'running'
+                                      ? 'outline'
+                                      : 'secondary'
+                              }
+                              className={cn(
+                                'mt-1 text-xs font-semibold',
+                                execution.status === 'success' &&
+                                  'bg-green-600 text-white border-green-600',
+                                execution.status === 'error' &&
+                                  'bg-red-600 text-white border-red-600',
+                              )}
+                            >
+                              {execution.status}
+                            </Badge>
+                          </div>
                         </div>
+                        {execution.status === 'running' && (
+                          <Button
+                            variant="ghost"
+                            onClick={(e) =>
+                              handleStopExecution(execution.id, e)
+                            }
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            title="Parar execução"
+                          >
+                            <StopCircle className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
 
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <div>Início: {formatDate(execution.startTime)}</div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2 text-neutral-600">
+                          <Clock className="w-3 h-3" />
+                          <Typography variant="span" className="text-xs">
+                            {formatDate(execution.startTime)}
+                          </Typography>
+                        </div>
                         {execution.endTime && (
-                          <div>Fim: {formatDate(execution.endTime)}</div>
+                          <div className="flex items-center gap-2 text-neutral-600">
+                            <CheckCircle className="w-3 h-3" />
+                            <Typography variant="span" className="text-xs">
+                              {formatDate(execution.endTime)}
+                            </Typography>
+                          </div>
                         )}
-                        <div>Duração: {formatDuration(execution.duration)}</div>
-                        <div>Tipo: {execution.triggerType}</div>
+                        <div className="flex items-center justify-between pt-2 border-t border-neutral-200">
+                          <Typography
+                            variant="span"
+                            className="text-xs text-neutral-500"
+                          >
+                            Duração
+                          </Typography>
+                          <Typography
+                            variant="span"
+                            className="text-xs font-medium"
+                          >
+                            {formatDuration(execution.duration)}
+                          </Typography>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Typography
+                            variant="span"
+                            className="text-xs text-neutral-500"
+                          >
+                            Tipo
+                          </Typography>
+                          <Typography
+                            variant="span"
+                            className="text-xs font-medium"
+                          >
+                            {execution.triggerType}
+                          </Typography>
+                        </div>
                       </div>
 
                       {selectedExecution?.id === execution.id &&
                         onExecutionSelect && (
                           <Button
                             variant="gradient"
-                            className="mt-3 w-full"
+                            className="mt-4 w-full"
                             onClick={(e) => {
                               e.stopPropagation();
                               onExecutionSelect(execution);
                               onClose();
                             }}
                           >
-                            🔍 Visualizar no Fluxo
+                            Visualizar no Fluxo
                           </Button>
                         )}
                     </div>
@@ -294,129 +349,8 @@ export function ExecutionsPanel({
               )}
             </div>
           </div>
-
-          {/* Detalhes da Execução */}
-          <div className="w-1/2 overflow-y-auto">
-            {selectedExecution ? (
-              <div className="p-6">
-                <Typography variant="h4" className="mb-4">
-                  Detalhes da Execução
-                </Typography>
-
-                <div className="space-y-4">
-                  {/* Status */}
-                  <div>
-                    <Typography variant="h5" className="mb-2">
-                      Status
-                    </Typography>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(selectedExecution.status)}
-                      <span
-                        className={cn(
-                          'px-3 py-1 rounded-full text-sm font-semibold',
-                          getStatusColor(selectedExecution.status),
-                        )}
-                      >
-                        {selectedExecution.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Informações Básicas */}
-                  <div>
-                    <Typography variant="h5" className="mb-2">
-                      Informações
-                    </Typography>
-                    <div className="bg-gray-50/40 p-3 rounded-lg space-y-1 text-sm">
-                      <div>
-                        <strong>ID:</strong> {selectedExecution.id}
-                      </div>
-                      <div>
-                        <strong>Início:</strong>{' '}
-                        {formatDate(selectedExecution.startTime)}
-                      </div>
-                      {selectedExecution.endTime && (
-                        <div>
-                          <strong>Fim:</strong>{' '}
-                          {formatDate(selectedExecution.endTime)}
-                        </div>
-                      )}
-                      <div>
-                        <strong>Duração:</strong>{' '}
-                        {formatDuration(selectedExecution.duration)}
-                      </div>
-                      <div>
-                        <strong>Tipo:</strong> {selectedExecution.triggerType}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dados de Entrada */}
-                  {selectedExecution.data && (
-                    <div>
-                      <Typography variant="h5" className="mb-2">
-                        Dados de Entrada
-                      </Typography>
-                      <pre className="bg-gray-50/40 p-3 rounded-lg text-xs overflow-x-auto">
-                        {JSON.stringify(selectedExecution.data, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-
-                  {/* Resultado */}
-                  {selectedExecution.result && (
-                    <div>
-                      <Typography variant="h5" className="mb-2">
-                        Resultado
-                      </Typography>
-                      <pre className="bg-gray-50/40 p-3 rounded-lg text-xs overflow-x-auto">
-                        {JSON.stringify(selectedExecution.result, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-
-                  {/* Erro */}
-                  {selectedExecution.error && (
-                    <div>
-                      <Typography variant="h5" className="mb-2 text-red-600">
-                        Erro
-                      </Typography>
-                      <pre className="bg-red-50 p-3 rounded-lg text-xs text-red-800 overflow-x-auto">
-                        {selectedExecution.error}
-                      </pre>
-                    </div>
-                  )}
-
-                  {/* Execução dos Nós */}
-                  {selectedExecution.nodeExecutions && (
-                    <div>
-                      <Typography variant="h5" className="mb-2">
-                        Execução dos Nós
-                      </Typography>
-                      <pre className="bg-gray-50/40 p-3 rounded-lg text-xs overflow-x-auto">
-                        {JSON.stringify(
-                          selectedExecution.nodeExecutions,
-                          null,
-                          2,
-                        )}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-500">
-                <div className="text-center">
-                  <Play className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <Typography variant="p">
-                    Selecione uma execução para ver os detalhes
-                  </Typography>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -25,19 +25,80 @@ async function decrypt(input: string): Promise<JWTPayload> {
   return payload;
 }
 
-export async function createSession(formData: {
-  email: string;
-  remember: boolean;
-}): Promise<void> {
+export async function createSession(
+  formData: {
+    email: string;
+    remember: boolean;
+  },
+  userData?: {
+    confirmed?: boolean;
+    hasPlan?: boolean;
+  },
+): Promise<void> {
   const user = { email: formData.email };
   const remember = formData.remember;
   const time = remember ? 7 * 24 * 60 * 60 : 60 * 60; // 7 dias ou 1 hora
   const expires = new Date(Date.now() + time * 1000);
-  const session = await encrypt({ user, expires, remember }, time);
+
+  const sessionPayload: JWTPayload = {
+    user,
+    expires,
+    remember,
+    confirmed: userData?.confirmed ?? false,
+    hasPlan: userData?.hasPlan ?? false,
+  };
+
+  const session = await encrypt(sessionPayload, time);
 
   cookies().set({
     name: 'session',
     value: session,
+    expires: expires,
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+  });
+}
+
+/**
+ * Atualizar sessão com informações de plano e confirmação
+ * Útil quando o usuário confirma email ou cria/substitui plano
+ */
+export async function updateSessionWithPlanStatus(
+  email: string,
+  confirmed?: boolean,
+  hasPlan?: boolean,
+): Promise<void> {
+  const session = await getSession();
+  if (!session) return;
+
+  const sessionData = session as {
+    user?: { email?: string };
+    remember?: boolean;
+    confirmed?: boolean;
+    hasPlan?: boolean;
+  };
+
+  // Só atualizar se o email corresponder
+  if (sessionData.user?.email !== email) return;
+
+  const remember = sessionData.remember ?? false;
+  const time = remember ? 7 * 24 * 60 * 60 : 60 * 60;
+  const expires = new Date(Date.now() + time * 1000);
+
+  const updatedPayload: JWTPayload = {
+    ...sessionData,
+    expires,
+    confirmed:
+      confirmed !== undefined ? confirmed : (sessionData.confirmed ?? false),
+    hasPlan: hasPlan !== undefined ? hasPlan : (sessionData.hasPlan ?? false),
+  };
+
+  const updatedSession = await encrypt(updatedPayload, time);
+
+  cookies().set({
+    name: 'session',
+    value: updatedSession,
     expires: expires,
     httpOnly: true,
     secure: true,
@@ -64,6 +125,9 @@ export async function updateSession(
   const parsed = (await decrypt(session)) as {
     expires: Date;
     remember: boolean;
+    confirmed?: boolean;
+    hasPlan?: boolean;
+    user?: { email?: string };
   };
   const time = parsed.remember ? 7 * 24 * 60 * 60 : 60 * 60;
   parsed.expires = new Date(Date.now() + time * 1000);

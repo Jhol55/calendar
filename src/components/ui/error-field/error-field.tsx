@@ -11,7 +11,7 @@ export const ErrorField = forwardRef<HTMLParagraphElement, ErrorFieldProps>(
       <p
         ref={ref}
         className={cn(
-          'text-red-500 min-h-6 h-6 text-sm self-start leading-none',
+          'text-red-500 min-h-6 h-6 text-sm self-start leading-none py-2',
           className,
         )}
       >

@@ -10,6 +10,7 @@ import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
 import { register } from '@/actions/forms/register';
+import { useUser } from '@/hooks/use-user';
 
 export const RegisterForm = ({
   className,
@@ -20,6 +21,7 @@ export const RegisterForm = ({
 }) => {
   const baseId = useId();
   const router = useRouter();
+  const { handleUpdate } = useUser();
 
   const inputs: (InputProps & { label: string })[] = [
     {
@@ -61,7 +63,13 @@ export const RegisterForm = ({
       return;
     }
 
-    router.push('/confirm');
+    // Invalidar cache do usuário para garantir dados atualizados da nova sessão
+    handleUpdate();
+
+    // Pequeno delay para garantir que a sessão foi atualizada no servidor
+    setTimeout(() => {
+      router.push('/confirm');
+    }, 100);
   };
 
   return (

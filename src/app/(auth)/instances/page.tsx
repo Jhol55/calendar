@@ -7,28 +7,22 @@ import { CreateInstanceForm } from '@/components/features/forms/create-instance/
 import { Dialog } from '@/components/ui/dialog';
 import { Loading } from '@/components/ui/loading';
 import { useUser } from '@/hooks/use-user';
+import { useInstances } from '@/lib/react-query/hooks/use-user';
 
 export default function Instances() {
   const [loading, setLoading] = useState(true);
   const [showCreateInstanceForm, setShowCreateInstanceForm] = useState(false);
 
-  const { instances, handleUpdate } = useUser();
+  const { handleUpdate } = useUser();
+  // Buscar instâncias diretamente nesta página
+  const { data: instances = [], isLoading: instancesLoading } = useInstances({
+    enabled: true, // Habilitar busca nesta página
+  });
 
   useEffect(() => {
-    setLoading(true);
-
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
-
-    return () => clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
-    if (instances.length > 0) {
-      setLoading(false);
-    }
-  }, [instances]);
+    // Atualizar loading baseado no estado da query
+    setLoading(instancesLoading);
+  }, [instancesLoading]);
 
   return (
     <main className="relative flex w-screen h-screen overflow-hidden p-6 md:p-10 bg-gradient-to-br from-neutral-50 via-white to-blue-50 text-neutral-800">
