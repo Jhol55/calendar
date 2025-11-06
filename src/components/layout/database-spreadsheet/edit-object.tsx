@@ -9,9 +9,8 @@ import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
 import { FormSelect } from '@/components/ui/select';
 import { SubmitButton } from '@/components/ui/submit-button';
-import { Plus, Trash2, Key } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { z } from 'zod';
-import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { EditArrayDialog } from './edit-array';
 
@@ -371,7 +370,7 @@ function EditObjectForm({
     );
   };
 
-  const handleSubmit = async (data: FieldValues) => {
+  const handleSubmit = async () => {
     const processedObject: Record<string, unknown> = {};
 
     objectPairs.forEach((pair) => {
@@ -472,8 +471,6 @@ function EditObjectForm({
     >
       <FormContent
         objectPairs={objectPairs}
-        setObjectPairs={setObjectPairs}
-        onClose={onClose}
         columnName={columnName}
         addPair={addPair}
         removePair={removePair}
@@ -492,8 +489,6 @@ function EditObjectForm({
 // Componente que renderiza o conteúdo do formulário
 function FormContent({
   objectPairs,
-  setObjectPairs,
-  onClose,
   columnName,
   addPair,
   removePair,
@@ -506,8 +501,6 @@ function FormContent({
   updatePairObjectPairs,
 }: {
   objectPairs: ObjectPair[];
-  setObjectPairs: React.Dispatch<React.SetStateAction<ObjectPair[]>>;
-  onClose: () => void;
   columnName: string;
   addPair: () => void;
   removePair: (id: string) => void;
@@ -522,7 +515,7 @@ function FormContent({
     objectPairs: Array<{ key: string; value: string }>,
   ) => void;
 }) {
-  const { errors, setValue } = useForm();
+  const { setValue } = useForm();
 
   // Inicializar valores do formulário quando os pares mudarem
   React.useEffect(() => {
@@ -616,7 +609,8 @@ function FormContent({
           {objectPairs.length === 0 ? (
             <div className="text-center py-8 text-neutral-500">
               <Typography variant="p">
-                Nenhum par chave/valor. Clique em "Adicionar Par" para começar.
+                Nenhum par chave/valor. Clique em &quot;Adicionar Par&quot; para
+                começar.
               </Typography>
             </div>
           ) : (

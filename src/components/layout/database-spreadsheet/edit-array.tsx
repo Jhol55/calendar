@@ -384,7 +384,7 @@ function FormContent({
   setArrayItems: React.Dispatch<React.SetStateAction<ArrayItem[]>>;
   columnName: string;
 }) {
-  const { setValue, form } = useForm();
+  const { setValue } = useForm();
 
   // Inicializar valores do formulário quando os items mudarem
   React.useEffect(() => {

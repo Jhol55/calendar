@@ -51,11 +51,13 @@ export async function getSessionHasPlan(): Promise<{
       success: true,
       hasPlan,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[getSessionHasPlan] Erro:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to get session data';
     return {
       success: false,
-      message: 'Failed to get session data',
+      message: errorMessage,
     };
   }
 }

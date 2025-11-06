@@ -63,16 +63,18 @@ function NodeConfigLayoutContent({
     .sort()
     .join(',');
 
-  const edgesKey = useMemo(() => edgesKeyStr, [edgesKeyStr]);
-  const nodesKey = useMemo(() => nodesKeyStr, [nodesKeyStr]);
-
   // Memoizar edges e nodes apenas quando as chaves mudarem
+  // Usamos apenas as chaves como dependências para evitar loops infinitos
+  // (allEdges/allNodes são recriados a cada render, mas as chaves só mudam quando IDs mudam)
   const liveEdges = useMemo(() => {
     return allEdges.map((edge) => ({
       source: edge.source,
       target: edge.target,
     }));
-  }, [edgesKey, allEdges]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Usamos apenas edgesKeyStr porque allEdges é recriado a cada render
+    // mas edgesKeyStr só muda quando os IDs realmente mudam
+  }, [edgesKeyStr]);
 
   const liveNodes = useMemo(() => {
     return allNodes.map((n) => ({
@@ -80,7 +82,10 @@ function NodeConfigLayoutContent({
       type: n.type,
       data: n.data,
     }));
-  }, [nodesKey, allNodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Usamos apenas nodesKeyStr porque allNodes é recriado a cada render
+    // mas nodesKeyStr só muda quando os IDs realmente mudam
+  }, [nodesKeyStr]);
 
   const [tempLabel, setTempLabel] = useState(nodeLabel || '');
 

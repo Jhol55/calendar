@@ -23,11 +23,13 @@ export async function getSessionEmail(): Promise<{
       success: true,
       email: sessionEmail,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error getting session email:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to get session email';
     return {
       success: false,
-      message: 'Failed to get session email',
+      message: errorMessage,
     };
   }
 }

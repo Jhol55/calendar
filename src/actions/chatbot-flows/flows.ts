@@ -5,6 +5,10 @@ import { NodeData } from '@/components/layout/chatbot-flow';
 import { prisma } from '@/services/prisma';
 import { getSession } from '@/utils/security/session';
 
+// Type helper para Prisma JSON fields - necessário usar any devido à tipagem do Prisma
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PrismaJsonValue = any;
+
 interface SessionUser {
   user: {
     email: string;
@@ -120,9 +124,11 @@ export async function listFlows(filters?: FlowFilters) {
     });
 
     return { success: true, flows };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error listing flows:', error);
-    return { success: false, error: 'Erro ao listar fluxos' };
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro ao listar fluxos';
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -172,9 +178,11 @@ export async function getFlow(id: string) {
     }
 
     return { success: true, flow };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error getting flow:', error);
-    return { success: false, error: 'Erro ao buscar fluxo' };
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro ao buscar fluxo';
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -198,8 +206,8 @@ export async function createFlow(flowData: CreateFlowData) {
       data: {
         name,
         description,
-        nodes: nodes as any,
-        edges: edges as any,
+        nodes: nodes as PrismaJsonValue,
+        edges: edges as PrismaJsonValue,
         token,
         userId,
         isActive: isActive !== undefined ? isActive : true,
@@ -223,9 +231,11 @@ export async function createFlow(flowData: CreateFlowData) {
     });
 
     return { success: true, flow };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating flow:', error);
-    return { success: false, error: 'Erro ao criar fluxo' };
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro ao criar fluxo';
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -263,8 +273,8 @@ export async function updateFlow(id: string, flowData: UpdateFlowData) {
       data: {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
-        ...(nodes !== undefined && { nodes: nodes as any }),
-        ...(edges !== undefined && { edges: edges as any }),
+        ...(nodes !== undefined && { nodes: nodes as PrismaJsonValue }),
+        ...(edges !== undefined && { edges: edges as PrismaJsonValue }),
         ...(token !== undefined && { token }),
         ...(isActive !== undefined && { isActive }),
       },
@@ -287,9 +297,11 @@ export async function updateFlow(id: string, flowData: UpdateFlowData) {
     });
 
     return { success: true, flow };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error updating flow:', error);
-    return { success: false, error: 'Erro ao atualizar fluxo' };
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro ao atualizar fluxo';
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -325,8 +337,10 @@ export async function deleteFlow(id: string) {
     });
 
     return { success: true, message: 'Fluxo deletado com sucesso' };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error deleting flow:', error);
-    return { success: false, error: 'Erro ao deletar fluxo' };
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro ao deletar fluxo';
+    return { success: false, error: errorMessage };
   }
 }

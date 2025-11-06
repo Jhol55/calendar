@@ -83,10 +83,10 @@ export async function POST(_request: NextRequest) {
         calculatedHasPlan: hasPlanFromDB,
       },
     });
-  } catch (error) {
-    return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 500 },
-    );
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to fix plan status';
+    console.error('Error fixing plan status:', error);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

@@ -84,10 +84,10 @@ export async function GET(_request: NextRequest) {
         hasPlan: sessionData.hasPlan !== hasPlanFromDB,
       },
     });
-  } catch (error) {
-    return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 500 },
-    );
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to get session';
+    console.error('Error getting session:', error);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
