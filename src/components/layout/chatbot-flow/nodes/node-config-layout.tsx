@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, ReactNode, useEffect, useCallback } from 'react';
+import React, {
+  useState,
+  ReactNode,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Typography } from '@/components/ui/typography';
 import { NodeExecutionPanel } from '../node-execution-panel';
@@ -43,13 +49,39 @@ function NodeConfigLayoutContent({
 
   // ✅ Buscar edges e nodes atuais do ReactFlow (sempre usa estado atual do editor)
   const reactFlowInstance = useReactFlow();
-  const liveEdges = reactFlowInstance?.getEdges() || [];
-  const liveNodes =
-    reactFlowInstance?.getNodes()?.map((n) => ({
+  const allEdges = reactFlowInstance?.getEdges() || [];
+  const allNodes = reactFlowInstance?.getNodes() || [];
+
+  // Criar chaves estáveis para memoização baseadas apenas nos IDs
+  // Calcular a chave de forma estável sem usar JSON.stringify nas dependências
+  const edgesKeyStr = allEdges
+    .map((e) => `${e.source}-${e.target}`)
+    .sort()
+    .join(',');
+  const nodesKeyStr = allNodes
+    .map((n) => n.id)
+    .sort()
+    .join(',');
+
+  const edgesKey = useMemo(() => edgesKeyStr, [edgesKeyStr]);
+  const nodesKey = useMemo(() => nodesKeyStr, [nodesKeyStr]);
+
+  // Memoizar edges e nodes apenas quando as chaves mudarem
+  const liveEdges = useMemo(() => {
+    return allEdges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+    }));
+  }, [edgesKey]);
+
+  const liveNodes = useMemo(() => {
+    return allNodes.map((n) => ({
       id: n.id,
       type: n.type,
       data: n.data,
-    })) || [];
+    }));
+  }, [nodesKey]);
+
   const [tempLabel, setTempLabel] = useState(nodeLabel || '');
 
   // Atualizar execução no contexto quando mudar

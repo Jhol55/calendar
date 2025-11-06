@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Square } from 'lucide-react';
 import { NodeData } from '../../../../features/forms/chatbot-flow/types';
 
-function EndNodeComponent({ data, selected }: NodeProps<NodeData>) {
+function EndNodeComponent({ selected }: NodeProps<NodeData>) {
   return (
     <div
       className={`bg-red-500 rounded-full p-4 shadow-lg ${

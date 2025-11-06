@@ -49,7 +49,7 @@ function ConditionFormFields({
   memoryItems: MemoryItem[];
   setMemoryItems: React.Dispatch<React.SetStateAction<MemoryItem[]>>;
 }) {
-  const { form, setValue, errors } = useForm();
+  const { form, setValue } = useForm();
   const conditionType = (form.conditionType as ConditionType) || 'if';
 
   // Estado para IF rules

@@ -317,6 +317,7 @@ export function NodeExecutionPanel({
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeId, flowId]);
 
   useEffect(() => {

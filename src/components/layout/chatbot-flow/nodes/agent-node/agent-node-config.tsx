@@ -99,7 +99,7 @@ function AgentFormFields({
   const updateTool = (
     index: number,
     field: keyof AgentTool,
-    value: string | Record<string, any>,
+    value: string | Record<string, unknown>,
   ) => {
     const newTools = [...tools];
     newTools[index] = { ...newTools[index], [field]: value };

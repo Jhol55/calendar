@@ -109,7 +109,8 @@ export function ExecutionsPanel({
         }
       }
     }
-  }, [isOpen, flowId, fetchExecutions, onExecutionSelect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, flowId]);
 
   // Detectar quando uma execução é selecionada (evento customizado)
   useEffect(() => {
@@ -135,7 +136,8 @@ export function ExecutionsPanel({
         handleExecutionSelected as EventListener,
       );
     };
-  }, [onExecutionSelect, fetchExecutions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
