@@ -144,7 +144,7 @@ export async function processOAuthCallback(
 
     // Decodificar state para obter nome da instância
     const decodedState = Buffer.from(state, 'base64').toString('utf-8');
-    const [stateEmail, timestamp, ...nameParts] = decodedState.split(':');
+    const [stateEmail, , ...nameParts] = decodedState.split(':');
     const instanceName = nameParts.join(':');
 
     if (stateEmail !== email) {
@@ -470,7 +470,6 @@ export async function exchangeWhatsAppToken(
     }
 
     // Configurar webhook com campos de coexistência
-    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/webhooks/whatsapp-official`;
     const verifyToken =
       process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'your_verify_token_here';
 

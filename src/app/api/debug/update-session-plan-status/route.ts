@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSession } from '@/utils/security/session';
 import { prisma } from '@/services/prisma';
 import { updateSessionWithPlanStatus } from '@/utils/security/session';
@@ -7,7 +7,7 @@ import { updateSessionWithPlanStatus } from '@/utils/security/session';
  * Rota de debug para forçar atualização do status de plano na sessão
  * Útil quando a subscription foi deletada mas a sessão ainda tem hasPlan: true
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const session = await getSession();
     const sessionData = session as {

@@ -10,9 +10,9 @@ export interface Execution {
   endTime?: string;
   duration?: number;
   error?: string;
-  data?: any;
-  result?: any;
-  nodeExecutions?: any;
+  data?: unknown;
+  result?: unknown;
+  nodeExecutions?: Record<string, unknown>;
 }
 
 export interface ListExecutionsParams {
@@ -73,9 +73,10 @@ export async function listExecutions(
       endTime: exec.updatedAt?.toISOString(),
       duration: exec.duration || undefined,
       error: exec.error || undefined,
-      data: exec.data as any,
-      result: exec.result as any,
-      nodeExecutions: exec.nodeExecutions as any,
+      data: exec.data as unknown,
+      result: exec.result as unknown,
+      nodeExecutions:
+        (exec.nodeExecutions as Record<string, unknown> | null) || undefined,
     }));
 
     return {
@@ -83,11 +84,13 @@ export async function listExecutions(
       executions: mappedExecutions,
       total,
     };
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro ao listar execuções';
     console.error('Error listing executions:', error);
     return {
       success: false,
-      error: 'Erro ao listar execuções',
+      error: errorMessage,
     };
   }
 }
@@ -119,15 +122,19 @@ export async function getExecution(id: string) {
       endTime: execution.updatedAt?.toISOString(),
       duration: execution.duration || undefined,
       error: execution.error || undefined,
-      data: execution.data as any,
-      result: execution.result as any,
-      nodeExecutions: execution.nodeExecutions as any,
+      data: execution.data as unknown,
+      result: execution.result as unknown,
+      nodeExecutions:
+        (execution.nodeExecutions as Record<string, unknown> | null) ||
+        undefined,
     };
 
     return { success: true, execution: mappedExecution };
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro ao buscar execução';
     console.error('Error getting execution:', error);
-    return { success: false, error: 'Erro ao buscar execução' };
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -184,9 +191,11 @@ export async function stopExecution(id: string) {
       endTime: updatedExecution.updatedAt?.toISOString(),
       duration: updatedExecution.duration || undefined,
       error: updatedExecution.error || undefined,
-      data: updatedExecution.data as any,
-      result: updatedExecution.result as any,
-      nodeExecutions: updatedExecution.nodeExecutions as any,
+      data: updatedExecution.data as unknown,
+      result: updatedExecution.result as unknown,
+      nodeExecutions:
+        (updatedExecution.nodeExecutions as Record<string, unknown> | null) ||
+        undefined,
     };
 
     return { success: true, execution: mappedExecution };

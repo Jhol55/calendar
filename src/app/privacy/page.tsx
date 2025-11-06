@@ -134,8 +134,8 @@ export default function PrivacyPolicyPage() {
             <Typography variant="p" className="mb-2">
               Podemos atualizar esta Política de Privacidade periodicamente.
               Notificaremos você sobre mudanças significativas publicando a nova
-              política nesta página e atualizando a data de "Última
-              atualização".
+              política nesta página e atualizando a data de &quot;Última
+              atualização&quot;.
             </Typography>
           </section>
 

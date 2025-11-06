@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSession } from '@/utils/security/session';
 import { prisma } from '@/services/prisma';
 import { stripe } from '@/services/stripe/stripe.service';
@@ -6,7 +6,7 @@ import { stripe } from '@/services/stripe/stripe.service';
 /**
  * Rota de debug para verificar se há subscriptions no Stripe que não estão no banco
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getSession();
     const sessionData = session as {

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Typography } from '@/components/ui/typography';
-import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
@@ -30,7 +29,7 @@ function EditColumnForm({
     setColumnData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (data: FieldValues) => {
+  const handleSubmit = async () => {
     // Validação manual
     if (!columnData.name.trim()) {
       alert('Nome da coluna é obrigatório');

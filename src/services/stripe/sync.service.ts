@@ -59,18 +59,20 @@ export async function syncAllSubscriptions(): Promise<SyncResult> {
           subscriptionId: subscription.id,
           action: 'synced',
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         result.errors++;
         result.success = false;
         result.details.push({
           userId: 0,
           subscriptionId: subscription.id,
           action: 'error',
-          error: error.message,
+          error: errorMessage,
         });
         console.error(
           `❌ Erro ao sincronizar assinatura ${subscription.id}:`,
-          error.message,
+          errorMessage,
         );
       }
     }
@@ -79,14 +81,15 @@ export async function syncAllSubscriptions(): Promise<SyncResult> {
       `✅ Sincronização concluída: ${result.processed} processadas, ${result.errors} erros`,
     );
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('❌ Erro crítico ao sincronizar assinaturas:', error);
     result.success = false;
     result.details.push({
       userId: 0,
       subscriptionId: 'all',
       action: 'critical_error',
-      error: error.message,
+      error: errorMessage,
     });
     return result;
   }
@@ -244,7 +247,7 @@ async function updateSubscriptionFromStripe(
       ? 'yearly'
       : 'monthly';
 
-  const updateData: any = {
+  const updateData: Parameters<typeof prisma.subscription.update>[0]['data'] = {
     status: subscription.status,
     billingPeriod: planId ? billingPeriod : undefined, // Só atualizar se encontrou o plano
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
@@ -393,10 +396,15 @@ export async function checkSyncStatus(): Promise<{
         }
 
         result.inSync++;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const stripeError = error as {
+          type?: string;
+          statusCode?: number;
+          message?: string;
+        };
         if (
-          error.type === 'StripeInvalidRequestError' &&
-          error.statusCode === 404
+          stripeError.type === 'StripeInvalidRequestError' &&
+          stripeError.statusCode === 404
         ) {
           // Assinatura deletada no Stripe mas ainda no banco
           result.missing++;
@@ -406,9 +414,10 @@ export async function checkSyncStatus(): Promise<{
             dbStatus: dbSub.status,
           });
         } else {
+          const errorMessage = stripeError.message || 'Unknown error';
           console.error(
             `❌ Erro ao verificar assinatura ${dbSub.stripeSubscriptionId}:`,
-            error.message,
+            errorMessage,
           );
         }
       }
@@ -418,7 +427,7 @@ export async function checkSyncStatus(): Promise<{
       `✅ Verificação concluída: ${result.inSync} sincronizadas, ${result.outOfSync} dessincronizadas, ${result.missing} faltando`,
     );
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Erro ao verificar status de sincronização:', error);
     throw error;
   }

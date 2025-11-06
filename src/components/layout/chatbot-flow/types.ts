@@ -186,7 +186,7 @@ export interface TransformationStep {
   type: TransformationType;
   operation: TransformationOperation;
   input: string; // Suporta variáveis dinâmicas
-  params?: Record<string, any>; // Parâmetros extras baseados na operação
+  params?: Record<string, unknown>; // Parâmetros extras baseados na operação
 }
 
 export interface TransformationConfig {
@@ -289,14 +289,14 @@ export interface ColumnDefinition {
   name: string;
   type: ColumnType;
   required?: boolean;
-  default?: any;
+  default?: unknown;
   unique?: boolean;
 }
 
 export interface FilterRule {
   field: string;
   operator: FilterOperator;
-  value: any;
+  value: unknown;
 }
 
 export interface FilterConfig {
@@ -315,10 +315,10 @@ export interface DatabaseConfig {
   columnsToRemove?: string[];
 
   // Para insert
-  record?: Record<string, any>;
+  record?: Record<string, unknown>;
 
   // Para update
-  updates?: Record<string, any>;
+  updates?: Record<string, unknown>;
 
   // Para update, delete, get
   filters?: FilterConfig;
@@ -421,18 +421,38 @@ export interface NodeData {
   }>;
   actions?: Array<{
     type: string;
-    params: Record<string, any>;
+    params: Record<string, unknown>;
   }>;
   // Handlers para execução parcial (não são serializados)
   onPartialExecute?: (nodeId: string) => void | Promise<void>;
   isNodeExecuting?: (nodeId: string) => boolean;
 }
 
+export interface FlowNode {
+  id: string;
+  type: NodeType;
+  position: { x: number; y: number };
+  data: NodeData;
+  selected?: boolean;
+  dragging?: boolean;
+}
+
+export interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+  type?: string;
+  animated?: boolean;
+  selected?: boolean;
+}
+
 export interface FlowData {
   id: string;
   name: string;
-  nodes: any[];
-  edges: any[];
+  nodes: FlowNode[];
+  edges: FlowEdge[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -443,7 +463,7 @@ export interface AgentTool {
   id: string;
   name: string;
   description: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
   targetNodeId?: string; // ID do node que será executado quando a tool for chamada
 }
 

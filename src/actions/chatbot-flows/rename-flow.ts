@@ -37,11 +37,13 @@ export async function renameFlow(formData: FormData) {
       message: result.error || 'Erro ao renomear fluxo',
       field: 'newName',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro ao renomear fluxo';
     console.error('Error renaming flow:', error);
     return {
       success: false,
-      message: 'Erro ao renomear fluxo',
+      message: errorMessage,
       field: 'newName',
     };
   }

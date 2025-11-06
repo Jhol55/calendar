@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cleanQueues } from '@/services/queue';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     await cleanQueues();
 
