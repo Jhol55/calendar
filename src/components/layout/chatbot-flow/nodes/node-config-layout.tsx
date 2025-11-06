@@ -49,43 +49,57 @@ function NodeConfigLayoutContent({
 
   // ✅ Buscar edges e nodes atuais do ReactFlow (sempre usa estado atual do editor)
   const reactFlowInstance = useReactFlow();
-  const allEdges = reactFlowInstance?.getEdges() || [];
-  const allNodes = reactFlowInstance?.getNodes() || [];
+  const allEdgesRaw = reactFlowInstance?.getEdges() || [];
+  const allNodesRaw = reactFlowInstance?.getNodes() || [];
 
   // Criar chaves estáveis para memoização baseadas apenas nos IDs
   // Calcular a chave de forma estável sem usar JSON.stringify nas dependências
-  const edgesKeyStr = allEdges
-    .map((e) => `${e.source}-${e.target}`)
-    .sort()
-    .join(',');
-  const nodesKeyStr = allNodes
-    .map((n) => n.id)
-    .sort()
-    .join(',');
+  const edgesKeyStr = useMemo(
+    () =>
+      allEdgesRaw
+        .map((e) => `${e.source}-${e.target}`)
+        .sort()
+        .join(','),
+    [
+      allEdgesRaw
+        .map((e) => `${e.source}-${e.target}`)
+        .sort()
+        .join(','),
+    ],
+  );
+  const nodesKeyStr = useMemo(
+    () =>
+      allNodesRaw
+        .map((n) => n.id)
+        .sort()
+        .join(','),
+    [
+      allNodesRaw
+        .map((n) => n.id)
+        .sort()
+        .join(','),
+    ],
+  );
+
+  // Memoizar os arrays baseados nas chaves estáveis para evitar loops infinitos
+  const allEdges = useMemo(() => allEdgesRaw, [edgesKeyStr]);
+  const allNodes = useMemo(() => allNodesRaw, [nodesKeyStr]);
 
   // Memoizar edges e nodes apenas quando as chaves mudarem
-  // Usamos apenas as chaves como dependências para evitar loops infinitos
-  // (allEdges/allNodes são recriados a cada render, mas as chaves só mudam quando IDs mudam)
-  // Usamos apenas edgesKeyStr porque allEdges é recriado a cada render
-  // mas edgesKeyStr só muda quando os IDs realmente mudam
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const liveEdges = useMemo(() => {
     return allEdges.map((edge) => ({
       source: edge.source,
       target: edge.target,
     }));
-  }, [edgesKeyStr]);
+  }, [allEdges]);
 
-  // Usamos apenas nodesKeyStr porque allNodes é recriado a cada render
-  // mas nodesKeyStr só muda quando os IDs realmente mudam
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const liveNodes = useMemo(() => {
     return allNodes.map((n) => ({
       id: n.id,
       type: n.type,
       data: n.data,
     }));
-  }, [nodesKeyStr]);
+  }, [allNodes]);
 
   const [tempLabel, setTempLabel] = useState(nodeLabel || '');
 
