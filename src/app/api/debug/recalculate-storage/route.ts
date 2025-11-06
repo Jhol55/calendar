@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getUserIdFromSession } from '@/lib/auth/session';
 import { getStorageUsage } from '@/services/subscription/subscription.service';
 
@@ -6,7 +6,7 @@ import { getStorageUsage } from '@/services/subscription/subscription.service';
  * Rota de debug para forçar recálculo completo do armazenamento
  * Útil quando há discrepância entre valores incrementais e reais
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const userId = await getUserIdFromSession();
 

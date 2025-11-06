@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { Wand2 } from 'lucide-react';
 
 interface VariableInputProps {
@@ -20,17 +20,7 @@ export function VariableInput({
   multiline = false,
   rows = 3,
 }: VariableInputProps) {
-  const [highlightedValue, setHighlightedValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
-
-  useEffect(() => {
-    // Destacar variáveis no formato {{variable}}
-    const highlighted = value.replace(
-      /\{\{([^}]+)\}\}/g,
-      '<span class="variable-highlight">{{$1}}</span>',
-    );
-    setHighlightedValue(highlighted);
-  }, [value]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>,

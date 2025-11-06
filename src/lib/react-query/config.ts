@@ -52,14 +52,15 @@ export const CACHE_TIMES = {
  * - Erros 4xx (exceto 401/403): não retry
  * - Erros 5xx: retry limitado
  */
-const retryStrategy = (failureCount: number, error: any): boolean => {
+const retryStrategy = (failureCount: number, error: unknown): boolean => {
+  const errorObj = error as { status?: number } | null;
   // Não retry em erros de autenticação/autorização
-  if (error?.status === 401 || error?.status === 403) {
+  if (errorObj?.status === 401 || errorObj?.status === 403) {
     return false;
   }
 
   // Não retry em erros de validação (4xx)
-  if (error?.status >= 400 && error?.status < 500) {
+  if (errorObj?.status && errorObj.status >= 400 && errorObj.status < 500) {
     return false;
   }
 
@@ -167,22 +168,24 @@ export const queryClient = new QueryClient({
  * Sanitizar dados recebidos (segurança)
  * Remove propriedades potencialmente perigosas
  */
-function sanitizeData(data: any): void {
+function sanitizeData(data: unknown): void {
   if (typeof data !== 'object' || data === null) return;
+
+  const dataObj = data as Record<string, unknown>;
 
   // Lista de propriedades a remover (exemplo)
   const dangerousProps = ['__proto__', 'constructor', 'prototype'];
 
   for (const prop of dangerousProps) {
-    if (prop in data) {
-      delete data[prop];
+    if (prop in dataObj) {
+      delete dataObj[prop];
     }
   }
 
   // Recursivamente sanitizar objetos aninhados
-  for (const key in data) {
-    if (typeof data[key] === 'object' && data[key] !== null) {
-      sanitizeData(data[key]);
+  for (const key in dataObj) {
+    if (typeof dataObj[key] === 'object' && dataObj[key] !== null) {
+      sanitizeData(dataObj[key]);
     }
   }
 }

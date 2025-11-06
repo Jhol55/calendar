@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSession } from '@/utils/security/session';
 import { prisma } from '@/services/prisma';
 
 /**
  * Rota de debug para verificar estado da sessão e plano no banco
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const session = await getSession();
     const sessionData = session as {

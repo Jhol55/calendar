@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSession } from '@/utils/security/session';
 import { prisma } from '@/services/prisma';
 import { updateSessionWithPlanStatus } from '@/utils/security/session';
@@ -7,7 +7,7 @@ import { updateSessionWithPlanStatus } from '@/utils/security/session';
  * Rota para corrigir o status de plano do usuário
  * Útil quando você setou planId para null mas esqueceu de cancelar a subscription
  */
-export async function POST(_request: NextRequest) {
+export async function POST() {
   try {
     const session = await getSession();
     const sessionData = session as {

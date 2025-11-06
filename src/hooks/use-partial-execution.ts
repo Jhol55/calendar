@@ -4,17 +4,18 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Edge } from 'reactflow';
+import { Edge, Node } from 'reactflow';
+import { NodeData } from '@/components/layout/chatbot-flow';
 
 interface PartialExecutionOptions {
   flowId: string;
   targetNodeId: string;
-  executionData?: any;
+  executionData?: Record<string, unknown>;
   flow?: {
     id: string;
     name: string;
-    nodes: any[];
-    edges: any[];
+    nodes: Node<NodeData>[];
+    edges: Edge[];
     originalFlowId?: string | null;
   };
 }
