@@ -125,9 +125,9 @@ function LoopFormFields({
               variant="span"
               className="text-xs text-blue-700 block mt-2"
             >
-              💡 <strong>Dica:</strong> Conecte a saída "loop" de volta aos
-              nodes que devem ser repetidos, e a saída "done" ao próximo passo
-              após o loop.
+              💡 <strong>Dica:</strong> Conecte a saída &quot;loop&quot; de
+              volta aos nodes que devem ser repetidos, e a saída
+              &quot;done&quot; ao próximo passo após o loop.
             </Typography>
           </div>
         </div>

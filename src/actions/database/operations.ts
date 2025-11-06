@@ -278,7 +278,7 @@ export async function updateCell(
 
       if (rowIndex !== -1) {
         // Converter o valor para o tipo correto da coluna antes de salvar
-        let typedValue: any = value;
+        let typedValue: string | number | boolean | null = value;
         if (columnDef.type === 'number') {
           typedValue = value.trim() === '' ? null : Number(value);
         } else if (columnDef.type === 'boolean') {
@@ -489,7 +489,7 @@ export async function addRow(
           continue;
 
         // Converter o valor para o tipo correto da coluna antes de validar
-        let typedValue: any = value;
+        let typedValue: string | number | boolean = value;
         if (column.type === 'number') {
           typedValue = Number(value);
         } else if (column.type === 'boolean') {

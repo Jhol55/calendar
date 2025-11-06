@@ -3,6 +3,8 @@ import {
   FieldErrors,
   FieldValues,
   UseFormSetError,
+  UseFormReset,
+  UseFormSetValue,
 } from 'react-hook-form';
 
 export interface FormContextProps {

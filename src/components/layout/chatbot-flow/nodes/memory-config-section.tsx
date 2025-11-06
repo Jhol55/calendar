@@ -8,14 +8,13 @@ import { Button } from '@/components/ui/button';
 import { FormSelect } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { MemoryItem } from '../types';
+import type { FormContextProps } from '@/contexts/form/form-context.type';
 
 interface MemoryConfigSectionProps {
   memoryItems: MemoryItem[];
   setMemoryItems: React.Dispatch<React.SetStateAction<MemoryItem[]>>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  form: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  setValue: (name: string, value: any) => void;
+  form: FormContextProps['form'];
+  setValue: FormContextProps['setValue'];
   showMemoryConfig?: boolean; // Controla se a seção deve ser exibida (false por padrão)
 }
 

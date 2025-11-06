@@ -7,7 +7,7 @@ import { updateSessionWithPlanStatus } from '@/utils/security/session';
  * Rota para corrigir o status de plano do usuário
  * Útil quando você setou planId para null mas esqueceu de cancelar a subscription
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const session = await getSession();
     const sessionData = session as {

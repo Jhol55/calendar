@@ -8,7 +8,6 @@ import {
   MemoryItem,
 } from '../../types';
 import { Typography } from '@/components/ui/typography';
-import { useUser } from '@/hooks/use-user';
 import { useInstances } from '@/lib/react-query/hooks/use-user';
 import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';

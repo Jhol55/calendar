@@ -10,7 +10,7 @@ import {
   FlowExecutionProvider,
   useFlowExecution,
 } from '@/contexts/flow-execution/flow-execution-context';
-import { listExecutions } from '@/actions/executions';
+import { listExecutions, type Execution } from '@/actions/executions';
 import { useReactFlow } from 'reactflow';
 
 interface NodeConfigLayoutProps {
@@ -34,7 +34,7 @@ function NodeConfigLayoutContent({
   nodeLabel,
   onNodeLabelChange,
   execution,
-}: NodeConfigLayoutProps & { execution: any }) {
+}: NodeConfigLayoutProps & { execution: Execution | null }) {
   const { setSelectedExecution } = useFlowExecution();
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
@@ -110,7 +110,7 @@ function NodeConfigLayoutContent({
                 nodeId={nodeId}
                 flowId={flowId}
                 mode="input"
-                onVariableSelect={(variable) => {}}
+                onVariableSelect={() => {}}
                 currentEdges={liveEdges} // ✅ Edges atuais do ReactFlow
                 currentNodes={liveNodes} // ✅ Nodes atuais do ReactFlow
               />
@@ -257,7 +257,7 @@ function NodeConfigLayoutContent({
 }
 
 export function NodeConfigLayout(props: NodeConfigLayoutProps) {
-  const [execution, setExecution] = useState<any>(null);
+  const [execution, setExecution] = useState<Execution | null>(null);
 
   const loadExecution = useCallback(async () => {
     if (!props.flowId) return;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +40,7 @@ export function ExecutionsPanel({
     null,
   );
 
-  const fetchExecutions = async () => {
+  const fetchExecutions = useCallback(async () => {
     setLoading(true);
     try {
       const result = await listExecutions({
@@ -60,7 +60,7 @@ export function ExecutionsPanel({
     } finally {
       setLoading(false);
     }
-  };
+  }, [flowId]);
 
   const handleStopExecution = async (
     executionId: string,
@@ -104,16 +104,16 @@ export function ExecutionsPanel({
           if (onExecutionSelect) {
             onExecutionSelect(execution);
           }
-        } catch (err) {
+        } catch {
           console.warn('⚠️ Could not parse selected execution');
         }
       }
     }
-  }, [isOpen, flowId]);
+  }, [isOpen, flowId, fetchExecutions, onExecutionSelect]);
 
   // Detectar quando uma execução é selecionada (evento customizado)
   useEffect(() => {
-    const handleExecutionSelected = (event: any) => {
+    const handleExecutionSelected = (event: CustomEvent<Execution>) => {
       const execution = event.detail;
       console.log('🎯 Nova execução detectada:', execution.id);
       setSelectedExecution(execution);
@@ -124,12 +124,18 @@ export function ExecutionsPanel({
       fetchExecutions();
     };
 
-    window.addEventListener('executionSelected', handleExecutionSelected);
+    window.addEventListener(
+      'executionSelected',
+      handleExecutionSelected as EventListener,
+    );
 
     return () => {
-      window.removeEventListener('executionSelected', handleExecutionSelected);
+      window.removeEventListener(
+        'executionSelected',
+        handleExecutionSelected as EventListener,
+      );
     };
-  }, [onExecutionSelect]);
+  }, [onExecutionSelect, fetchExecutions]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

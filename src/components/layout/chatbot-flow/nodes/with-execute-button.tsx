@@ -8,11 +8,6 @@ import { NodeProps } from 'reactflow';
 import { NodeData } from '../types';
 import { NodeExecuteButton } from './node-execute-button';
 
-interface WithExecuteButtonProps extends NodeProps<NodeData> {
-  onPartialExecute?: (nodeId: string) => void | Promise<void>;
-  isNodeExecuting?: (nodeId: string) => boolean;
-}
-
 export function withExecuteButton<P extends NodeProps<NodeData>>(
   WrappedComponent: ComponentType<P>,
 ) {
@@ -20,8 +15,12 @@ export function withExecuteButton<P extends NodeProps<NodeData>>(
     const [isHovered, setIsHovered] = useState(false);
 
     // Extrair as props do data (onde são armazenadas)
-    const onPartialExecute = (props.data as any)?.onPartialExecute;
-    const isNodeExecuting = (props.data as any)?.isNodeExecuting;
+    const nodeData = props.data as NodeData & {
+      onPartialExecute?: (nodeId: string) => void | Promise<void>;
+      isNodeExecuting?: (nodeId: string) => boolean;
+    };
+    const onPartialExecute = nodeData?.onPartialExecute;
+    const isNodeExecuting = nodeData?.isNodeExecuting;
     const { id } = props;
 
     const isExecuting = isNodeExecuting ? isNodeExecuting(id) : false;

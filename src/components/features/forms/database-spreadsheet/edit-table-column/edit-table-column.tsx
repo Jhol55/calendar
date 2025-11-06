@@ -8,7 +8,6 @@ import { Form } from '@/components/ui/form';
 import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
 import { FormSelect } from '@/components/ui/select';
-import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { editColumnSchema } from './edit-table-column.schema';
 import { EditColumnDialogProps, ColumnData } from './edit-table-column.type';

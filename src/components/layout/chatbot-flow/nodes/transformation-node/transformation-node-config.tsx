@@ -211,8 +211,11 @@ function TransformationFormFields({
   const updateStep = (
     index: number,
     field: keyof TransformationStep,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    value: any,
+    value:
+      | string
+      | TransformationType
+      | TransformationOperation
+      | Record<string, unknown>,
   ) => {
     const newSteps = [...steps];
 

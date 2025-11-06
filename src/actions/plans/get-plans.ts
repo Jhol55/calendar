@@ -29,8 +29,9 @@ export async function getPlans(): Promise<{
         isActive: plan.isActive,
       })),
     };
-  } catch (error: any) {
-    console.error('Error fetching plans:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error fetching plans:', errorMessage);
     return {
       success: false,
       message: 'Failed to fetch plans',
