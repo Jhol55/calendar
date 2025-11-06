@@ -1,5 +1,10 @@
 import Stripe from 'stripe';
 import { prisma } from '@/services/prisma';
+import {
+  getErrorMessage,
+  getErrorStack,
+  hasCode,
+} from '@/lib/types/error-guards';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY is not defined');
@@ -99,7 +104,7 @@ export async function createOrGetCustomer({
         return (await stripe.customers.retrieve(
           existingSubscription.stripeCustomerId,
         )) as Stripe.Customer;
-      } catch (error) {
+      } catch {
         // Customer não existe no Stripe, criar novo
       }
     }
@@ -357,14 +362,14 @@ export async function handleWebhook(
 
     console.log(`✅ Webhook ${event.type} processado com sucesso`);
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Erro ao processar webhook:', {
       eventType: event.type,
-      error: error.message,
-      stack: error.stack,
+      error: getErrorMessage(error),
+      stack: getErrorStack(error),
       timestamp: new Date().toISOString(),
     });
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
@@ -477,9 +482,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             existingSubscription.stripeSubscriptionId,
           );
           console.log('✅ Trial subscription cancelado no Stripe');
-        } catch (retrieveError: any) {
+        } catch (retrieveError: unknown) {
           // Se não encontrar no Stripe, significa que foi criada apenas no banco
-          if (retrieveError?.code === 'resource_missing') {
+          if (
+            hasCode(retrieveError) &&
+            retrieveError.code === 'resource_missing'
+          ) {
             console.log(
               'ℹ️ Trial subscription não existe no Stripe (criada apenas no banco)',
             );
@@ -743,7 +751,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
         });
 
         // Atualizar planId e billingPeriod se mudou
-        const updateData: any = {
+        const updateData: Parameters<
+          typeof prisma.subscription.update
+        >[0]['data'] = {
           planId: newPlanId,
           billingPeriod: newBillingPeriod,
           status: subscription.status,
@@ -780,7 +790,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
     // Se não encontrou correspondência, apenas atualizar os outros campos
     if (newPlanId === null) {
-      const updateData: any = {
+      const updateData: Parameters<
+        typeof prisma.subscription.update
+      >[0]['data'] = {
         status: subscription.status,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
       };
@@ -800,10 +812,11 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     }
   } else {
     // Se não há priceId, apenas atualizar outros campos
-    const updateData: any = {
-      status: subscription.status,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    };
+    const updateData: Parameters<typeof prisma.subscription.update>[0]['data'] =
+      {
+        status: subscription.status,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      };
 
     // Só adicionar campos de data se não forem null (não sobrescrever dados existentes)
     if (trialEndsAt !== null) updateData.trialEndsAt = trialEndsAt;

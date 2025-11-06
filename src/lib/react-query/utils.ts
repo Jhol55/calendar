@@ -6,6 +6,12 @@
 
 import { QueryClient, QueryKey } from '@tanstack/react-query';
 import { ApiResponse, ApiError } from './types';
+import {
+  getErrorMessage,
+  hasStatus,
+  hasMessage,
+  hasCode,
+} from '@/lib/types/error-guards';
 
 /**
  * Wrapper seguro para query functions
@@ -14,8 +20,8 @@ import { ApiResponse, ApiError } from './types';
 export async function safeQueryFn<T>(
   fn: () => Promise<ApiResponse<T>>,
   options?: {
-    transformData?: (data: any) => T;
-    validateResponse?: (response: any) => boolean;
+    transformData?: (data: unknown) => T;
+    validateResponse?: (response: unknown) => boolean;
   },
 ): Promise<T> {
   try {
@@ -33,9 +39,10 @@ export async function safeQueryFn<T>(
 
     // Verificar sucesso
     if (!response.success) {
+      const status = hasStatus(response) ? response.status : undefined;
       throw {
         message: response.error || response.message || 'Request failed',
-        status: (response as any).status,
+        status,
       } as ApiError;
     }
 
@@ -45,13 +52,13 @@ export async function safeQueryFn<T>(
       : (response.data as T);
 
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Normalizar erro
     const apiError: ApiError = {
-      message: error?.message || 'An unexpected error occurred',
-      status: error?.status || error?.response?.status,
-      code: error?.code,
-      details: error?.details || error?.response?.data,
+      message: getErrorMessage(error),
+      status: hasStatus(error) ? error.status : undefined,
+      code: hasCode(error) ? error.code : undefined,
+      details: undefined, // Não tipado, deixar undefined por segurança
     };
 
     throw apiError;
@@ -89,7 +96,7 @@ export async function prefetchQueries(
   queryClient: QueryClient,
   queries: Array<{
     queryKey: QueryKey;
-    queryFn: () => Promise<any>;
+    queryFn: () => Promise<unknown>;
     staleTime?: number;
   }>,
 ): Promise<void> {
@@ -260,13 +267,13 @@ export async function forceRefetch(
   maxRetries: number = 3,
 ): Promise<void> {
   let attempts = 0;
-  let lastError: any;
+  let lastError: unknown;
 
   while (attempts < maxRetries) {
     try {
       await queryClient.refetchQueries({ queryKey });
       return;
-    } catch (error) {
+    } catch (error: unknown) {
       lastError = error;
       attempts++;
 

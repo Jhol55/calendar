@@ -5,6 +5,7 @@ import {
   createOrGetCustomer,
   createCheckoutSession,
 } from '@/services/stripe/stripe.service';
+import { getErrorMessage, getErrorStack } from '@/lib/types/error-guards';
 
 export async function POST(request: NextRequest) {
   let userId: number | null = null;
@@ -126,9 +127,9 @@ export async function POST(request: NextRequest) {
       await prisma.$transaction(async (tx) => {
         // Criar ou atualizar assinatura
         await tx.subscription.upsert({
-          where: { userId },
+          where: { userId: userId as number },
           create: {
-            userId,
+            userId: userId as number,
             planId: plan.id,
             status: 'trialing',
             billingPeriod: finalBillingPeriod as 'monthly' | 'yearly',
@@ -150,15 +151,15 @@ export async function POST(request: NextRequest) {
 
         // Atualizar plano do usuário
         await tx.user.update({
-          where: { id: userId },
+          where: { id: userId as number },
           data: { planId: plan.id },
         });
 
         // Criar ou atualizar limites com valores reais calculados (não zerar!)
         await tx.user_plan_limits.upsert({
-          where: { userId },
+          where: { userId: userId as number },
           create: {
-            userId,
+            userId: userId as number,
             currentStorageMB,
             currentInstances,
           },
@@ -258,12 +259,12 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
       url: session.url,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log detalhado apenas no servidor (não expor ao cliente)
     console.error('Error creating checkout session:', error);
     console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
+      message: getErrorMessage(error),
+      stack: getErrorStack(error),
       userId: userId || 'unknown',
       timestamp: new Date().toISOString(),
     });

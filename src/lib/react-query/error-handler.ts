@@ -4,8 +4,14 @@
  * Gerenciamento centralizado de erros com logging e recovery
  */
 
-import { QueryCache, MutationCache } from '@tanstack/react-query';
+import {
+  QueryCache,
+  MutationCache,
+  Query,
+  Mutation,
+} from '@tanstack/react-query';
 import { ApiError } from './types';
+import { getErrorMessage, hasStatus, hasCode } from '@/lib/types/error-guards';
 
 /**
  * Categorias de erros
@@ -22,8 +28,8 @@ export enum ErrorCategory {
 /**
  * Classificar erro por categoria
  */
-export function categorizeError(error: any): ErrorCategory {
-  const status = error?.status || error?.response?.status;
+export function categorizeError(error: unknown): ErrorCategory {
+  const status = hasStatus(error) ? error.status : undefined;
 
   if (!status) {
     return ErrorCategory.NETWORK;
@@ -51,7 +57,7 @@ export function categorizeError(error: any): ErrorCategory {
 /**
  * Formatar mensagem de erro para o usuário
  */
-export function formatErrorMessage(error: any): string {
+export function formatErrorMessage(error: unknown): string {
   const category = categorizeError(error);
 
   // Mensagens personalizadas por categoria
@@ -65,10 +71,21 @@ export function formatErrorMessage(error: any): string {
   };
 
   // Usar mensagem específica do erro se disponível
-  const specificMessage =
-    error?.message || error?.error || error?.data?.message;
+  const specificMessage = getErrorMessage(error);
 
   return specificMessage || defaultMessages[category];
+}
+
+/**
+ * Interface para log de erros
+ */
+interface ErrorLog {
+  timestamp: string;
+  category: ErrorCategory;
+  message: string;
+  error: string;
+  status?: number;
+  context?: unknown;
 }
 
 /**
@@ -86,16 +103,16 @@ export class ErrorLogger {
     return ErrorLogger.instance;
   }
 
-  log(error: any, context?: any): void {
+  log(error: unknown, context?: unknown): void {
     const category = categorizeError(error);
     const timestamp = new Date().toISOString();
 
-    const errorLog = {
+    const errorLog: ErrorLog = {
       timestamp,
       category,
       message: formatErrorMessage(error),
-      error: error?.message || String(error),
-      status: error?.status,
+      error: getErrorMessage(error),
+      status: hasStatus(error) ? error.status : undefined,
       context,
     };
 
@@ -115,7 +132,7 @@ export class ErrorLogger {
     }
   }
 
-  private sendToServer(errorLog: any): void {
+  private sendToServer(errorLog: ErrorLog): void {
     // TODO: Implementar envio para servidor de logs
     // fetch('/api/logs/error', {
     //   method: 'POST',
@@ -132,7 +149,7 @@ export class ErrorLogger {
 export function createQueryErrorHandler() {
   const logger = ErrorLogger.getInstance();
 
-  return (error: any, query: any) => {
+  return (error: unknown, query: Query) => {
     logger.log(error, {
       type: 'query',
       queryKey: query.queryKey,
@@ -155,7 +172,12 @@ export function createQueryErrorHandler() {
 export function createMutationErrorHandler() {
   const logger = ErrorLogger.getInstance();
 
-  return (error: any, variables: any, context: any, mutation: any) => {
+  return (
+    error: unknown,
+    variables: unknown,
+    context: unknown,
+    mutation: Mutation,
+  ) => {
     logger.log(error, {
       type: 'mutation',
       mutationKey: mutation.options.mutationKey,
@@ -167,7 +189,10 @@ export function createMutationErrorHandler() {
 /**
  * Retry strategy baseada em categoria de erro
  */
-export function shouldRetryError(failureCount: number, error: any): boolean {
+export function shouldRetryError(
+  failureCount: number,
+  error: unknown,
+): boolean {
   const category = categorizeError(error);
 
   // Não retry para erros de validação e autenticação
@@ -190,7 +215,7 @@ export function shouldRetryError(failureCount: number, error: any): boolean {
 /**
  * Delay para retry com backoff exponencial
  */
-export function getRetryDelay(attemptIndex: number, error: any): number {
+export function getRetryDelay(attemptIndex: number, error: unknown): number {
   const category = categorizeError(error);
 
   // Para erros de rede, usar backoff mais agressivo
@@ -219,7 +244,7 @@ export function createErrorBoundaryHandler() {
 /**
  * Utilidade para mostrar toast de erro (integrar com sua biblioteca de toast)
  */
-export function showErrorToast(error: any): void {
+export function showErrorToast(error: unknown): void {
   const message = formatErrorMessage(error);
 
   // TODO: Integrar com biblioteca de toast (ex: react-hot-toast, sonner, etc)
@@ -231,19 +256,21 @@ export function showErrorToast(error: any): void {
 /**
  * Validador de resposta da API
  */
-export function validateApiResponse(response: any): boolean {
+export function validateApiResponse(response: unknown): boolean {
   // Verificar estrutura básica
   if (!response || typeof response !== 'object') {
     return false;
   }
 
+  const responseObj = response as Record<string, unknown>;
+
   // Verificar propriedade success
-  if (typeof response.success !== 'boolean') {
+  if (typeof responseObj.success !== 'boolean') {
     return false;
   }
 
   // Se não foi sucesso, deve ter mensagem de erro
-  if (!response.success && !response.error && !response.message) {
+  if (!responseObj.success && !responseObj.error && !responseObj.message) {
     return false;
   }
 
@@ -253,16 +280,17 @@ export function validateApiResponse(response: any): boolean {
 /**
  * Sanitizar dados de erro (remover informações sensíveis)
  */
-export function sanitizeError(error: any): ApiError {
+export function sanitizeError(error: unknown): ApiError {
   const sanitized: ApiError = {
     message: formatErrorMessage(error),
-    status: error?.status || error?.response?.status,
-    code: error?.code,
+    status: hasStatus(error) ? error.status : undefined,
+    code: hasCode(error) ? error.code : undefined,
   };
 
   // Não incluir detalhes em produção
   if (process.env.NODE_ENV === 'development') {
-    sanitized.details = error?.details || error?.response?.data;
+    // Detalhes não tipados por segurança
+    sanitized.details = undefined;
   }
 
   return sanitized;
