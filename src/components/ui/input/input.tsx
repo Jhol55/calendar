@@ -32,6 +32,17 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       ...registerProps
     } = register(fieldName);
 
+    // Sincronizar externalValue com o formulário quando mudar
+    useEffect(() => {
+      if (externalValue !== undefined) {
+        const formValue = form[fieldName];
+        const externalValueStr = String(externalValue);
+        if (formValue !== externalValueStr) {
+          setValue(fieldName, externalValueStr, { shouldValidate: false });
+        }
+      }
+    }, [externalValue, fieldName, setValue, form]);
+
     const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (!['checkbox', 'radio'].includes(type)) {
         setValue(fieldName, maskSchema?.[fieldName]?.(e) ?? e.target.value);

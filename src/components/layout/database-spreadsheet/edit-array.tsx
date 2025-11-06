@@ -9,9 +9,8 @@ import { FormControl } from '@/components/ui/form-control';
 import { Input } from '@/components/ui/input';
 import { FormSelect } from '@/components/ui/select';
 import { SubmitButton } from '@/components/ui/submit-button';
-import { Plus, Trash2, X, Key } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { z } from 'zod';
-import { FieldValues } from 'react-hook-form';
 import { useForm } from '@/hooks/use-form';
 import { EditObjectDialog } from './edit-object';
 
@@ -68,88 +67,7 @@ function EditArrayForm({
   columnName: string;
   isNested?: boolean;
 }) {
-  const addItem = () => {
-    const newItem: ArrayItem = {
-      id: `item-${Date.now()}`,
-      type: 'string',
-      value: '',
-    };
-    setArrayItems((prev) => [...prev, newItem]);
-  };
-
-  const removeItem = (id: string) => {
-    setArrayItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const updateItemType = (id: string, type: ItemType) => {
-    setArrayItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-
-        // Resetar valores ao mudar de tipo
-        const newItem: ArrayItem = { id: item.id, type };
-
-        switch (type) {
-          case 'string':
-          case 'number':
-            newItem.value = '';
-            break;
-          case 'boolean':
-            newItem.booleanValue = true;
-            break;
-          case 'null':
-            // Sem valores adicionais
-            break;
-          case 'object':
-            newItem.objectPairs = [{ key: '', value: '' }];
-            break;
-          case 'array':
-            newItem.arrayValue = '[]';
-            break;
-          case 'json':
-            newItem.jsonValue = '';
-            break;
-        }
-
-        return newItem;
-      }),
-    );
-  };
-
-  const updateItemValue = (id: string, value: string) => {
-    setArrayItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, value } : item)),
-    );
-  };
-
-  const updateItemBooleanValue = (id: string, booleanValue: boolean) => {
-    setArrayItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, booleanValue } : item)),
-    );
-  };
-
-  const updateItemArrayValue = (id: string, arrayValue: string) => {
-    setArrayItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, arrayValue } : item)),
-    );
-  };
-
-  const updateItemJsonValue = (id: string, jsonValue: string) => {
-    setArrayItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, jsonValue } : item)),
-    );
-  };
-
-  const updateItemObjectPairs = (
-    id: string,
-    objectPairs: Array<{ key: string; value: string }>,
-  ) => {
-    setArrayItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, objectPairs } : item)),
-    );
-  };
-
-  const handleSubmit = async (data: FieldValues) => {
+  const handleSubmit = async () => {
     // Converter items para array final
     const processedArray = arrayItems.map((item) => {
       switch (item.type) {
@@ -236,7 +154,6 @@ function EditArrayForm({
       <FormContent
         arrayItems={arrayItems}
         setArrayItems={setArrayItems}
-        onClose={onClose}
         columnName={columnName}
       />
     </Form>
@@ -461,29 +378,36 @@ function ArrayEditor({
 function FormContent({
   arrayItems,
   setArrayItems,
-  onClose,
   columnName,
 }: {
   arrayItems: ArrayItem[];
   setArrayItems: React.Dispatch<React.SetStateAction<ArrayItem[]>>;
-  onClose: () => void;
   columnName: string;
 }) {
-  const { errors, setValue } = useForm();
+  const { setValue, form } = useForm();
 
   // Inicializar valores do formulário quando os items mudarem
   React.useEffect(() => {
     // Usar setTimeout para garantir que o formulário está pronto
     const timer = setTimeout(() => {
       arrayItems.forEach((item) => {
-        setValue(`type_${item.id}`, item.type);
+        setValue(`type_${item.id}`, item.type, { shouldValidate: false });
 
         if (item.type === 'boolean') {
           const boolValue = item.booleanValue ? 'true' : 'false';
-          setValue(`booleanValue_${item.id}`, boolValue);
+          setValue(`booleanValue_${item.id}`, boolValue, {
+            shouldValidate: false,
+          });
+        } else if (item.type === 'string' || item.type === 'number') {
+          const itemValue = item.value || '';
+          setValue(`value_${item.id}`, itemValue, { shouldValidate: false });
+        } else if (item.type === 'json') {
+          setValue(`jsonValue_${item.id}`, item.jsonValue || '', {
+            shouldValidate: false,
+          });
         }
       });
-    }, 100);
+    }, 50); // Reduzir delay para 50ms para inicialização mais rápida
 
     return () => clearTimeout(timer);
   }, [arrayItems, setValue]);
@@ -540,6 +464,8 @@ function FormContent({
     setArrayItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, value } : item)),
     );
+    // Sincronizar com o formulário imediatamente
+    setValue(`value_${id}`, value, { shouldValidate: false });
   };
 
   const updateItemBooleanValue = (id: string, booleanValue: boolean) => {
@@ -635,7 +561,8 @@ function FormContent({
         {arrayItems.length === 0 ? (
           <div className="text-center py-8 text-neutral-500">
             <Typography variant="p">
-              Nenhum item no array. Clique em "Adicionar Valor" para começar.
+              Nenhum item no array. Clique em &quot;Adicionar Valor&quot; para
+              começar.
             </Typography>
           </div>
         ) : (
@@ -817,9 +744,10 @@ export function EditArrayDialog({
   useEffect(() => {
     if (isOpen) {
       const items: ArrayItem[] = initialArray.map((item, index) => {
+        const itemId = `item-${Date.now()}-${index}`;
         if (Array.isArray(item)) {
           return {
-            id: `item-${index}`,
+            id: itemId,
             type: 'array',
             arrayValue: JSON.stringify(item),
           };
@@ -829,36 +757,39 @@ export function EditArrayDialog({
             value: String(value),
           }));
           return {
-            id: `item-${index}`,
+            id: itemId,
             type: 'object',
             objectPairs,
           };
         } else if (typeof item === 'number') {
           return {
-            id: `item-${index}`,
+            id: itemId,
             type: 'number',
             value: String(item),
           };
         } else if (typeof item === 'boolean') {
           return {
-            id: `item-${index}`,
+            id: itemId,
             type: 'boolean',
             booleanValue: item,
           };
         } else if (item === null) {
           return {
-            id: `item-${index}`,
+            id: itemId,
             type: 'null',
           };
         } else {
           return {
-            id: `item-${index}`,
+            id: itemId,
             type: 'string',
             value: String(item),
           };
         }
       });
       setArrayItems(items);
+    } else {
+      // Limpar array quando fechar
+      setArrayItems([]);
     }
   }, [isOpen, initialArray]);
 
