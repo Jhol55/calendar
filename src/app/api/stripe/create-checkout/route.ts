@@ -11,8 +11,8 @@ export async function POST(request: NextRequest) {
 
   try {
     // Autenticação: Validar sessão
-    const session = await getSession();
-    const sessionUser = session as { user?: { email?: string } } | null;
+    const authSession = await getSession();
+    const sessionUser = authSession as { user?: { email?: string } } | null;
 
     if (!sessionUser?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
