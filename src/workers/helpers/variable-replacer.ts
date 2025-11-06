@@ -1,8 +1,47 @@
 /**
+ * Tipo para methodMatch: [fullMatch, methodName, argsString]
+ */
+type MethodMatch = [string, string, string];
+
+/**
+ * Type guard para verificar se um valor tem uma propriedade específica
+ */
+function hasProperty(
+  value: unknown,
+  prop: string,
+): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    value !== undefined &&
+    typeof value === 'object' &&
+    prop in value
+  );
+}
+
+/**
+ * Type guard para verificar se um valor tem um método específico
+ */
+function hasMethod(
+  value: unknown,
+  method: string,
+): value is Record<string, (...args: unknown[]) => unknown> {
+  return (
+    value !== null &&
+    value !== undefined &&
+    typeof value === 'object' &&
+    method in value &&
+    typeof (value as Record<string, unknown>)[method] === 'function'
+  );
+}
+
+/**
  * Avalia uma expressão JavaScript de forma segura (estilo n8n)
  * Suporta encadeamento de métodos como .replace("0", "1").toUpperCase()
  */
-function evaluateJavaScriptExpression(baseValue: any, expression: string): any {
+function evaluateJavaScriptExpression(
+  baseValue: unknown,
+  expression: string,
+): unknown {
   try {
     // Remover espaços extras
     let trimmedExpr = expression.trim();
@@ -23,7 +62,7 @@ function evaluateJavaScriptExpression(baseValue: any, expression: string): any {
       // Detectar se é uma chamada de método (ex: replace("0", "1")) ou propriedade (ex: length)
       // Precisa capturar parênteses balanceados para argumentos complexos
       const methodNameMatch = trimmedExpr.match(/^(\w+)\s*\(/);
-      let methodMatch: RegExpMatchArray | null = null;
+      let methodMatch: MethodMatch | null = null;
 
       if (methodNameMatch) {
         const methodName = methodNameMatch[1];
@@ -49,7 +88,7 @@ function evaluateJavaScriptExpression(baseValue: any, expression: string): any {
         if (depth === 0 && endPos <= trimmedExpr.length) {
           const fullMatch = trimmedExpr.substring(0, endPos);
           const argsString = trimmedExpr.substring(startPos + 1, endPos - 1);
-          methodMatch = [fullMatch, methodName, argsString] as any;
+          methodMatch = [fullMatch, methodName, argsString];
         }
       }
 
@@ -99,7 +138,7 @@ function evaluateJavaScriptExpression(baseValue: any, expression: string): any {
         }
 
         // Parsear argumentos de forma segura
-        const args: any[] = [];
+        const args: unknown[] = [];
         if (argsString.trim()) {
           const parsedArgs = parseMethodArguments(argsString);
           args.push(...parsedArgs);
@@ -117,10 +156,12 @@ function evaluateJavaScriptExpression(baseValue: any, expression: string): any {
         }
 
         // Chamar o método
-        if (typeof (targetValue as any)[methodName] === 'function') {
-          currentValue = (targetValue as any)[methodName](...args);
+        if (hasMethod(targetValue, methodName)) {
+          const method = targetValue[methodName];
+          currentValue = method(...args);
         } else if (methodName === 'parseInt') {
-          currentValue = parseInt(String(currentValue), args[0] || 10);
+          const radix = typeof args[0] === 'number' ? args[0] : 10;
+          currentValue = parseInt(String(currentValue), radix);
         } else if (methodName === 'parseFloat') {
           currentValue = parseFloat(String(currentValue));
         } else {
@@ -137,7 +178,11 @@ function evaluateJavaScriptExpression(baseValue: any, expression: string): any {
           return currentValue;
         }
 
-        currentValue = (currentValue as any)[propertyName];
+        if (hasProperty(currentValue, propertyName)) {
+          currentValue = currentValue[propertyName];
+        } else {
+          throw new Error(`Propriedade "${propertyName}" não está disponível`);
+        }
 
         // Remover a parte processada da expressão
         trimmedExpr = trimmedExpr.substring(propertyMatch[0].length).trim();
@@ -148,10 +193,11 @@ function evaluateJavaScriptExpression(baseValue: any, expression: string): any {
     }
 
     return currentValue;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(
       `❌ Erro ao avaliar expressão JavaScript "${expression}":`,
-      error.message,
+      errorMessage,
     );
     return baseValue;
   }
@@ -160,8 +206,8 @@ function evaluateJavaScriptExpression(baseValue: any, expression: string): any {
 /**
  * Parseia argumentos de uma chamada de método de forma segura
  */
-function parseMethodArguments(argsString: string): any[] {
-  const args: any[] = [];
+function parseMethodArguments(argsString: string): unknown[] {
+  const args: unknown[] = [];
   let current = '';
   let depth = 0;
   let inString = false;
@@ -223,7 +269,7 @@ function parseMethodArguments(argsString: string): any[] {
 /**
  * Converte uma string de argumento em valor JavaScript
  */
-function parseArgumentValue(arg: string): any {
+function parseArgumentValue(arg: string): unknown {
   const trimmed = arg.trim();
 
   // String (com ou sem aspas)
@@ -263,8 +309,10 @@ function parseArgumentValue(arg: string): any {
 }
 
 // Função para substituir variáveis no texto
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function replaceVariables(text: string, context: any): any {
+export function replaceVariables(
+  text: string,
+  context: Record<string, unknown>,
+): unknown {
   if (!text) return text;
 
   // Se não for string, retornar como está
@@ -299,7 +347,6 @@ export function replaceVariables(text: string, context: any): any {
       const jsPattern =
         /\.(replace|toUpperCase|toLowerCase|trim|substring|substr|slice|split|join|concat|indexOf|lastIndexOf|includes|startsWith|endsWith|repeat|padStart|padEnd|toFixed|toString|parseInt|parseFloat|map|filter|find|some|every|reduce|length)\s*\(?/i;
 
-      let matchPos = -1;
       let bestSplitPos = -1;
 
       // Tentar encontrar onde começa a expressão JS procurando métodos/propriedades conhecidos
@@ -314,7 +361,7 @@ export function replaceVariables(text: string, context: any): any {
           const candidateExpr = cleanPath.substring(i);
 
           // Tentar resolver o path candidato
-          let testValue: any = context;
+          let testValue: unknown = context;
           const testParts = candidatePath.split('.');
           let pathValid = true;
 
@@ -334,7 +381,10 @@ export function replaceVariables(text: string, context: any): any {
                   pathValid = false;
                   break;
                 }
-              } else if (!Array.isArray(testValue) && part in testValue) {
+              } else if (
+                !Array.isArray(testValue) &&
+                hasProperty(testValue, part)
+              ) {
                 testValue = testValue[part];
               } else {
                 pathValid = false;
@@ -360,7 +410,7 @@ export function replaceVariables(text: string, context: any): any {
       if (bestSplitPos === -1) {
         // Tentar resolver o path completo
         const testParts = cleanPath.split('.');
-        let testValue: any = context;
+        let testValue: unknown = context;
         let validUntil = -1;
 
         for (let i = 0; i < testParts.length; i++) {
@@ -382,7 +432,10 @@ export function replaceVariables(text: string, context: any): any {
                 // Índice inválido - não é expressão JS, é erro
                 break;
               }
-            } else if (!Array.isArray(testValue) && part in testValue) {
+            } else if (
+              !Array.isArray(testValue) &&
+              hasProperty(testValue, part)
+            ) {
               testValue = testValue[part];
               validUntil = i;
             } else {
@@ -407,8 +460,7 @@ export function replaceVariables(text: string, context: any): any {
       // Resolver o path da variável base
       const parts = variablePath.split('.');
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let value: any = context;
+      let value: unknown = context;
       for (const part of parts) {
         // Verificar se value é um objeto válido (não null, não string, não number, etc)
         // null é typeof 'object' mas não é um objeto válido para acessar propriedades
@@ -428,7 +480,7 @@ export function replaceVariables(text: string, context: any): any {
               // Índice fora dos limites ou negativo - não resolvido
               return '__UNRESOLVED__' + match;
             }
-          } else if (!Array.isArray(value) && part in value) {
+          } else if (!Array.isArray(value) && hasProperty(value, part)) {
             value = value[part];
           } else {
             // Path não existe - marcar como não resolvido

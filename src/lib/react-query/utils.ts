@@ -6,12 +6,7 @@
 
 import { QueryClient, QueryKey } from '@tanstack/react-query';
 import { ApiResponse, ApiError } from './types';
-import {
-  getErrorMessage,
-  hasStatus,
-  hasMessage,
-  hasCode,
-} from '@/lib/types/error-guards';
+import { getErrorMessage, hasStatus, hasCode } from '@/lib/types/error-guards';
 
 /**
  * Wrapper seguro para query functions

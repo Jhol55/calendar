@@ -13,7 +13,7 @@ import {
 /**
  * Tipo genérico para respostas da API
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -27,7 +27,7 @@ export interface ApiError {
   message: string;
   status?: number;
   code?: string;
-  details?: any;
+  details?: unknown;
 }
 
 /**
@@ -56,7 +56,7 @@ export type CustomMutationOptions<
 /**
  * Tipo para query com prefetch
  */
-export interface PrefetchableQuery<T = any> {
+export interface PrefetchableQuery<T = unknown> {
   queryKey: QueryKey;
   queryFn: () => Promise<T>;
 }
@@ -75,7 +75,7 @@ export interface QueryLoadingState {
 /**
  * Contexto para optimistic updates
  */
-export interface OptimisticContext<T = any> {
+export interface OptimisticContext<T = unknown> {
   previous?: T;
   optimistic?: T;
   rollback?: () => void;
@@ -148,5 +148,5 @@ export interface QueryMetadata {
 export interface RetryConfig {
   attempts: number;
   delay: number | ((attemptIndex: number) => number);
-  shouldRetry?: (error: any) => boolean;
+  shouldRetry?: (error: unknown) => boolean;
 }
