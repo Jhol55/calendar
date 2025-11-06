@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
 import { DATABASE_CONFIG } from '@/config/database.config';
+import { canUseStorage } from '@/services/subscription/subscription.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +13,30 @@ export async function POST(request: NextRequest) {
         { error: 'userId, tableName, and data are required' },
         { status: 400 },
       );
+    }
+
+    // Verificar limite de armazenamento antes de inserir
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (user) {
+        // Estimar tamanho do registro em MB (JSON stringified)
+        const recordSizeBytes = Buffer.byteLength(JSON.stringify(data), 'utf8');
+        const recordSizeMB = recordSizeBytes / (1024 * 1024);
+        const check = await canUseStorage(user.id, recordSizeMB);
+        if (!check.allowed) {
+          return NextResponse.json(
+            { error: check.message || 'Limite de armazenamento atingido' },
+            { status: 403 },
+          );
+        }
+      }
+    } catch (error) {
+      // Ignorar erros de validação de armazenamento (não bloquear se falhar)
+      console.warn('Erro ao validar limite de armazenamento:', error);
     }
 
     // Buscar a partição ativa (não cheia)

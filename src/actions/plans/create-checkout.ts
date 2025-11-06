@@ -101,6 +101,9 @@ export async function createCheckoutSession(
       // Validação de segurança: Verificar se usuário já tem subscription ativa
       const existingSubscription = await prisma.subscription.findUnique({
         where: { userId },
+        include: {
+          plan: true,
+        },
       });
 
       if (existingSubscription) {
@@ -113,6 +116,33 @@ export async function createCheckoutSession(
             message: 'You already have an active subscription',
           };
         }
+
+        // Verificar se já teve Trial anteriormente (mesmo que cancelado)
+        // Se o plano atual ou anterior foi Trial, não permitir novo Trial
+        const wasTrial = existingSubscription.plan?.slug === 'trial';
+        if (wasTrial) {
+          return {
+            success: false,
+            message: 'Você já utilizou o teste grátis anteriormente',
+          };
+        }
+      }
+
+      // Verificar se já teve Trial verificando histórico de planos do usuário
+      // Se o usuário já teve um Trial no passado, não permitir novo Trial
+      const userWithPlanHistory = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          plan: true,
+        },
+      });
+
+      // Se o plano atual do usuário é Trial (mesmo sem subscription ativa), já usou Trial
+      if (userWithPlanHistory?.plan?.slug === 'trial') {
+        return {
+          success: false,
+          message: 'Você já utilizou o teste grátis anteriormente',
+        };
       }
 
       // Criar assinatura grátis diretamente no banco (sem Stripe)

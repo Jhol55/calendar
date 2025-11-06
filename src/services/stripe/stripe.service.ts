@@ -5,12 +5,63 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY is not defined');
 }
 
+// Usar a versão mais recente suportada pela biblioteca
+// O tipo esperado é '2025-10-29.clover', mas a API aceita '2024-12-18.acacia'
+// Vamos usar type assertion para garantir compatibilidade
+const STRIPE_API_VERSION = '2024-12-18.acacia' as Stripe.LatestApiVersion;
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: STRIPE_API_VERSION,
   typescript: true,
 });
 
 const TRIAL_DAYS = 7;
+
+/**
+ * Interface auxiliar para propriedades de período de assinatura do Stripe
+ * Essas propriedades existem em runtime mas podem não estar nos tipos da biblioteca
+ */
+interface StripeSubscriptionWithPeriod extends Stripe.Subscription {
+  current_period_start: number;
+  current_period_end: number;
+}
+
+/**
+ * Type guard para verificar se subscription tem as propriedades de período
+ */
+function hasPeriodProperties(
+  subscription: Stripe.Subscription,
+): subscription is StripeSubscriptionWithPeriod {
+  return (
+    'current_period_start' in subscription &&
+    'current_period_end' in subscription &&
+    typeof (subscription as StripeSubscriptionWithPeriod)
+      .current_period_start === 'number' &&
+    typeof (subscription as StripeSubscriptionWithPeriod).current_period_end ===
+      'number'
+  );
+}
+
+/**
+ * Interface auxiliar para Invoice com subscription
+ */
+interface StripeInvoiceWithSubscription extends Stripe.Invoice {
+  subscription: string | Stripe.Subscription | null;
+}
+
+/**
+ * Função auxiliar para converter timestamp Unix para Date de forma segura
+ */
+function safeUnixToDate(timestamp: number | null | undefined): Date | null {
+  if (
+    timestamp &&
+    typeof timestamp === 'number' &&
+    !isNaN(timestamp) &&
+    timestamp > 0
+  ) {
+    return new Date(timestamp * 1000);
+  }
+  return null;
+}
 
 export interface CreateCustomerParams {
   email: string;
@@ -355,8 +406,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     billingInterval:
       stripeSubscription.items.data[0]?.price.recurring?.interval,
     trialEnd: stripeSubscription.trial_end,
-    current_period_start: stripeSubscription.current_period_start,
-    current_period_end: stripeSubscription.current_period_end,
+    current_period_start: hasPeriodProperties(stripeSubscription)
+      ? stripeSubscription.current_period_start
+      : undefined,
+    current_period_end: hasPeriodProperties(stripeSubscription)
+      ? stripeSubscription.current_period_end
+      : undefined,
   });
 
   // Função auxiliar para converter timestamp Unix para Date de forma segura
@@ -375,13 +430,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   };
 
   // Converter timestamps de forma segura
-  const currentPeriodStart = safeUnixToDate(
-    stripeSubscription.current_period_start,
-  );
-  const currentPeriodEnd = safeUnixToDate(
-    stripeSubscription.current_period_end,
-  );
-  const trialEndsAt = safeUnixToDate(stripeSubscription.trial_end);
+  const currentPeriodStart = hasPeriodProperties(stripeSubscription)
+    ? safeUnixToDate(stripeSubscription.current_period_start)
+    : null;
+  const currentPeriodEnd = hasPeriodProperties(stripeSubscription)
+    ? safeUnixToDate(stripeSubscription.current_period_end)
+    : null;
+  const trialEndsAt = safeUnixToDate(stripeSubscription.trial_end ?? null);
 
   console.log('📅 Datas convertidas (checkout):', {
     currentPeriodStart,
@@ -613,19 +668,13 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   // Converter timestamps Unix para Date (multiplicar por 1000 para milissegundos)
   // Validar que os valores são números válidos antes de converter
-  const currentPeriodStart =
-    subscription.current_period_start &&
-    typeof subscription.current_period_start === 'number' &&
-    !isNaN(subscription.current_period_start)
-      ? new Date(subscription.current_period_start * 1000)
-      : null;
+  const currentPeriodStart = hasPeriodProperties(subscription)
+    ? safeUnixToDate(subscription.current_period_start)
+    : null;
 
-  const currentPeriodEnd =
-    subscription.current_period_end &&
-    typeof subscription.current_period_end === 'number' &&
-    !isNaN(subscription.current_period_end)
-      ? new Date(subscription.current_period_end * 1000)
-      : null;
+  const currentPeriodEnd = hasPeriodProperties(subscription)
+    ? safeUnixToDate(subscription.current_period_end)
+    : null;
 
   const trialEndsAt =
     subscription.trial_end &&
@@ -647,10 +696,14 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     trialEndsAt,
     canceledAt,
     raw: {
-      current_period_start: subscription.current_period_start,
-      current_period_end: subscription.current_period_end,
-      trial_end: subscription.trial_end,
-      cancel_at: subscription.cancel_at,
+      current_period_start: hasPeriodProperties(subscription)
+        ? subscription.current_period_start
+        : null,
+      current_period_end: hasPeriodProperties(subscription)
+        ? subscription.current_period_end
+        : null,
+      trial_end: subscription.trial_end ?? null,
+      cancel_at: subscription.cancel_at ?? null,
     },
   });
 
@@ -860,7 +913,11 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  const subscriptionId = invoice.subscription as string;
+  const invoiceWithSubscription = invoice as StripeInvoiceWithSubscription;
+  const subscriptionId =
+    typeof invoiceWithSubscription.subscription === 'string'
+      ? invoiceWithSubscription.subscription
+      : (invoiceWithSubscription.subscription?.id ?? null);
 
   if (!subscriptionId) {
     return;
@@ -871,7 +928,11 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const subscriptionId = invoice.subscription as string;
+  const invoiceWithSubscription = invoice as StripeInvoiceWithSubscription;
+  const subscriptionId =
+    typeof invoiceWithSubscription.subscription === 'string'
+      ? invoiceWithSubscription.subscription
+      : (invoiceWithSubscription.subscription?.id ?? null);
 
   if (!subscriptionId) {
     return;

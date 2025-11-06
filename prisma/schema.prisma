@@ -96,11 +96,23 @@ model instances {
   created                    String
   updated                    String
   currentTime                String
+  // WhatsApp Official API (Meta) - Coexistência com Uazapi
+  whatsapp_official_enabled          Boolean @default(false)
+  whatsapp_official_phone_number_id  String? @db.VarChar(255)
+  whatsapp_official_business_account_id String? @db.VarChar(255)
+  whatsapp_official_access_token     String? @db.Text
+  whatsapp_official_phone_number     String? @db.VarChar(50)
+  whatsapp_official_status           String? @db.VarChar(50) // connected, disconnected, connecting
+  whatsapp_official_app_id           String? @db.VarChar(255)
+  whatsapp_official_app_secret       String? @db.VarChar(255)
+  whatsapp_official_webhook_verify_token String? @db.VarChar(255)
+  whatsapp_official_connected_at     DateTime?
 
   chatbot_flows chatbot_flows[]
 
   @@index([owner])
   @@index([status])
+  @@index([whatsapp_official_enabled])
 }
 
 model chatbot_flows {

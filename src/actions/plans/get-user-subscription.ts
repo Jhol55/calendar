@@ -26,10 +26,12 @@ export async function getUserSubscription(): Promise<{
       },
     });
 
-    // Buscar limites atuais (uso)
-    const limits = await prisma.user_plan_limits.findUnique({
-      where: { userId },
-    });
+    // SEMPRE recalcular storage e instances (função crítica para billing)
+    const { getStorageUsage, getInstanceCount } = await import(
+      '@/services/subscription/subscription.service'
+    );
+    const currentStorageMB = await getStorageUsage(userId);
+    const currentInstances = await getInstanceCount(userId);
 
     if (!subscription) {
       return {
@@ -68,8 +70,8 @@ export async function getUserSubscription(): Promise<{
             }
           : undefined,
         currentUsage: {
-          storageMB: limits?.currentStorageMB || 0,
-          instances: limits?.currentInstances || 0,
+          storageMB: currentStorageMB,
+          instances: currentInstances,
         },
       },
     };

@@ -27,31 +27,52 @@ import { replaceVariables } from '@/workers/helpers/variable-replacer';
  * Similar ao replaceVariablesInJSON do code-execution-helper, mas formatado para SQL
  */
 function replaceVariablesInSQL(sqlTemplate: string, context: any): string {
-  return sqlTemplate.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+  return sqlTemplate.replace(/\{\{([^}]+)\}\}/g, (match, path, offset) => {
     try {
       const cleanPath = path.trim();
       const parts = cleanPath.split('.');
 
+      // Verificar se a variável está entre aspas simples no template
+      // Procurar antes e depois da variável para detectar aspas
+      const beforeMatch = sqlTemplate.substring(
+        Math.max(0, offset - 10),
+        offset,
+      );
+      const afterMatch = sqlTemplate.substring(
+        offset + match.length,
+        Math.min(sqlTemplate.length, offset + match.length + 10),
+      );
+      const isInsideQuotes =
+        beforeMatch.match(/'[^']*$/) && afterMatch.match(/^[^']*'/);
+
       let value: any = context;
       for (const part of parts) {
-        if (value && typeof value === 'object') {
+        // Verificar se value é um objeto válido (não null, não string, não number, etc)
+        // null é typeof 'object' mas não é um objeto válido para acessar propriedades
+        const isObjectOrArray =
+          value !== null &&
+          value !== undefined &&
+          (typeof value === 'object' || Array.isArray(value));
+
+        if (isObjectOrArray) {
           // Tentar acessar como índice numérico primeiro (para arrays)
           const numericIndex = parseInt(part, 10);
-          if (
-            !isNaN(numericIndex) &&
-            Array.isArray(value) &&
-            numericIndex >= 0 &&
-            numericIndex < value.length
-          ) {
-            value = value[numericIndex];
-          } else if (part in value) {
+          if (!isNaN(numericIndex) && Array.isArray(value)) {
+            // Para arrays, índices negativos ou fora dos limites são inválidos
+            if (numericIndex >= 0 && numericIndex < value.length) {
+              value = value[numericIndex];
+            } else {
+              // Índice fora dos limites ou negativo - manter original
+              return match;
+            }
+          } else if (!Array.isArray(value) && part in value) {
             value = value[part];
           } else {
             // Variável não encontrada - manter original
             return match;
           }
         } else {
-          // Variável não encontrada - manter original
+          // Variável não encontrada (value é null, undefined, string, number, etc e não pode ter propriedades)
           return match;
         }
       }
@@ -64,9 +85,13 @@ function replaceVariablesInSQL(sqlTemplate: string, context: any): string {
         return match;
       }
 
-      // Converter baseado no tipo - ADICIONAR ASPAS SIMPLES para SQL
+      // Converter baseado no tipo
       if (typeof value === 'string') {
-        // Strings: adicionar aspas simples e escapar aspas internas
+        // Se já está entre aspas no template, não adicionar aspas (apenas escapar)
+        if (isInsideQuotes) {
+          return value.replace(/'/g, "''");
+        }
+        // Senão, adicionar aspas simples e escapar aspas internas
         return `'${value.replace(/'/g, "''")}'`;
       }
 
@@ -74,10 +99,14 @@ function replaceVariablesInSQL(sqlTemplate: string, context: any): string {
         return String(value);
       }
 
-      // Arrays e Objects: JSON.stringify e adicionar aspas simples para SQL
+      // Arrays e Objects: JSON.stringify
       try {
         const jsonString = JSON.stringify(value);
-        // Escapar aspas simples dentro do JSON
+        // Se já está entre aspas no template, apenas escapar
+        if (isInsideQuotes) {
+          return jsonString.replace(/'/g, "''");
+        }
+        // Senão, adicionar aspas simples e escapar aspas internas
         const escapedJson = jsonString.replace(/'/g, "''");
         return `'${escapedJson}'`;
       } catch {
@@ -221,7 +250,9 @@ export class SqlEngine {
 
       // 1. Resolver variáveis dinâmicas {{...}}
       const resolvedSql = replaceVariablesInSQL(sql, variableContext);
-      console.log(`   Resolved SQL: ${resolvedSql.substring(0, 200)}`);
+      console.log(`   Original SQL: ${sql}`);
+      console.log(`   Variables:`, JSON.stringify(variableContext));
+      console.log(`   Resolved SQL: ${resolvedSql}`);
 
       // Validar SQL resolvido vazio
       if (

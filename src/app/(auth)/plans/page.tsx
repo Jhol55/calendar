@@ -7,6 +7,7 @@ import { getPlans } from '@/actions/plans/get-plans';
 import { getUserSubscription } from '@/actions/plans/get-user-subscription';
 import { createCheckoutSession } from '@/actions/plans/create-checkout';
 import { changePlan } from '@/actions/plans/change-plan';
+import { hasUsedTrial as checkHasUsedTrial } from '@/actions/plans/has-used-trial';
 import { Plan } from '@/types/subscription';
 import { PLAN_FEATURES } from '@/config/plans.config';
 import { PricingHeader } from '@/components/layout/pricing/pricing-header';
@@ -42,6 +43,7 @@ export default function PlansPage() {
   );
   const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
   const [changingPlan, setChangingPlan] = useState(false);
+  const [hasUsedTrial, setHasUsedTrial] = useState(false);
 
   useEffect(() => {
     loadPlans();
@@ -74,9 +76,18 @@ export default function PlansPage() {
           result.data.status === 'active' &&
             result.data.stripeSubscriptionId !== undefined,
         );
-      } else {
-        // Se não tem subscription, pode ser erro ou realmente não tem
-        // setHasSubscription(false);
+
+        // Verificar se já usou Trial anteriormente
+        const currentPlanIsTrial = result.data.plan?.slug === 'trial';
+        if (currentPlanIsTrial) {
+          setHasUsedTrial(true);
+        }
+      }
+
+      // Verificar se já usou Trial mesmo se não tem subscription ativa
+      const trialCheck = await checkHasUsedTrial();
+      if (trialCheck.success && trialCheck.hasUsedTrial) {
+        setHasUsedTrial(true);
       }
     } catch (error) {
       console.error('Error loading current subscription:', error);
@@ -234,14 +245,16 @@ export default function PlansPage() {
           selectedFrequency={selectedPaymentFreq}
           onFrequencyChange={setSelectedPaymentFreq}
           leftButton={
-            <Button
-              variant="ghost"
-              onClick={() => router.push('/index')}
-              className="whitespace-nowrap w-fit text-neutral-600"
-            >
-              <ChevronLeft className="w-8 h-8 text-neutral-600" />
-              Voltar
-            </Button>
+            hasActivePaidPlan ? (
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/index')}
+                className="whitespace-nowrap w-fit text-neutral-600"
+              >
+                <ChevronLeft className="w-8 h-8 text-neutral-600" />
+                Voltar
+              </Button>
+            ) : undefined
           }
           // rightButton={
           //   hasSubscription ? (
@@ -267,16 +280,38 @@ export default function PlansPage() {
             // Desabilitar botão apenas se:
             // 1. O plano atual está ativo E
             // 2. Não está cancelado E
-            // 3. Está no mesmo período de cobrança (mensal/anual) E
-            // 4. Não é trial
+            // 3. Está no mesmo período de cobrança (mensal/anual)
+            // Para Trial: desabilitar se o usuário já tem QUALQUER plano ativo (active ou trialing)
             const isCurrentPlan = plan.id === currentPlanId;
             const isCurrentPeriod =
               selectedPaymentFreq === currentBillingPeriod;
-            const disableButton =
-              (isCurrentPlan &&
+
+            // Verificar se usuário tem plano ativo (incluindo trial)
+            const hasAnyActivePlan =
+              subscriptionStatus === 'active' ||
+              subscriptionStatus === 'trialing' ||
+              (hasActivePaidPlan && subscriptionStatus !== 'canceled');
+
+            let disableButton = false;
+
+            // Se for Trial, desabilitar se:
+            // 1. Usuário tem qualquer plano ativo OU
+            // 2. Usuário já usou Trial anteriormente (mesmo que não tenha subscription ativa)
+            if (isTrial) {
+              if (hasAnyActivePlan && subscriptionStatus !== null) {
+                disableButton = true;
+              } else if (hasUsedTrial) {
+                // Se já usou Trial antes, desabilitar mesmo sem subscription ativa
+                disableButton = true;
+              }
+            } else {
+              // Para outros planos, desabilitar apenas se for o plano atual ativo
+              disableButton =
+                isCurrentPlan &&
                 subscriptionStatus !== 'canceled' &&
-                isCurrentPeriod) ||
-              isTrial;
+                subscriptionStatus !== null &&
+                isCurrentPeriod;
+            }
 
             return (
               <PricingCard

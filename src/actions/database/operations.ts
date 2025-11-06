@@ -512,6 +512,34 @@ export async function addRow(
       }
     }
 
+    // Verificar limite de armazenamento antes de inserir
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (user) {
+        const { canUseStorage } = await import(
+          '@/services/subscription/subscription.service'
+        );
+        // Estimar tamanho do registro em MB (JSON stringified)
+        const recordSizeBytes = Buffer.byteLength(JSON.stringify(data), 'utf8');
+        const recordSizeMB = recordSizeBytes / (1024 * 1024);
+        const check = await canUseStorage(user.id, recordSizeMB);
+        if (!check.allowed) {
+          return {
+            success: false,
+            message: check.message || 'Limite de armazenamento atingido',
+            code: 403,
+          };
+        }
+      }
+    } catch (error) {
+      // Ignorar erros de validação de armazenamento (não bloquear se falhar)
+      console.warn('Erro ao validar limite de armazenamento:', error);
+    }
+
     // Buscar a partição ativa (não cheia)
     const activePartition = dataRecords.find((record) => !record.isFull);
 
@@ -560,6 +588,36 @@ export async function addRow(
         updatedAt: new Date(),
       },
     });
+
+    // Atualizar armazenamento usado automaticamente
+    try {
+      const { updateStorageUsageIncremental } = await import(
+        '@/services/subscription/subscription.service'
+      );
+      // Calcular tamanho aproximado do registro inserido
+      const recordSizeBytes = Buffer.byteLength(
+        JSON.stringify(typedData),
+        'utf8',
+      );
+      const recordSizeMB = recordSizeBytes / (1024 * 1024);
+
+      // Atualizar storage incrementalmente (async, não bloquear resposta)
+      updateStorageUsageIncremental(user.id, recordSizeMB).catch((err) => {
+        console.warn(
+          '⚠️ [ADD-ROW] Failed to update storage incrementally:',
+          err,
+        );
+      });
+      console.log(
+        `📊 [ADD-ROW] Storage updated: +${recordSizeMB.toFixed(4)}MB`,
+      );
+    } catch (error) {
+      // Não bloquear inserção se atualização de storage falhar
+      console.warn(
+        '⚠️ [ADD-ROW] Failed to update storage, but row was added:',
+        error,
+      );
+    }
 
     return {
       success: true,

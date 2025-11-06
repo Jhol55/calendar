@@ -10,4 +10,7 @@ export const createInstanceFormSchema = z.object({
       /^[a-zA-Z0-9\s\-_]+$/,
       'Nome deve conter apenas letras, números, espaços, hífens e underscores',
     ),
+  provider: z.enum(['default', 'cloud'], {
+    required_error: 'Selecione um provedor',
+  }),
 });

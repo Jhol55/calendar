@@ -319,16 +319,22 @@ export function replaceVariables(text: string, context: any): any {
           let pathValid = true;
 
           for (const part of testParts) {
-            if (testValue && typeof testValue === 'object') {
+            const isObjectOrArray =
+              testValue !== null &&
+              testValue !== undefined &&
+              (typeof testValue === 'object' || Array.isArray(testValue));
+
+            if (isObjectOrArray) {
               const numericIndex = parseInt(part, 10);
-              if (
-                !isNaN(numericIndex) &&
-                Array.isArray(testValue) &&
-                numericIndex >= 0 &&
-                numericIndex < testValue.length
-              ) {
-                testValue = testValue[numericIndex];
-              } else if (part in testValue) {
+              if (!isNaN(numericIndex) && Array.isArray(testValue)) {
+                // Para arrays, índices negativos ou fora dos limites são inválidos
+                if (numericIndex >= 0 && numericIndex < testValue.length) {
+                  testValue = testValue[numericIndex];
+                } else {
+                  pathValid = false;
+                  break;
+                }
+              } else if (!Array.isArray(testValue) && part in testValue) {
                 testValue = testValue[part];
               } else {
                 pathValid = false;
@@ -359,17 +365,24 @@ export function replaceVariables(text: string, context: any): any {
 
         for (let i = 0; i < testParts.length; i++) {
           const part = testParts[i];
-          if (testValue && typeof testValue === 'object') {
+          // Verificar se testValue é um objeto válido (não null, não string, não number, etc)
+          const isObjectOrArray =
+            testValue !== null &&
+            testValue !== undefined &&
+            (typeof testValue === 'object' || Array.isArray(testValue));
+
+          if (isObjectOrArray) {
             const numericIndex = parseInt(part, 10);
-            if (
-              !isNaN(numericIndex) &&
-              Array.isArray(testValue) &&
-              numericIndex >= 0 &&
-              numericIndex < testValue.length
-            ) {
-              testValue = testValue[numericIndex];
-              validUntil = i;
-            } else if (part in testValue) {
+            if (!isNaN(numericIndex) && Array.isArray(testValue)) {
+              // Para arrays, índices negativos ou fora dos limites são inválidos
+              if (numericIndex >= 0 && numericIndex < testValue.length) {
+                testValue = testValue[numericIndex];
+                validUntil = i;
+              } else {
+                // Índice inválido - não é expressão JS, é erro
+                break;
+              }
+            } else if (!Array.isArray(testValue) && part in testValue) {
               testValue = testValue[part];
               validUntil = i;
             } else {
@@ -397,31 +410,42 @@ export function replaceVariables(text: string, context: any): any {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let value: any = context;
       for (const part of parts) {
-        if (value && typeof value === 'object') {
+        // Verificar se value é um objeto válido (não null, não string, não number, etc)
+        // null é typeof 'object' mas não é um objeto válido para acessar propriedades
+        const isObjectOrArray =
+          value !== null &&
+          value !== undefined &&
+          (typeof value === 'object' || Array.isArray(value));
+
+        if (isObjectOrArray) {
           // Tentar acessar como índice numérico primeiro (para arrays)
           const numericIndex = parseInt(part, 10);
-          if (
-            !isNaN(numericIndex) &&
-            Array.isArray(value) &&
-            numericIndex >= 0 &&
-            numericIndex < value.length
-          ) {
-            value = value[numericIndex];
-          } else if (part in value) {
+          if (!isNaN(numericIndex) && Array.isArray(value)) {
+            // Para arrays, índices negativos ou fora dos limites retornam undefined
+            if (numericIndex >= 0 && numericIndex < value.length) {
+              value = value[numericIndex];
+            } else {
+              // Índice fora dos limites ou negativo - não resolvido
+              return '__UNRESOLVED__' + match;
+            }
+          } else if (!Array.isArray(value) && part in value) {
             value = value[part];
           } else {
             // Path não existe - marcar como não resolvido
             return '__UNRESOLVED__' + match;
           }
         } else {
-          // Path não existe - marcar como não resolvido
+          // Path não existe (value é null, undefined, string, number, etc e não pode ter propriedades)
           return '__UNRESOLVED__' + match;
         }
       }
 
-      // Tratar null e undefined
+      // Tratar null e undefined após resolver o path completo
+      // Se chegamos aqui, o path foi completamente resolvido
       if (value === null) {
-        return 'NULL'; // NULL SQL
+        // Para variáveis únicas, null retorna undefined (não resolvido)
+        // Para uso em SQL, null é tratado como 'NULL' mas aqui queremos undefined
+        return '__UNRESOLVED__' + match;
       }
       if (value === undefined) {
         return '__UNRESOLVED__' + match;
@@ -430,6 +454,10 @@ export function replaceVariables(text: string, context: any): any {
       // Se há expressão JavaScript, avaliá-la
       if (jsExpression) {
         value = evaluateJavaScriptExpression(value, jsExpression);
+        // Se a expressão JS retornou undefined, tratar como não resolvido
+        if (value === undefined) {
+          return '__UNRESOLVED__' + match;
+        }
       }
 
       // Converter para string preservando tipos

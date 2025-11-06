@@ -5,7 +5,6 @@ import { ChatbotFlow } from '@/actions/chatbot-flows/flows';
 import { useWorkflows, useDeleteWorkflow } from '@/lib/react-query/hooks';
 import {
   FileText,
-  Trash2,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -15,7 +14,9 @@ import {
 } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
-import { CreateWorkflowDialog } from '../../features/dialogs/create-workflow-dialog';
+import { CreateWorkflowDialog } from '../../../features/dialogs/create-workflow-dialog';
+import { FlowActions } from './flow-list-actions';
+import { RenameFlowDialog } from './rename-flow-dialog';
 
 interface FlowsListSidebarProps {
   onSelectFlow: (flow: ChatbotFlow) => void;
@@ -30,6 +31,10 @@ export function FlowsListSidebar({
 }: FlowsListSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [renamingFlow, setRenamingFlow] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Usar React Query para buscar workflows (userId obtido automaticamente no backend)
   const { data: workflows = [], isLoading: loading } = useWorkflows();
@@ -45,12 +50,13 @@ export function FlowsListSidebar({
     },
   });
 
-  const handleDelete = (flowId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-
+  const handleDelete = (flowId: string) => {
     if (!confirm('Deseja realmente deletar este fluxo?')) return;
-
     deleteWorkflow(flowId);
+  };
+
+  const handleRename = (flowId: string, currentName: string) => {
+    setRenamingFlow({ id: flowId, name: currentName });
   };
 
   const formatDate = (date: Date) => {
@@ -108,7 +114,7 @@ export function FlowsListSidebar({
       <div className="flex-1 overflow-y-auto" style={{ zoom: 0.9 }}>
         {loading ? (
           <div className="flex items-center justify-center p-8">
-            <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+            <Loader2 className="w-6 h-6 text-neutral-500 animate-spin" />
           </div>
         ) : workflows.length === 0 ? (
           <div className="p-8 text-center" style={{ zoom: 0.9 }}>
@@ -163,14 +169,12 @@ export function FlowsListSidebar({
                       </Typography>
                     </div>
                   </div>
-                  <Button
-                    onClick={(e) => handleDelete(flow.id, e)}
-                    variant="ghost"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
-                    title="Deletar fluxo"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
+                  <FlowActions
+                    flowId={flow.id}
+                    flowName={flow.name}
+                    onRename={handleRename}
+                    onDelete={handleDelete}
+                  />
                 </div>
               </button>
             ))}
@@ -182,6 +186,13 @@ export function FlowsListSidebar({
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
         onSubmit={handleCreateFlow}
+      />
+
+      <RenameFlowDialog
+        isOpen={!!renamingFlow}
+        onClose={() => setRenamingFlow(null)}
+        flowId={renamingFlow?.id || null}
+        currentName={renamingFlow?.name || ''}
       />
     </div>
   );

@@ -273,9 +273,10 @@ export default function BillingPage() {
                   formatValue={(value) => {
                     if (value >= 1000) {
                       const gb = value / 1000;
-                      return `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(2)}GB`;
+                      return `${gb.toFixed(2)}GB`;
                     }
-                    return `${value}MB`;
+                    // Sempre mostrar 2 casas decimais para MB (ex: 0.57MB, 1.02MB)
+                    return `${value.toFixed(2)}MB`;
                   }}
                 />
 

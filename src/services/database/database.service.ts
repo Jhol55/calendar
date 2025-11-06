@@ -746,51 +746,56 @@ export class DatabaseService {
     await this.checkRateLimit(userId);
 
     // USAR TRANSACTION para garantir atomicidade
-    const updatedSchema = await prisma.$transaction(async (tx) => {
-      // Busca todas as partições
-      const partitions = await tx.dataTable.findMany({
-        where: { userId, tableName },
-        orderBy: { partition: 'asc' },
-      });
-
-      if (partitions.length === 0) {
-        throw this.createError(
-          'TABLE_NOT_FOUND',
-          `Tabela "${tableName}" não existe`,
-        );
-      }
-
-      // Atualiza schema
-      const currentSchema = partitions[0].schema as unknown as TableSchema;
-      const newSchema = {
-        columns: currentSchema.columns.filter(
-          (col) => !columnNames.includes(col.name),
-        ),
-      };
-
-      // Invalidar cache após mudança de schema
-      await this.invalidateSchemaCache(userId, tableName);
-
-      // Atualiza cada partição (remove coluna dos dados também)
-      for (const partition of partitions) {
-        const records = partition.data as DatabaseRecord[];
-        const cleanedRecords = records.map((record) => {
-          const newRecord = { ...record };
-          columnNames.forEach((colName) => delete newRecord[colName]);
-          return newRecord;
+    const updatedSchema = await prisma.$transaction(
+      async (tx) => {
+        // Busca todas as partições
+        const partitions = await tx.dataTable.findMany({
+          where: { userId, tableName },
+          orderBy: { partition: 'asc' },
         });
 
-        await tx.dataTable.update({
-          where: { id: partition.id },
-          data: {
-            schema: newSchema as any,
-            data: cleanedRecords as any,
-          },
-        });
-      }
+        if (partitions.length === 0) {
+          throw this.createError(
+            'TABLE_NOT_FOUND',
+            `Tabela "${tableName}" não existe`,
+          );
+        }
 
-      return newSchema;
-    });
+        // Atualiza schema
+        const currentSchema = partitions[0].schema as unknown as TableSchema;
+        const newSchema = {
+          columns: currentSchema.columns.filter(
+            (col) => !columnNames.includes(col.name),
+          ),
+        };
+
+        // Invalidar cache após mudança de schema
+        await this.invalidateSchemaCache(userId, tableName);
+
+        // Atualiza cada partição (remove coluna dos dados também)
+        for (const partition of partitions) {
+          const records = partition.data as DatabaseRecord[];
+          const cleanedRecords = records.map((record) => {
+            const newRecord = { ...record };
+            columnNames.forEach((colName) => delete newRecord[colName]);
+            return newRecord;
+          });
+
+          await tx.dataTable.update({
+            where: { id: partition.id },
+            data: {
+              schema: newSchema as any,
+              data: cleanedRecords as any,
+            },
+          });
+        }
+
+        return newSchema;
+      },
+      {
+        timeout: 30000, // 30 segundos timeout para transações longas
+      },
+    );
 
     // Popular cache com schema atualizado após transaction
     await this.populateCacheFromPartition(userId, tableName, updatedSchema);
@@ -866,163 +871,210 @@ export class DatabaseService {
       tableName,
       async () => {
         return await this.withRetry(async () => {
-          return await prisma.$transaction(async (tx) => {
-            let partition = await tx.dataTable.findFirst({
-              where: {
-                userId,
-                tableName,
-                isFull: false,
-              },
-              orderBy: { partition: 'desc' },
-            });
-
-            console.log(
-              `📊 [DB-SERVICE] Active partition found:`,
-              partition
-                ? `ID ${partition.id}, partition ${partition.partition}`
-                : 'NONE',
-            );
-
-            // 2. Se não existe nenhuma partição, erro (precisa criar schema primeiro)
-            if (!partition) {
-              const hasTable = await tx.dataTable.findFirst({
-                where: { userId, tableName },
-              });
-
-              if (!hasTable) {
-                throw this.createError(
-                  'TABLE_NOT_FOUND',
-                  `Tabela "${tableName}" não existe. Use addColumns primeiro para criar o schema.`,
-                );
-              }
-
-              // Existe mas todas estão cheias - precisa criar nova
-              const lastPartition = await tx.dataTable.findFirst({
-                where: { userId, tableName },
+          return await prisma.$transaction(
+            async (tx) => {
+              let partition = await tx.dataTable.findFirst({
+                where: {
+                  userId,
+                  tableName,
+                  isFull: false,
+                },
                 orderBy: { partition: 'desc' },
               });
 
-              if (lastPartition!.partition >= this.MAX_PARTITIONS - 1) {
+              console.log(
+                `📊 [DB-SERVICE] Active partition found:`,
+                partition
+                  ? `ID ${partition.id}, partition ${partition.partition}`
+                  : 'NONE',
+              );
+
+              // 2. Se não existe nenhuma partição, erro (precisa criar schema primeiro)
+              if (!partition) {
+                const hasTable = await tx.dataTable.findFirst({
+                  where: { userId, tableName },
+                });
+
+                if (!hasTable) {
+                  throw this.createError(
+                    'TABLE_NOT_FOUND',
+                    `Tabela "${tableName}" não existe. Use addColumns primeiro para criar o schema.`,
+                  );
+                }
+
+                // Existe mas todas estão cheias - precisa criar nova
+                const lastPartition = await tx.dataTable.findFirst({
+                  where: { userId, tableName },
+                  orderBy: { partition: 'desc' },
+                });
+
+                if (lastPartition!.partition >= this.MAX_PARTITIONS - 1) {
+                  throw this.createError(
+                    'PARTITION_LIMIT',
+                    `Limite de partições atingido (${this.MAX_PARTITIONS})`,
+                  );
+                }
+
+                // Cria nova partição (dentro da transaction)
+                try {
+                  partition = await tx.dataTable.create({
+                    data: {
+                      userId,
+                      tableName,
+                      partition: lastPartition!.partition + 1,
+                      schema: lastPartition!.schema as any,
+                      data: [] as any,
+                      recordCount: 0,
+                      isFull: false,
+                    },
+                  });
+                } catch (error: any) {
+                  // Se der erro de unique constraint, outra requisição criou a partição
+                  // Tentar buscar novamente
+                  if (error.code === 'P2002') {
+                    console.log(
+                      `⚠️ Race condition detectada, tentando buscar partição criada por outra requisição...`,
+                    );
+                    partition = await tx.dataTable.findFirst({
+                      where: {
+                        userId,
+                        tableName,
+                        isFull: false,
+                      },
+                      orderBy: { partition: 'desc' },
+                    });
+
+                    if (!partition) {
+                      throw this.createError(
+                        'PARTITION_CREATION_FAILED',
+                        'Falha ao criar ou encontrar partição disponível',
+                      );
+                    }
+                  } else {
+                    throw error;
+                  }
+                }
+              }
+
+              if (!partition) {
                 throw this.createError(
-                  'PARTITION_LIMIT',
-                  `Limite de partições atingido (${this.MAX_PARTITIONS})`,
+                  'NO_ACTIVE_PARTITION',
+                  'Não foi possível encontrar ou criar uma partição ativa',
                 );
               }
 
-              // Cria nova partição (dentro da transaction)
-              try {
-                partition = await tx.dataTable.create({
-                  data: {
-                    userId,
-                    tableName,
-                    partition: lastPartition!.partition + 1,
-                    schema: lastPartition!.schema as any,
-                    data: [] as any,
-                    recordCount: 0,
-                    isFull: false,
-                  },
-                });
-              } catch (error: any) {
-                // Se der erro de unique constraint, outra requisição criou a partição
-                // Tentar buscar novamente
-                if (error.code === 'P2002') {
-                  console.log(
-                    `⚠️ Race condition detectada, tentando buscar partição criada por outra requisição...`,
-                  );
-                  partition = await tx.dataTable.findFirst({
-                    where: {
-                      userId,
-                      tableName,
-                      isFull: false,
-                    },
-                    orderBy: { partition: 'desc' },
-                  });
+              // 3. Valida registro contra schema e popular cache
+              const schema = partition.schema as unknown as TableSchema;
 
-                  if (!partition) {
-                    throw this.createError(
-                      'PARTITION_CREATION_FAILED',
-                      'Falha ao criar ou encontrar partição disponível',
-                    );
-                  }
-                } else {
-                  throw error;
-                }
+              // Popular cache oportunisticamente (já temos o schema da partição)
+              this.populateCacheFromPartition(userId, tableName, schema);
+
+              // Validar apenas se não validou com cache antes (cache miss)
+              if (!cachedSchema) {
+                this.validateRecord(record, schema);
               }
-            }
 
-            if (!partition) {
-              throw this.createError(
-                'NO_ACTIVE_PARTITION',
-                'Não foi possível encontrar ou criar uma partição ativa',
+              // 4. Converter tipos de acordo com o schema e adicionar campos automáticos
+              const convertedRecord = this.convertRecordTypes(record, schema);
+              const newRecordData: DatabaseRecord = {
+                _id: uuid(),
+                _createdAt: new Date().toISOString(),
+                _updatedAt: new Date().toISOString(),
+                ...convertedRecord,
+              };
+
+              // 4.1. Validar constraints UNIQUE (após ter _id gerado)
+              await this.validateUniqueConstraints(
+                tableName,
+                userId,
+                newRecordData,
+                schema,
+                undefined,
+                tx, // Passar transação para usar dentro da validação
               );
-            }
 
-            // 3. Valida registro contra schema e popular cache
-            const schema = partition.schema as unknown as TableSchema;
+              // 5. Adiciona na partição (ainda dentro da transaction)
+              const currentData = partition.data as DatabaseRecord[];
+              const updatedData = [...currentData, newRecordData];
+              const newCount = updatedData.length;
 
-            // Popular cache oportunisticamente (já temos o schema da partição)
-            this.populateCacheFromPartition(userId, tableName, schema);
+              // Optimistic Locking: apenas atualiza se recordCount não mudou
+              const currentCount = partition.recordCount;
+              const result = await tx.dataTable.updateMany({
+                where: {
+                  id: partition.id,
+                  recordCount: currentCount, // Lock otimista
+                },
+                data: {
+                  data: updatedData as any,
+                  recordCount: newCount,
+                  isFull: newCount >= this.MAX_PARTITION_SIZE,
+                },
+              });
 
-            // Validar apenas se não validou com cache antes (cache miss)
-            if (!cachedSchema) {
-              this.validateRecord(record, schema);
-            }
+              // Se count === 0, houve modificação concorrente
+              if (result.count === 0) {
+                throw this.createError(
+                  'CONCURRENT_MODIFICATION',
+                  'Concurrent modification detected, retrying...',
+                );
+              }
 
-            // 4. Converter tipos de acordo com o schema e adicionar campos automáticos
-            const convertedRecord = this.convertRecordTypes(record, schema);
-            const newRecordData: DatabaseRecord = {
-              _id: uuid(),
-              _createdAt: new Date().toISOString(),
-              _updatedAt: new Date().toISOString(),
-              ...convertedRecord,
-            };
-
-            // 4.1. Validar constraints UNIQUE (após ter _id gerado)
-            await this.validateUniqueConstraints(
-              tableName,
-              userId,
-              newRecordData,
-              schema,
-            );
-
-            // 5. Adiciona na partição (ainda dentro da transaction)
-            const currentData = partition.data as DatabaseRecord[];
-            const updatedData = [...currentData, newRecordData];
-            const newCount = updatedData.length;
-
-            // Optimistic Locking: apenas atualiza se recordCount não mudou
-            const currentCount = partition.recordCount;
-            const result = await tx.dataTable.updateMany({
-              where: {
-                id: partition.id,
-                recordCount: currentCount, // Lock otimista
-              },
-              data: {
-                data: updatedData as any,
-                recordCount: newCount,
-                isFull: newCount >= this.MAX_PARTITION_SIZE,
-              },
-            });
-
-            // Se count === 0, houve modificação concorrente
-            if (result.count === 0) {
-              throw this.createError(
-                'CONCURRENT_MODIFICATION',
-                'Concurrent modification detected, retrying...',
+              console.log(
+                `✅ [DB-SERVICE] Record inserted successfully! ID: ${newRecordData._id}, Total records in partition: ${newCount}`,
               );
-            }
 
-            console.log(
-              `✅ [DB-SERVICE] Record inserted successfully! ID: ${newRecordData._id}, Total records in partition: ${newCount}`,
-            );
+              // Calcular tamanho do registro para atualizar storage DEPOIS da transação
+              const recordSizeBytes = Buffer.byteLength(
+                JSON.stringify(newRecordData),
+                'utf8',
+              );
+              const recordSizeMB = recordSizeBytes / (1024 * 1024);
 
-            return newRecordData;
-          });
+              return { record: newRecordData, recordSizeMB };
+            },
+            {
+              timeout: 30000, // 30 segundos timeout para transações longas
+            },
+          );
         });
       },
     );
 
-    return newRecord;
+    // Atualizar armazenamento usado FORA da transação (após commit)
+    try {
+      const dbUser = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (dbUser && newRecord.recordSizeMB !== undefined) {
+        const { updateStorageUsageIncremental } = await import(
+          '@/services/subscription/subscription.service'
+        );
+
+        // Atualizar storage incrementalmente (fora da transaction para evitar locks)
+        updateStorageUsageIncremental(dbUser.id, newRecord.recordSizeMB).catch(
+          (err) => {
+            console.warn(
+              '⚠️ [DB-SERVICE] Failed to update storage incrementally:',
+              err,
+            );
+          },
+        );
+        console.log(
+          `📊 [DB-SERVICE] Storage updated: +${newRecord.recordSizeMB.toFixed(4)}MB`,
+        );
+      }
+    } catch (error) {
+      // Não bloquear inserção se atualização de storage falhar
+      console.warn(
+        '⚠️ [DB-SERVICE] Failed to update storage, but record was inserted:',
+        error,
+      );
+    }
+
+    return newRecord.record;
   }
 
   // ============================================
@@ -1173,6 +1225,56 @@ export class DatabaseService {
     await this.verifyTableOwnership(userId, tableName);
     await this.checkRateLimit(userId);
 
+    // Verificar limite de armazenamento antes de atualizar
+    // UPDATE pode aumentar significativamente o tamanho dos dados
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (user) {
+        const { canUseStorage } = await import(
+          '@/services/subscription/subscription.service'
+        );
+
+        // Estimar impacto do update
+        // Pior caso: cada campo atualizado adiciona dados
+        const updateSizeBytes = Buffer.byteLength(
+          JSON.stringify(updates),
+          'utf8',
+        );
+
+        // Estimar quantos registros serão afetados
+        const estimatedCount = await this.estimateAffectedRecords(
+          userId,
+          tableName,
+          filters,
+        );
+
+        // Calcular tamanho adicional estimado (conservador)
+        const estimatedAdditionalMB =
+          (updateSizeBytes * estimatedCount) / (1024 * 1024);
+
+        // Validar apenas se o update pode aumentar significativamente (> 0.01MB)
+        if (estimatedAdditionalMB > 0.01) {
+          const check = await canUseStorage(user.id, estimatedAdditionalMB);
+          if (!check.allowed) {
+            throw this.createError(
+              'STORAGE_LIMIT',
+              check.message ||
+                'Limite de armazenamento atingido para esta atualização',
+            );
+          }
+        }
+      }
+    } catch (error: any) {
+      if (error.code === 'STORAGE_LIMIT') {
+        throw error;
+      }
+      // Ignorar outros erros
+    }
+
     // Validar e converter tipos dos updates com schema da tabela (apenas campos presentes)
     const schema = await this.getCachedSchema(userId, tableName);
     let convertedUpdates = updates;
@@ -1200,97 +1302,160 @@ export class DatabaseService {
     // Operação pequena - usar partition lock + retry para evitar conflitos
     const result = await this.withPartitionLock(userId, tableName, async () => {
       return await this.withRetry(async () => {
-        return await prisma.$transaction(async (tx) => {
-          // Busca todas as partições
-          const partitions = await tx.dataTable.findMany({
-            where: { userId, tableName },
-            orderBy: { partition: 'asc' },
-          });
+        return await prisma.$transaction(
+          async (tx) => {
+            // Busca todas as partições
+            const partitions = await tx.dataTable.findMany({
+              where: { userId, tableName },
+              orderBy: { partition: 'asc' },
+            });
 
-          if (partitions.length === 0) {
-            throw this.createError(
-              'TABLE_NOT_FOUND',
-              `Tabela "${tableName}" não existe`,
-            );
-          }
+            if (partitions.length === 0) {
+              throw this.createError(
+                'TABLE_NOT_FOUND',
+                `Tabela "${tableName}" não existe`,
+              );
+            }
 
-          // Popular cache com schema da primeira partição (oportunista)
-          if (partitions.length > 0 && partitions[0].schema) {
-            const schema = partitions[0].schema as unknown as TableSchema;
-            await this.populateCacheFromPartition(userId, tableName, schema);
-          }
+            // Popular cache com schema da primeira partição (oportunista)
+            if (partitions.length > 0 && partitions[0].schema) {
+              const schema = partitions[0].schema as unknown as TableSchema;
+              await this.populateCacheFromPartition(userId, tableName, schema);
+            }
 
-          let totalUpdated = 0;
-          const updatedRecords: DatabaseRecord[] = [];
+            let totalUpdated = 0;
+            const updatedRecords: DatabaseRecord[] = [];
+            let storageDeltaBytes = 0; // Para atualizar storage
 
-          // Obter schema para validação de UNIQUE
-          const schema =
-            partitions.length > 0
-              ? (partitions[0].schema as unknown as TableSchema)
-              : null;
+            // Obter schema para validação de UNIQUE
+            const schema =
+              partitions.length > 0
+                ? (partitions[0].schema as unknown as TableSchema)
+                : null;
 
-          // Atualiza em cada partição
-          for (const partition of partitions) {
-            let records = partition.data as DatabaseRecord[];
-            let modified = false;
-            const currentCount = partition.recordCount;
+            // Atualiza em cada partição
+            for (const partition of partitions) {
+              let records = partition.data as DatabaseRecord[];
+              let modified = false;
+              const currentCount = partition.recordCount;
 
-            // Filtra e atualiza registros que atendem condições
-            records = await Promise.all(
-              records.map(async (record) => {
-                if (this.matchesFilters(record, filters)) {
-                  // Validar UNIQUE antes de aplicar update
-                  if (schema) {
-                    await this.validateUniqueConstraints(
-                      tableName,
-                      userId,
-                      { ...record, ...convertedUpdates },
-                      schema,
-                      record._id, // excludeRecordId
+              // Filtra e atualiza registros que atendem condições
+              records = await Promise.all(
+                records.map(async (record) => {
+                  if (this.matchesFilters(record, filters)) {
+                    // Calcular tamanho antes da atualização
+                    const oldSizeBytes = Buffer.byteLength(
+                      JSON.stringify(record),
+                      'utf8',
                     );
+
+                    // Validar UNIQUE antes de aplicar update
+                    if (schema) {
+                      await this.validateUniqueConstraints(
+                        tableName,
+                        userId,
+                        { ...record, ...convertedUpdates },
+                        schema,
+                        record._id, // excludeRecordId
+                        tx, // Passar transação
+                      );
+                    }
+
+                    modified = true;
+                    totalUpdated++;
+                    const updatedRecord = {
+                      ...record,
+                      ...convertedUpdates,
+                      _updatedAt: new Date().toISOString(),
+                    };
+
+                    // Calcular tamanho depois da atualização
+                    const newSizeBytes = Buffer.byteLength(
+                      JSON.stringify(updatedRecord),
+                      'utf8',
+                    );
+
+                    // Acumular delta de storage
+                    storageDeltaBytes += newSizeBytes - oldSizeBytes;
+
+                    updatedRecords.push(updatedRecord);
+                    return updatedRecord;
                   }
+                  return record;
+                }),
+              );
 
-                  modified = true;
-                  totalUpdated++;
-                  const updatedRecord = {
-                    ...record,
-                    ...convertedUpdates,
-                    _updatedAt: new Date().toISOString(),
-                  };
-                  updatedRecords.push(updatedRecord);
-                  return updatedRecord;
+              // Salva apenas se houve mudança (com optimistic locking)
+              if (modified) {
+                const updateResult = await tx.dataTable.updateMany({
+                  where: {
+                    id: partition.id,
+                    recordCount: currentCount, // Optimistic lock
+                  },
+                  data: { data: records as any },
+                });
+
+                if (updateResult.count === 0) {
+                  throw this.createError(
+                    'CONCURRENT_MODIFICATION',
+                    'Concurrent modification detected, retrying...',
+                  );
                 }
-                return record;
-              }),
-            );
-
-            // Salva apenas se houve mudança (com optimistic locking)
-            if (modified) {
-              const updateResult = await tx.dataTable.updateMany({
-                where: {
-                  id: partition.id,
-                  recordCount: currentCount, // Optimistic lock
-                },
-                data: { data: records as any },
-              });
-
-              if (updateResult.count === 0) {
-                throw this.createError(
-                  'CONCURRENT_MODIFICATION',
-                  'Concurrent modification detected, retrying...',
-                );
               }
             }
-          }
 
-          return {
-            success: true,
-            affected: totalUpdated,
-            records: updatedRecords,
-          };
-        });
+            // Retornar também o delta de storage para atualizar depois
+            return {
+              success: true,
+              affected: totalUpdated,
+              records: updatedRecords,
+              storageDeltaBytes,
+            };
+          },
+          {
+            timeout: 30000, // 30 segundos timeout para transações longas
+          },
+        );
       });
     });
+
+    // Atualizar storage usado FORA da transação (após commit)
+    if (
+      result.storageDeltaBytes !== undefined &&
+      result.storageDeltaBytes !== 0
+    ) {
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: userId },
+          select: { id: true },
+        });
+
+        if (dbUser) {
+          const { updateStorageUsageIncremental } = await import(
+            '@/services/subscription/subscription.service'
+          );
+          const storageDeltaMB = result.storageDeltaBytes / (1024 * 1024);
+
+          // Atualizar storage com delta (pode ser positivo ou negativo)
+          updateStorageUsageIncremental(dbUser.id, storageDeltaMB).catch(
+            (err) => {
+              console.warn(
+                '⚠️ [DB-SERVICE] Failed to update storage after update:',
+                err,
+              );
+            },
+          );
+          console.log(
+            `📊 [DB-SERVICE] Storage updated after update: ${storageDeltaMB >= 0 ? '+' : ''}${storageDeltaMB.toFixed(4)}MB (${result.affected} records)`,
+          );
+        }
+      } catch (error) {
+        console.warn(
+          '⚠️ [DB-SERVICE] Failed to update storage after update:',
+          error,
+        );
+      }
+    }
 
     return result;
   }
@@ -1329,69 +1494,122 @@ export class DatabaseService {
     // Operação pequena - usar partition lock + retry para evitar conflitos
     const result = await this.withPartitionLock(userId, tableName, async () => {
       return await this.withRetry(async () => {
-        return await prisma.$transaction(async (tx) => {
-          const partitions = await tx.dataTable.findMany({
-            where: { userId, tableName },
-            orderBy: { partition: 'asc' },
-          });
-
-          if (partitions.length === 0) {
-            throw this.createError(
-              'TABLE_NOT_FOUND',
-              `Tabela "${tableName}" não existe`,
-            );
-          }
-
-          // Popular cache com schema da primeira partição (oportunista)
-          if (partitions.length > 0 && partitions[0].schema) {
-            const schema = partitions[0].schema as unknown as TableSchema;
-            await this.populateCacheFromPartition(userId, tableName, schema);
-          }
-
-          let totalDeleted = 0;
-
-          for (const partition of partitions) {
-            let records = partition.data as DatabaseRecord[];
-            const initialCount = records.length;
-            const currentCount = partition.recordCount;
-
-            // Remove registros que atendem filtros
-            records = records.filter((record) => {
-              const shouldDelete = this.matchesFilters(record, filters);
-              if (shouldDelete) totalDeleted++;
-              return !shouldDelete;
+        return await prisma.$transaction(
+          async (tx) => {
+            const partitions = await tx.dataTable.findMany({
+              where: { userId, tableName },
+              orderBy: { partition: 'asc' },
             });
 
-            // Atualiza se houve remoção (com optimistic locking)
-            if (records.length !== initialCount) {
-              const updateResult = await tx.dataTable.updateMany({
-                where: {
-                  id: partition.id,
-                  recordCount: currentCount, // Optimistic lock
-                },
-                data: {
-                  data: records as any,
-                  recordCount: records.length,
-                  isFull: records.length >= this.MAX_PARTITION_SIZE,
-                },
+            if (partitions.length === 0) {
+              throw this.createError(
+                'TABLE_NOT_FOUND',
+                `Tabela "${tableName}" não existe`,
+              );
+            }
+
+            // Popular cache com schema da primeira partição (oportunista)
+            if (partitions.length > 0 && partitions[0].schema) {
+              const schema = partitions[0].schema as unknown as TableSchema;
+              await this.populateCacheFromPartition(userId, tableName, schema);
+            }
+
+            let totalDeleted = 0;
+            let deletedRecordsSizeBytes = 0; // Para atualizar storage
+
+            for (const partition of partitions) {
+              let records = partition.data as DatabaseRecord[];
+              const initialCount = records.length;
+              const currentCount = partition.recordCount;
+
+              // Remove registros que atendem filtros e calcula tamanho dos deletados
+              records = records.filter((record) => {
+                const shouldDelete = this.matchesFilters(record, filters);
+                if (shouldDelete) {
+                  totalDeleted++;
+                  // Calcular tamanho do registro deletado
+                  deletedRecordsSizeBytes += Buffer.byteLength(
+                    JSON.stringify(record),
+                    'utf8',
+                  );
+                }
+                return !shouldDelete;
               });
 
-              if (updateResult.count === 0) {
-                throw this.createError(
-                  'CONCURRENT_MODIFICATION',
-                  'Concurrent modification detected, retrying...',
-                );
+              // Atualiza se houve remoção (com optimistic locking)
+              if (records.length !== initialCount) {
+                const updateResult = await tx.dataTable.updateMany({
+                  where: {
+                    id: partition.id,
+                    recordCount: currentCount, // Optimistic lock
+                  },
+                  data: {
+                    data: records as any,
+                    recordCount: records.length,
+                    isFull: records.length >= this.MAX_PARTITION_SIZE,
+                  },
+                });
+
+                if (updateResult.count === 0) {
+                  throw this.createError(
+                    'CONCURRENT_MODIFICATION',
+                    'Concurrent modification detected, retrying...',
+                  );
+                }
               }
             }
-          }
 
-          return {
-            success: true,
-            affected: totalDeleted,
-          };
-        });
+            // Retornar também o tamanho dos registros deletados para atualizar depois
+            return {
+              success: true,
+              affected: totalDeleted,
+              deletedRecordsSizeBytes,
+            };
+          },
+          {
+            timeout: 30000, // 30 segundos timeout para transações longas
+          },
+        );
       });
     });
+
+    // Atualizar storage usado FORA da transação (após commit)
+    if (
+      result.deletedRecordsSizeBytes !== undefined &&
+      result.deletedRecordsSizeBytes > 0
+    ) {
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: userId },
+          select: { id: true },
+        });
+
+        if (dbUser) {
+          const { updateStorageUsageIncremental } = await import(
+            '@/services/subscription/subscription.service'
+          );
+          const deletedSizeMB = result.deletedRecordsSizeBytes / (1024 * 1024);
+
+          // Subtrair do storage (delta negativo)
+          updateStorageUsageIncremental(dbUser.id, -deletedSizeMB).catch(
+            (err) => {
+              console.warn(
+                '⚠️ [DB-SERVICE] Failed to update storage after deletion:',
+                err,
+              );
+            },
+          );
+          console.log(
+            `📊 [DB-SERVICE] Storage updated after delete: -${deletedSizeMB.toFixed(4)}MB (${result.affected} records)`,
+          );
+        }
+      } catch (error) {
+        console.warn(
+          '⚠️ [DB-SERVICE] Failed to update storage after deletion:',
+          error,
+        );
+      }
+    }
 
     return result;
   }
@@ -1527,6 +1745,7 @@ export class DatabaseService {
     record: Record<string, any>,
     schema: TableSchema,
     excludeRecordId?: string,
+    tx?: any, // Prisma transaction client (opcional)
   ): Promise<void> {
     const uniqueColumns = schema.columns.filter((col) => col.unique);
 
@@ -1535,7 +1754,9 @@ export class DatabaseService {
     }
 
     // Buscar em todas as partições de forma otimizada
-    const partitions = await prisma.dataTable.findMany({
+    // Usar transação se fornecida, senão usar prisma direto
+    const client = tx || prisma;
+    const partitions = await client.dataTable.findMany({
       where: {
         userId,
         tableName,

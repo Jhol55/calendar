@@ -97,8 +97,8 @@ const MenuItemComponent = memo(
           className={cn(
             'relative w-full gap-3 h-12 text-left transition-all duration-200',
             isHovered ? 'justify-start px-4' : 'justify-center px-0',
-            isActive && isHovered && '!bg-neutral-200 shadow-md rounded-full',
-            'hover:bg-neutral-200 rounded-full',
+            isActive && isHovered && '!bg-neutral-100 shadow-md rounded-full',
+            'hover:bg-neutral-100 hover:shadow-md rounded-full',
             level > 0 && isHovered && 'ml-4 text-sm h-10 w-[calc(100%-1rem)]',
             'bg-transparent border-none',
             menuItemClassName,
@@ -112,7 +112,7 @@ const MenuItemComponent = memo(
           }}
         >
           {isActive && !isHovered && (
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !h-10 !w-10 inset-0 rounded-full shadow-md bg-neutral-200 -z-50 border" />
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !h-10 !w-10 inset-0 rounded-full shadow-md bg-neutral-100 -z-50 border" />
           )}
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3 min-w-0">

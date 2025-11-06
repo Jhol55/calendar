@@ -5,6 +5,7 @@ import { getUserIdFromSession } from '@/lib/auth/session';
 import { prisma } from '@/services/prisma';
 import { changeSubscriptionPlan } from '@/services/stripe/stripe.service';
 import { updateSessionWithPlanStatus } from '@/utils/security/session';
+import { validatePlanDowngrade } from '@/services/subscription/subscription.service';
 
 export async function changePlan(
   planId: number,
@@ -64,6 +65,22 @@ export async function changePlan(
         success: false,
         message: 'Você já está neste plano com esta modalidade',
       };
+    }
+
+    // Validar se o uso atual excede os limites do novo plano (apenas para downgrades imediatos)
+    if (applyImmediately) {
+      const validation = await validatePlanDowngrade(userId, {
+        maxStorageMB: newPlan.maxStorageMB,
+        maxInstances: newPlan.maxInstances,
+        name: newPlan.name,
+      });
+
+      if (!validation.allowed) {
+        return {
+          success: false,
+          message: validation.errors.join(' '),
+        };
+      }
     }
 
     // Buscar price ID do Stripe

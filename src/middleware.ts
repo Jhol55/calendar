@@ -14,8 +14,11 @@ export async function middleware(request: NextRequest) {
   const session = await getSession();
   const path = request.nextUrl.pathname;
 
+  // Rotas públicas que não precisam de autenticação
+  const publicRoutes = ['/', '/privacy', '/terms'];
+
   // 1. Verificar autenticação
-  if (!session && path !== '/') {
+  if (!session && !publicRoutes.includes(path)) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 

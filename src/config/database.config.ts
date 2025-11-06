@@ -7,19 +7,20 @@ export const DATABASE_CONFIG = {
    * Número máximo de registros por partição
    * Quando atingir esse limite, uma nova partição é criada
    */
-  MAX_PARTITION_SIZE: 1000,
+  MAX_PARTITION_SIZE: 10000,
 
   /**
    * Número máximo de partições por tabela
    * Limite total de registros = MAX_PARTITION_SIZE * MAX_PARTITIONS_PER_TABLE
-   * Ex: 1000 * 1000 = 1 milhão de registros por tabela
+   * Ex: 10000 * 100000 = 1 bilhão de registros por tabela
+   * Nota: O limite real é o armazenamento (MB/GB) do plano do usuário
    */
-  MAX_PARTITIONS_PER_TABLE: 1000,
+  MAX_PARTITIONS_PER_TABLE: 100000,
 
   /**
    * Número máximo de tabelas por usuário
    */
-  MAX_TABLES_PER_USER: 50,
+  MAX_TABLES_PER_USER: 999,
 
   /**
    * Cache da partição ativa em memória (futura otimização)
@@ -54,7 +55,7 @@ export const DATABASE_CONFIG = {
   /**
    * Máximo de partições a escanear por query (evita DoS)
    */
-  MAX_PARTITIONS_TO_SCAN: 100,
+  MAX_PARTITIONS_TO_SCAN: 100000,
 
   /**
    * Tamanho do lote para processamento em lotes (batch processing)

@@ -4,6 +4,7 @@ import { generateValidationCodeFromEmail } from '@/utils/security/auth';
 import { prisma } from '@/services/prisma';
 import { confirmEmailFormSchema } from '@/components/features/forms/confirm-email/confirm-email.schema';
 import { updateSessionWithPlanStatus } from '@/utils/security/session';
+import { getSession } from '@/utils/security/session';
 
 type ConfirmEmailResponse = {
   success: boolean;
@@ -27,6 +28,29 @@ export async function confirmEmail(
       message: validationResult.error.errors[0].message,
       code: 400,
       field: validationResult.error.errors[0].path[0] as string,
+    };
+  }
+
+  // Validação de segurança: verificar se o email corresponde ao da sessão atual
+  const session = await getSession();
+  const sessionEmail = (session as { user?: { email?: string } } | null)?.user
+    ?.email;
+
+  if (!sessionEmail) {
+    return {
+      success: false,
+      message: 'Sessão não encontrada. Por favor, faça login novamente.',
+      code: 401,
+      field: 'validationCode',
+    };
+  }
+
+  if (sessionEmail !== data.email) {
+    return {
+      success: false,
+      message: 'O email informado não corresponde à sua sessão.',
+      code: 403,
+      field: 'email',
     };
   }
 

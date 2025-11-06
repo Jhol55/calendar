@@ -11,13 +11,18 @@ import { loginFormSchema } from '@/components/features/forms/login/login.schema'
 import { useRouter } from 'next/navigation';
 import { FormControl } from '@/components/ui/form-control';
 import { login } from '@/actions/forms/login';
+import { getUserSubscription } from '@/actions/plans/get-user-subscription';
+import { createCheckoutSession } from '@/actions/plans/create-checkout';
+import { getSessionHasPlan } from '@/actions/auth/get-session-has-plan';
 
 export const LoginForm = ({
   className,
   children,
+  onSuccess,
 }: {
   className?: string;
   children?: React.ReactNode;
+  onSuccess?: () => void;
 }) => {
   const baseId = useId();
   const router = useRouter();
@@ -56,7 +61,89 @@ export const LoginForm = ({
       return;
     }
 
-    router.push('/index');
+    // Se há um callback personalizado, usar ele
+    if (onSuccess) {
+      onSuccess();
+      return;
+    }
+
+    // Verificar se há plano pendente no sessionStorage
+    const pendingPlanId =
+      typeof window !== 'undefined'
+        ? sessionStorage.getItem('pendingPlanId')
+        : null;
+    const pendingPaymentFreq =
+      typeof window !== 'undefined'
+        ? (sessionStorage.getItem('pendingPaymentFreq') as
+            | 'monthly'
+            | 'yearly'
+            | null)
+        : null;
+
+    if (pendingPlanId && pendingPaymentFreq) {
+      // Limpar sessionStorage primeiro
+      sessionStorage.removeItem('pendingPlanId');
+      sessionStorage.removeItem('pendingPaymentFreq');
+
+      try {
+        // Verificar se o usuário tem plano ativo
+        const subscriptionResult = await getUserSubscription();
+
+        // Se não tem subscription ou não está ativa, criar checkout diretamente
+        const hasActivePlan =
+          subscriptionResult.success &&
+          subscriptionResult.data &&
+          (subscriptionResult.data.status === 'active' ||
+            subscriptionResult.data.status === 'trialing');
+
+        if (!hasActivePlan) {
+          // Criar checkout session e redirecionar para Stripe
+          const planId = parseInt(pendingPlanId, 10);
+          const checkoutResult = await createCheckoutSession(
+            planId,
+            pendingPaymentFreq,
+          );
+
+          if (checkoutResult.success && checkoutResult.url) {
+            // Se for Trial, redirecionar para /billing (que depois vai para /index se necessário)
+            // Se for plano pago, redirecionar para Stripe
+            if (
+              checkoutResult.url.includes('/billing') ||
+              checkoutResult.url.includes('/index')
+            ) {
+              router.push(checkoutResult.url.replace(/^https?:\/\/[^/]+/, ''));
+              return;
+            }
+            // Se for Stripe, usar window.location.href
+            window.location.href = checkoutResult.url;
+            return;
+          } else {
+            // Se falhar, redirecionar para /plans
+            console.error('Erro ao criar checkout:', checkoutResult.message);
+            router.push('/plans');
+            return;
+          }
+        }
+
+        // Se tem plano ativo, redirecionar para /plans (sem criar checkout)
+        router.push('/plans');
+      } catch (error) {
+        console.error(
+          'Erro ao verificar subscription ou criar checkout:',
+          error,
+        );
+        router.push('/plans');
+      }
+    } else {
+      // Não há plano pendente - verificar se tem plano ativo na sessão e redirecionar
+      const sessionResult = await getSessionHasPlan();
+
+      if (sessionResult.success && sessionResult.hasPlan) {
+        router.push('/index');
+      } else {
+        router.push('/plans');
+      }
+    }
   };
 
   return (

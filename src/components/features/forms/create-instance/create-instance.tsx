@@ -3,12 +3,14 @@ import { InputProps } from '@/components/ui/input/input.type';
 import { ErrorField } from '@/components/ui/error-field';
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import React, { useId } from 'react';
+import { FormSelect } from '@/components/ui/select';
+import React, { useId, useState, useEffect } from 'react';
 import { createInstanceFormSchema } from './create-instance.schema';
 import { cn } from '@/lib/utils';
 import { FieldValues, UseFormSetError } from 'react-hook-form';
 import { FormControl } from '@/components/ui/form-control';
 import { createInstance } from '@/actions/uazapi/instance';
+import { initiateCloudInstanceCreation } from '@/actions/whatsapp-official/embedded-signup';
 import { Typography } from '@/components/ui/typography';
 
 export const CreateInstanceForm = ({
@@ -21,6 +23,7 @@ export const CreateInstanceForm = ({
   onSuccess?: () => void;
 }) => {
   const baseId = useId();
+  const [provider, setProvider] = useState<string>('default');
 
   const inputs: (InputProps & { label: string })[] = [
     {
@@ -31,22 +34,101 @@ export const CreateInstanceForm = ({
     },
   ];
 
+  const providerOptions = [
+    { value: 'default', label: 'Padrão (Não oficial)' },
+    { value: 'cloud', label: 'Cloud (Oficial)' },
+  ];
+
+  useEffect(() => {
+    // Escutar mensagens do Embedded Signup
+    const handleMessage = async (event: MessageEvent) => {
+      // Verificar origem da mensagem
+      if (!event.origin.includes('facebook.com')) {
+        return;
+      }
+
+      const data = event.data;
+
+      // Verificar se é uma mensagem do Embedded Signup
+      if (data && data.type === 'embedded_signup_complete' && data.code) {
+        // O callback criará a instância automaticamente
+        // Aqui apenas fechamos o modal e chamamos onSuccess
+        if (onSuccess) {
+          onSuccess();
+        }
+        window.removeEventListener('message', handleMessage);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [onSuccess]);
+
   const handleSubmit = async (
     data: FieldValues,
     setError: UseFormSetError<FieldValues>,
   ) => {
-    const response = await createInstance(data.name);
+    const selectedProvider = data.provider || 'default';
 
-    if (!response.success) {
-      setError('name', {
-        message: response.message || 'Erro ao criar instância',
-      });
-      return;
-    }
+    if (selectedProvider === 'cloud') {
+      // Iniciar fluxo OAuth do Facebook para Cloud
+      // Passar a URL atual do navegador para garantir que use o domínio correto do ngrok
+      const currentOrigin = window.location.origin;
+      const response = await initiateCloudInstanceCreation(
+        data.name,
+        currentOrigin,
+      );
 
-    // Chamar callback de sucesso se fornecido
-    if (onSuccess) {
-      onSuccess();
+      if (!response.success) {
+        setError('provider', {
+          message:
+            response.message || 'Erro ao iniciar conexão com WhatsApp Cloud',
+        });
+        return;
+      }
+
+      // Abrir popup com OAuth
+      if (response.data && (response.data as any).oauthUrl) {
+        const { oauthUrl } = response.data as { oauthUrl: string };
+        const width = 800;
+        const height = 600;
+        const left = (window.screen.width - width) / 2;
+        const top = (window.screen.height - height) / 2;
+
+        const popup = window.open(
+          oauthUrl,
+          'WhatsAppCloudSignup',
+          `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`,
+        );
+
+        if (!popup) {
+          setError('provider', {
+            message: 'Por favor, permita popups para este site',
+          });
+          return;
+        }
+
+        // O callback será tratado pelo listener de mensagens
+        return;
+      }
+    } else {
+      // Criar instância padrão (Uazapi)
+      const response = await createInstance(data.name);
+
+      if (!response.success) {
+        setError('name', {
+          message: response.message || 'Erro ao criar instância',
+        });
+        return;
+      }
+
+      // Chamar callback de sucesso se fornecido
+      if (onSuccess) {
+        onSuccess();
+      }
     }
   };
 
@@ -89,7 +171,20 @@ export const CreateInstanceForm = ({
             <ErrorField fieldName={input.fieldName} />
           </React.Fragment>
         ))}
-        <SubmitButton variant="gradient">Criar Instância</SubmitButton>
+        {/* Campo de seleção de provedor */}
+        <FormControl variant="label" htmlFor={`${baseId}-provider`}>
+          Provedor
+        </FormControl>
+        <FormSelect
+          fieldName="provider"
+          placeholder="Selecione o provedor"
+          options={providerOptions}
+          onValueChange={(value) => setProvider(value)}
+        />
+        <ErrorField fieldName="provider" />
+        <SubmitButton variant="gradient">
+          {provider === 'cloud' ? 'Conectar WhatsApp Cloud' : 'Criar Instância'}
+        </SubmitButton>
         {children}
         <div className="h-full" /> {/* justify-center when overflow */}
       </Form>

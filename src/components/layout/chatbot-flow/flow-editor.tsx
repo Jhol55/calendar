@@ -21,7 +21,7 @@ import 'reactflow/dist/style.css';
 
 import { Sidebar } from './modules-sidebar';
 import { MessageNodeConfig } from './nodes/message-node/message-node-config';
-import { FlowsListSidebar } from './flows-list-sidebar';
+import { FlowsListSidebar } from './flow-list-sidebar/flows-list-sidebar';
 import {
   EndNode,
   MessageNode,

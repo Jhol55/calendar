@@ -4,16 +4,52 @@ import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { ConfirmEmailForm } from '@/components/features/forms/confirm-email';
 import { useUser } from '@/hooks/use-user';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 
 export default function Confirm() {
   const { user, handleUpdate } = useUser();
 
+  // Estado local para manter o email exibido mesmo após limpar sessionStorage
+  const [displayEmail, setDisplayEmail] = useState<string>('seu email');
+
   // Invalidar cache quando a página carregar para garantir dados atualizados
   useEffect(() => {
     handleUpdate();
   }, [handleUpdate]);
+
+  // Atualizar displayEmail quando user ou sessionStorage mudarem
+  useEffect(() => {
+    const loadEmail = async () => {
+      // Priorizar email do hook useUser (quando usuário está logado)
+      if (user?.email) {
+        setDisplayEmail(user.email);
+        return;
+      }
+
+      // Se não tiver, tentar sessionStorage (fluxo de registro inicial)
+      const pendingEmail =
+        typeof window !== 'undefined'
+          ? sessionStorage.getItem('pendingEmail')
+          : null;
+      if (pendingEmail) {
+        setDisplayEmail(pendingEmail);
+        return;
+      }
+
+      // Por último, buscar diretamente da sessão no servidor
+      // Isso garante que mesmo quando o hook ainda não carregou, temos o email
+      const { getSessionEmail } = await import(
+        '@/actions/auth/get-session-email'
+      );
+      const sessionResult = await getSessionEmail();
+      if (sessionResult.success && sessionResult.email) {
+        setDisplayEmail(sessionResult.email);
+      }
+    };
+
+    loadEmail();
+  }, [user?.email]);
 
   return (
     <main className="relative flex justify-center items-center w-screen h-screen overflow-hidden p-6 md:p-10 bg-gradient-to-br from-slate-50 via-white to-blue-50 text-slate-800">
@@ -34,7 +70,7 @@ export default function Confirm() {
           >
             Um código de confirmação foi enviado para
             <Typography variant="b" className="text-slate-900">
-              {' ' + user?.email}
+              {' ' + displayEmail}
             </Typography>
             . Por favor, verifique sua caixa de entrada e siga as instruções
             para completar o processo de registro.

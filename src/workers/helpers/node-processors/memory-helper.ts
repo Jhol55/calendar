@@ -37,6 +37,42 @@ interface NodeExecutionsRecord {
  * Tenta converter strings JSON ou formato JavaScript para objetos
  * Parseia recursivamente arrays e objetos
  */
+/**
+ * Converte placeholders {__undefined__: true} de volta para undefined recursivamente
+ */
+function restoreUndefinedValues(value: unknown): unknown {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  // Verificar se é o placeholder para undefined
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    '__undefined__' in value &&
+    (value as { __undefined__: unknown }).__undefined__ === true
+  ) {
+    return undefined;
+  }
+
+  // Se for array, processar cada elemento
+  if (Array.isArray(value)) {
+    return value.map((item) => restoreUndefinedValues(item));
+  }
+
+  // Se for objeto, processar cada propriedade
+  if (typeof value === 'object' && value !== null) {
+    const restored: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      restored[key] = restoreUndefinedValues(val);
+    }
+    return restored;
+  }
+
+  return value;
+}
+
 function parseMemoryValue(value: unknown): unknown {
   // Se for null ou undefined, retornar como está
   if (value === null || value === undefined) {
@@ -112,9 +148,60 @@ export async function salvarMemoria(
   ttlSeconds?: number,
 ): Promise<{ success: boolean; expiresAt?: Date }> {
   try {
+    // Verificar limite de armazenamento antes de salvar
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (user) {
+        const { canUseStorage } = await import(
+          '@/services/subscription/subscription.service'
+        );
+        // Estimar tamanho da memória em MB (JSON stringified)
+        // Para append mode, calcular apenas o tamanho dos novos dados
+        const valorSizeBytes = Buffer.byteLength(JSON.stringify(valor), 'utf8');
+        const valorSizeMB = valorSizeBytes / (1024 * 1024);
+        const check = await canUseStorage(user.id, valorSizeMB);
+        if (!check.allowed) {
+          throw new Error(check.message || 'Limite de armazenamento atingido');
+        }
+      }
+    } catch (error) {
+      // Se for erro de limite de armazenamento, propagar
+      if (
+        error instanceof Error &&
+        (error.message.includes('armazenamento') ||
+          error.message.includes('Armazenamento insuficiente') ||
+          error.message.includes('Limite de armazenamento'))
+      ) {
+        throw error;
+      }
+      // Se usuário não encontrado, permitir (pode ser teste sem usuário)
+      if (
+        error instanceof Error &&
+        error.message.includes('usuário') === false
+      ) {
+        console.warn('Erro ao validar limite de armazenamento:', error);
+      }
+      // Ignorar outros erros silenciosamente
+    }
+
     const expiresAt = ttlSeconds
       ? new Date(Date.now() + ttlSeconds * 1000)
       : null;
+
+    // Buscar memória existente para calcular delta (se houver)
+    const existingMemory = await prisma.chatbot_memories.findUnique({
+      where: {
+        userId_chave: {
+          userId,
+          chave,
+        },
+      },
+      select: { valor: true },
+    });
 
     await prisma.chatbot_memories.upsert({
       where: {
@@ -135,6 +222,49 @@ export async function salvarMemoria(
         updatedAt: new Date(),
       },
     });
+
+    // Atualizar armazenamento usado automaticamente
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (user) {
+        const { updateStorageUsageIncremental } = await import(
+          '@/services/subscription/subscription.service'
+        );
+
+        // Calcular tamanho do novo valor
+        const newSizeBytes = Buffer.byteLength(JSON.stringify(valor), 'utf8');
+        const newSizeMB = newSizeBytes / (1024 * 1024);
+
+        // Se já existia, subtrair o tamanho antigo
+        let deltaMB = newSizeMB;
+        if (existingMemory?.valor) {
+          const oldSizeBytes = Buffer.byteLength(
+            JSON.stringify(existingMemory.valor),
+            'utf8',
+          );
+          const oldSizeMB = oldSizeBytes / (1024 * 1024);
+          deltaMB = newSizeMB - oldSizeMB; // Delta (pode ser negativo se diminuiu)
+        }
+
+        // Atualizar storage incrementalmente
+        if (deltaMB !== 0) {
+          await updateStorageUsageIncremental(user.id, deltaMB);
+          console.log(
+            `📊 [MEMORY] Storage updated: ${deltaMB >= 0 ? '+' : ''}${deltaMB.toFixed(4)}MB`,
+          );
+        }
+      }
+    } catch (error) {
+      // Não bloquear salvamento se atualização de storage falhar
+      console.warn(
+        '⚠️ [MEMORY] Failed to update storage, but memory was saved:',
+        error,
+      );
+    }
 
     console.log(`💾 Memória salva: ${userId}/${chave}`, {
       expiresAt,
@@ -236,9 +366,42 @@ export async function deletarMemoria(
       return { success: true, found: false };
     }
 
+    // Calcular tamanho da memória antes de deletar
+    const memorySizeBytes = Buffer.byteLength(
+      JSON.stringify(memoria.valor),
+      'utf8',
+    );
+
     await prisma.chatbot_memories.delete({
       where: { id: memoria.id },
     });
+
+    // Atualizar armazenamento usado automaticamente
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
+      });
+
+      if (user) {
+        const { updateStorageUsageIncremental } = await import(
+          '@/services/subscription/subscription.service'
+        );
+        const memorySizeMB = memorySizeBytes / (1024 * 1024);
+
+        // Subtrair do storage (delta negativo)
+        await updateStorageUsageIncremental(user.id, -memorySizeMB);
+        console.log(
+          `📊 [MEMORY] Storage updated after delete: -${memorySizeMB.toFixed(4)}MB`,
+        );
+      }
+    } catch (error) {
+      // Não bloquear deleção se atualização de storage falhar
+      console.warn(
+        '⚠️ [MEMORY] Failed to update storage after delete, but memory was deleted:',
+        error,
+      );
+    }
 
     console.log(`🗑️ Memória deletada: ${userId}/${chave}`);
     return { success: true, found: true };
@@ -402,10 +565,16 @@ export async function processNodeMemory(
             variableContext,
           );
 
-          // Se o valor não foi resolvido (undefined), manter o placeholder original
-          // IMPORTANTE: Nunca deixar undefined pois JSON.stringify remove campos undefined
+          // Se o valor não foi resolvido (undefined) para uma variável única não resolvida,
+          // usar um placeholder especial que será convertido de volta para undefined ao recuperar
+          // Isso é necessário porque JSON.stringify remove campos undefined
+          const isSingleVariable = /^\{\{[^}]+}\}$/.test(item.value.trim());
           const resolvedValue =
-            rawResolvedValue !== undefined ? rawResolvedValue : item.value;
+            rawResolvedValue !== undefined
+              ? rawResolvedValue
+              : isSingleVariable
+                ? { __undefined__: true } // Placeholder que será convertido para undefined ao recuperar
+                : item.value;
 
           console.log('✅ Resolved memory item:', {
             resolvedKey,
@@ -482,10 +651,16 @@ export async function processNodeMemory(
           ttl,
         );
 
+        // Converter placeholders {__undefined__: true} de volta para undefined antes de retornar
+        const restoredItems = resolvedItems.map((item) => ({
+          key: item.key,
+          value: restoreUndefinedValues(item.value),
+        }));
+
         return {
           action: 'save',
           name: resolvedMemoryName,
-          items: resolvedItems, // Array para compatibilidade com testes
+          items: restoredItems, // Array para compatibilidade com testes
           saveMode: saveMode || 'overwrite',
           success: saveResult.success,
           expiresAt: saveResult.expiresAt,
@@ -542,6 +717,9 @@ export async function processNodeMemory(
             }
           }
         }
+
+        // Converter placeholders {__undefined__: true} de volta para undefined
+        parsedValue = restoreUndefinedValues(parsedValue);
 
         // Calcular metadados sobre o valor
         const valueType = Array.isArray(parsedValue)

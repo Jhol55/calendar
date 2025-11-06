@@ -40,14 +40,17 @@ async function startWorker() {
       __dirname,
       '../src/workers/helpers/subscription-sync.ts',
     );
-    const { iniciarJobSincronizacaoAssinaturas } = await import(
-      `file://${syncPath.replace(/\\/g, '/')}`
-    );
+    const {
+      iniciarJobSincronizacaoAssinaturas,
+      iniciarJobRecalculoArmazenamento,
+    } = await import(`file://${syncPath.replace(/\\/g, '/')}`);
     iniciarJobSincronizacaoAssinaturas();
+    iniciarJobRecalculoArmazenamento();
 
     console.log('🚀 Queue worker started');
     console.log('📊 Monitoring queues: webhook, flow, notification');
     console.log('🔄 Subscription sync job scheduled (daily at 2:00 AM)');
+    console.log('💾 Storage recalculation job scheduled (daily at 3:00 AM)');
     console.log('🧹 Memory cleanup job scheduled (daily at 3:00 AM)');
     console.log('⏹️  Press Ctrl+C to stop');
   } catch (error) {

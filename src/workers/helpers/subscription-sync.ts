@@ -3,6 +3,7 @@ import {
   checkSyncStatus,
   syncAllSubscriptions,
 } from '@/services/stripe/sync.service';
+import { recalculateAllStorageUsage } from './storage-recalc';
 
 /**
  * Job de sincronização automática de assinaturas Stripe
@@ -56,5 +57,39 @@ export function iniciarJobSincronizacaoAssinaturas() {
 
   console.log(
     '✅ Job de sincronização de assinaturas agendado (todo dia às 2:00 AM)',
+  );
+}
+
+/**
+ * Job de recálculo periódico de armazenamento
+ * Roda diariamente às 3:00 AM para validar e corrigir discrepâncias
+ */
+export function iniciarJobRecalculoArmazenamento() {
+  // Roda todo dia às 3:00 AM (após sincronização de assinaturas)
+  cron.schedule('0 3 * * *', async () => {
+    console.log('🔄 [Job] Iniciando recálculo periódico de armazenamento...');
+
+    try {
+      const result = await recalculateAllStorageUsage();
+
+      if (result.errors > 0) {
+        console.warn(
+          `⚠️ [Job] Recálculo concluído com erros: ${result.processed} processados, ${result.errors} erros`,
+        );
+      } else {
+        console.log(
+          `✅ [Job] Recálculo concluído: ${result.processed} usuários processados`,
+        );
+      }
+    } catch (error: any) {
+      console.error(
+        '❌ [Job] Erro no recálculo de armazenamento:',
+        error.message,
+      );
+    }
+  });
+
+  console.log(
+    '✅ Job de recálculo de armazenamento agendado (todo dia às 3:00 AM)',
   );
 }

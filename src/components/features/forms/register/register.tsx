@@ -63,8 +63,16 @@ export const RegisterForm = ({
       return;
     }
 
+    // Salvar email no sessionStorage para usar na página de confirmação
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('pendingEmail', data.email);
+    }
+
     // Invalidar cache do usuário para garantir dados atualizados da nova sessão
     handleUpdate();
+
+    // NÃO limpar o sessionStorage aqui - manter o plano pendente para usar após confirmação de email
+    // O plano pendente será usado após a confirmação do email no ConfirmEmailForm
 
     // Pequeno delay para garantir que a sessão foi atualizada no servidor
     setTimeout(() => {
