@@ -207,11 +207,12 @@ export async function getStorageUsage(
     });
 
     return totalSizeMBRounded;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Fallback para método antigo se houver erro (ex: banco antigo sem pg_column_size)
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn(
       '⚠️ Erro ao calcular storage com SQL otimizado, usando fallback:',
-      error.message,
+      errorMessage,
     );
 
     return getStorageUsageFallback(userId);

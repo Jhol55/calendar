@@ -55,15 +55,19 @@ async function findWebhookInFlows(webhookId: string, userId: number) {
   });
   console.log(`📊 Found ${flows.length} ACTIVE flows for user ${userId}`);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const matches: Array<{
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    flow: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    node: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    config: any;
-  }> = [];
+  interface WebhookMatch {
+    flow: {
+      id: string;
+      name: string;
+      nodes: unknown;
+      edges: unknown;
+      userId: number;
+    };
+    node: { id: string; type: string; data: { webhookConfig: unknown } };
+    config: unknown;
+  }
+
+  const matches: WebhookMatch[] = [];
 
   for (const flow of flows) {
     console.log(`\n🔄 Checking flow: ${flow.name} (ID: ${flow.id})`);
@@ -187,15 +191,19 @@ async function findWebhookByInstance(instanceToken: string) {
   });
   console.log(`📊 Found ${flows.length} ACTIVE flows in database`);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const matches: Array<{
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    flow: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    node: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    config: any;
-  }> = [];
+  interface WebhookMatch {
+    flow: {
+      id: string;
+      name: string;
+      nodes: unknown;
+      edges: unknown;
+      userId: number;
+    };
+    node: { id: string; type: string; data: { webhookConfig: unknown } };
+    config: unknown;
+  }
+
+  const matches: WebhookMatch[] = [];
 
   for (const flow of flows) {
     console.log(`\n🔄 Checking flow: ${flow.name} (ID: ${flow.id})`);

@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
     const schema = dataRecords[0].schema;
 
     // Extrair todos os dados (campo data é JSONB com array)
-    const allData: any[] = [];
+    const allData: Record<string, unknown>[] = [];
     dataRecords.forEach((record) => {
-      const data = record.data as any;
+      const data = record.data;
       if (Array.isArray(data)) {
-        allData.push(...data);
+        allData.push(...(data as Record<string, unknown>[]));
       }
     });
 
@@ -48,11 +48,10 @@ export async function GET(request: NextRequest) {
       data: allData,
       schema,
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to fetch table data';
     console.error('Error fetching table data:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch table data' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

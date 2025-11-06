@@ -37,7 +37,7 @@ export async function hasActivePlan(): Promise<{
       success: true,
       hasActivePlan: userPlan !== null && userPlan.isActive,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       '[hasActivePlan] Error checking if user has active plan:',
       error,

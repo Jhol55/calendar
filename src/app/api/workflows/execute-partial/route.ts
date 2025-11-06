@@ -7,16 +7,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
 import { executeFlow } from '@/workers/helpers/flow-executor';
 import { getSession } from '@/utils/security/session';
+// Type helper para Prisma JSON fields - necessário usar any devido à tipagem do Prisma
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PrismaJsonValue = any;
+
+interface FlowNode {
+  id: string;
+  type: string;
+  data?: Record<string, unknown>;
+  position?: { x: number; y: number };
+}
+
+interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+}
 
 interface PartialExecutionRequest {
   flowId: string;
   targetNodeId: string;
-  triggerData?: any;
+  triggerData?: Record<string, unknown>;
   flow?: {
     id: string;
     name: string;
-    nodes: any[];
-    edges: any[];
+    nodes: FlowNode[];
+    edges: FlowEdge[];
     originalFlowId?: string | null;
   };
 }
@@ -38,12 +56,13 @@ export async function POST(request: NextRequest) {
     );
 
     // Obter userId da sessão (necessário para flows temporários)
-    const session = (await getSession()) as any;
+    const session = await getSession();
+    const sessionData = session as { user?: { email?: string } } | null;
     let currentUserId: number | null = null;
 
-    if (session?.user?.email) {
+    if (sessionData?.user?.email) {
       const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { email: sessionData.user.email },
         select: { id: true },
       });
       if (user) {
@@ -52,9 +71,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Usar flow inline (sem salvar) ou buscar do banco
-    let flow: any;
-    let nodes: any[];
-    let edges: any[];
+    let flow: {
+      id: string;
+      name: string;
+      nodes: FlowNode[];
+      edges: FlowEdge[];
+      userId: number | null;
+    };
+    let nodes: FlowNode[];
+    let edges: FlowEdge[];
 
     if (inlineFlow) {
       // Executar flow sem salvar (modo preview)
@@ -89,9 +114,22 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      flow = dbFlow;
-      nodes = dbFlow.nodes as any[];
-      edges = dbFlow.edges as any[];
+      const dbNodes = Array.isArray(dbFlow.nodes)
+        ? (dbFlow.nodes as unknown as FlowNode[])
+        : [];
+      const dbEdges = Array.isArray(dbFlow.edges)
+        ? (dbFlow.edges as unknown as FlowEdge[])
+        : [];
+
+      flow = {
+        id: dbFlow.id,
+        name: dbFlow.name,
+        nodes: dbNodes,
+        edges: dbEdges,
+        userId: dbFlow.userId,
+      };
+      nodes = dbNodes;
+      edges = dbEdges;
     }
 
     // Identificar o caminho do início até o targetNode
@@ -126,8 +164,8 @@ export async function POST(request: NextRequest) {
         await prisma.chatbot_flows.update({
           where: { id: existingTempFlow.id },
           data: {
-            nodes: inlineFlow.nodes,
-            edges: inlineFlow.edges,
+            nodes: inlineFlow.nodes as PrismaJsonValue,
+            edges: inlineFlow.edges as PrismaJsonValue,
             updatedAt: new Date(),
           },
         });
@@ -139,8 +177,8 @@ export async function POST(request: NextRequest) {
         const tempFlow = await prisma.chatbot_flows.create({
           data: {
             name: `Preview - User ${currentUserId}`,
-            nodes: inlineFlow.nodes,
-            edges: inlineFlow.edges,
+            nodes: inlineFlow.nodes as PrismaJsonValue,
+            edges: inlineFlow.edges as PrismaJsonValue,
             userId: currentUserId,
             isActive: false,
             isTemporary: true, // ✅ Marcar explicitamente como temporário
@@ -182,11 +220,15 @@ export async function POST(request: NextRequest) {
     );
 
     // Mesclar nodeExecutions de todas as execuções recentes (mais recente tem prioridade)
-    let mergedNodeExecutions: any = {};
+    let mergedNodeExecutions: Record<string, unknown> = {};
     for (let i = recentExecutions.length - 1; i >= 0; i--) {
       const exec = recentExecutions[i];
-      const nodeExecs = exec.nodeExecutions as any;
-      if (nodeExecs && typeof nodeExecs === 'object') {
+      const nodeExecs = exec.nodeExecutions as Record<string, unknown> | null;
+      if (
+        nodeExecs &&
+        typeof nodeExecs === 'object' &&
+        !Array.isArray(nodeExecs)
+      ) {
         mergedNodeExecutions = { ...mergedNodeExecutions, ...nodeExecs };
         console.log(
           `📦 Mesclando nodeExecutions da execution ${exec.id} (flow: ${exec.flowId}):`,
@@ -213,10 +255,10 @@ export async function POST(request: NextRequest) {
         flowId: actualFlowId,
         status: 'running',
         triggerType: inlineFlow ? 'manual_partial_preview' : 'manual_partial',
-        triggerData,
+        triggerData: triggerData as PrismaJsonValue,
         startTime,
-        data: triggerData,
-        nodeExecutions: mergedNodeExecutions, // ✅ Herdar dados de nodes anteriores
+        data: triggerData as PrismaJsonValue,
+        nodeExecutions: mergedNodeExecutions as PrismaJsonValue, // ✅ Herdar dados de nodes anteriores
       },
     });
 
@@ -227,8 +269,8 @@ export async function POST(request: NextRequest) {
     // Executar o flow parcialmente
     try {
       // Encontrar o primeiro node (webhook ou outro tipo)
-      const startNode = nodes.find((node: any) => {
-        const hasIncoming = edges.some((edge: any) => edge.target === node.id);
+      const startNode = nodes.find((node) => {
+        const hasIncoming = edges.some((edge) => edge.target === node.id);
         return !hasIncoming;
       });
 
@@ -346,8 +388,8 @@ export async function POST(request: NextRequest) {
  */
 function findPathToNode(
   targetNodeId: string,
-  nodes: any[],
-  edges: any[],
+  nodes: FlowNode[],
+  edges: FlowEdge[],
 ): string[] {
   // Criar mapa de conexões
   const graph = new Map<string, string[]>();

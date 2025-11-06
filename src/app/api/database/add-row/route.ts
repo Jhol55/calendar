@@ -3,6 +3,10 @@ import { prisma } from '@/services/prisma';
 import { DATABASE_CONFIG } from '@/config/database.config';
 import { canUseStorage } from '@/services/subscription/subscription.service';
 
+// Type helper para Prisma JSON fields - necessário usar any devido à tipagem do Prisma
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PrismaJsonValue = any;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -59,10 +63,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Pegar os dados atuais
-    const currentData = (activePartition.data as any[]) || [];
+    const currentData = (
+      Array.isArray(activePartition.data) ? activePartition.data : []
+    ) as Record<string, unknown>[];
 
     // Adicionar novo registro
-    currentData.push(data);
+    currentData.push(data as Record<string, unknown>);
 
     // Verificar se atingiu o limite
     const isFull = currentData.length >= DATABASE_CONFIG.MAX_PARTITION_SIZE;
@@ -71,7 +77,7 @@ export async function POST(request: NextRequest) {
     await prisma.dataTable.update({
       where: { id: activePartition.id },
       data: {
-        data: currentData as any,
+        data: currentData as PrismaJsonValue,
         recordCount: currentData.length,
         isFull,
         updatedAt: new Date(),
@@ -79,8 +85,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data });
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to add row';
     console.error('Error adding row:', error);
-    return NextResponse.json({ error: 'Failed to add row' }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

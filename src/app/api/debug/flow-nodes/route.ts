@@ -28,7 +28,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Analisar os nodes
-    const nodes = flow.nodes as any[];
+    const nodes = Array.isArray(flow.nodes)
+      ? (flow.nodes as Array<{
+          id: string;
+          type: string;
+          data?: {
+            webhookConfig?: { webhookId?: string; serviceType?: string };
+          };
+        }>)
+      : [];
+    const edges = Array.isArray(flow.edges) ? flow.edges : [];
     const nodeAnalysis = nodes.map((node, index) => ({
       index,
       id: node.id,
@@ -44,16 +53,15 @@ export async function GET(request: NextRequest) {
         id: flow.id,
         name: flow.name,
         totalNodes: nodes.length,
-        totalEdges: (flow.edges as any[]).length,
+        totalEdges: edges.length,
       },
       nodeAnalysis,
       rawNodes: nodes,
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to analyze flow nodes';
     console.error('Error analyzing flow nodes:', error);
-    return NextResponse.json(
-      { error: 'Failed to analyze flow nodes' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

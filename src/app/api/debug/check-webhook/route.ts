@@ -88,9 +88,12 @@ export async function GET(request: NextRequest) {
           stripeSubscriptions.data[0]?.id,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return NextResponse.json(
-      { error: error.message, stack: error.stack },
+      { error: errorMessage, ...(errorStack && { stack: errorStack }) },
       { status: 500 },
     );
   }

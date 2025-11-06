@@ -290,12 +290,15 @@ export async function createCheckoutSession(
       sessionId: session.id,
       url: session.url,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log detalhado no servidor para debugging (não expor ao cliente)
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     console.error('Error creating checkout session:', {
       userId,
-      error: error.message,
-      stack: error.stack,
+      error: errorMessage,
+      ...(errorStack && { stack: errorStack }),
       timestamp: new Date().toISOString(),
     });
 

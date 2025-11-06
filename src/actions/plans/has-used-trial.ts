@@ -53,7 +53,7 @@ export async function hasUsedTrial(): Promise<{
       success: true,
       hasUsedTrial: false,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error checking if user has used trial:', error);
     return {
       success: false,

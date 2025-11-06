@@ -135,10 +135,13 @@ export async function POST(request: NextRequest) {
         status: subscriptionRecord.status,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     console.error('Error syncing subscription:', error);
     return NextResponse.json(
-      { error: error.message, stack: error.stack },
+      { error: errorMessage, ...(errorStack && { stack: errorStack }) },
       { status: 500 },
     );
   }

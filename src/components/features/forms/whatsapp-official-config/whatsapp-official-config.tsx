@@ -19,10 +19,20 @@ interface WhatsAppOfficialConfigProps {
   instanceName: string;
 }
 
+interface FacebookSDK {
+  init: (config: { appId: string; version: string; xfbml: boolean }) => void;
+  getLoginStatus: (callback: (response: unknown) => void) => void;
+  login: (
+    callback: (response: unknown) => void,
+    options?: { scope?: string },
+  ) => void;
+  logout: (callback: () => void) => void;
+}
+
 declare global {
   interface Window {
-    FB: any;
-    fbAsyncInit: () => void;
+    FB?: FacebookSDK;
+    fbAsyncInit?: () => void;
   }
 }
 
@@ -58,7 +68,13 @@ export function WhatsAppOfficialConfig({
     try {
       const response = await getWhatsAppOfficialStatus(instanceToken);
       if (response.success && response.data) {
-        setStatus(response.data as any);
+        const data = response.data as {
+          enabled: boolean;
+          status: string;
+          phoneNumber?: string;
+          connectedAt?: Date;
+        };
+        setStatus(data);
       } else {
         setStatus({
           enabled: false,

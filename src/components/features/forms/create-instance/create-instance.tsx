@@ -91,7 +91,11 @@ export const CreateInstanceForm = ({
       }
 
       // Abrir popup com OAuth
-      if (response.data && (response.data as any).oauthUrl) {
+      if (
+        response.data &&
+        typeof response.data === 'object' &&
+        'oauthUrl' in response.data
+      ) {
         const { oauthUrl } = response.data as { oauthUrl: string };
         const width = 800;
         const height = 600;

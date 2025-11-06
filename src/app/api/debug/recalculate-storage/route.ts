@@ -22,11 +22,10 @@ export async function POST(request: NextRequest) {
       storageMB,
       message: `Armazenamento recalculado: ${storageMB}MB`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to recalculate storage';
     console.error('Error recalculating storage:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to recalculate storage' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

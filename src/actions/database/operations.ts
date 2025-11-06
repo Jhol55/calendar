@@ -245,7 +245,7 @@ export async function updateCell(
       // VALIDAÇÃO DE UNIQUE ANTES DE ATUALIZAR
       if (columnDef.unique && value && value.trim() !== '') {
         // Converter o valor para o tipo correto da coluna antes de validar
-        let typedValue: any = value;
+        let typedValue: string | number | boolean = value;
         if (columnDef.type === 'number') {
           typedValue = Number(value);
         } else if (columnDef.type === 'boolean') {

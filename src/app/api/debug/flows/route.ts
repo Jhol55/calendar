@@ -5,22 +5,33 @@ export async function GET(request: NextRequest) {
   try {
     const flows = await prisma.chatbot_flows.findMany();
 
+    interface WebhookConfig {
+      webhookId?: string;
+      serviceType?: string;
+    }
+
+    interface FlowNode {
+      id?: string;
+      type?: string;
+      data?: {
+        webhookConfig?: WebhookConfig;
+      };
+    }
+
     const flowsWithWebhooks = flows.map((flow) => {
-      const nodes = flow.nodes as unknown[];
-      const webhookNodes = nodes.filter((node: unknown) => {
-        const n = node as { type?: string; data?: { webhookConfig?: any } };
-        return n.type === 'webhook';
+      const nodes = Array.isArray(flow.nodes) ? (flow.nodes as FlowNode[]) : [];
+      const webhookNodes = nodes.filter((node) => {
+        return node.type === 'webhook';
       });
 
       return {
         id: flow.id,
         name: flow.name,
-        totalNodes: Array.isArray(nodes) ? nodes.length : 0,
-        webhookNodes: webhookNodes.map((node: unknown) => {
-          const n = node as { id?: string; data?: { webhookConfig?: any } };
+        totalNodes: nodes.length,
+        webhookNodes: webhookNodes.map((node) => {
           return {
-            nodeId: n.id,
-            webhookConfig: n.data?.webhookConfig,
+            nodeId: node.id,
+            webhookConfig: node.data?.webhookConfig,
           };
         }),
       };
@@ -30,11 +41,10 @@ export async function GET(request: NextRequest) {
       totalFlows: flows.length,
       flows: flowsWithWebhooks,
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to fetch flows';
     console.error('Debug error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch flows' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

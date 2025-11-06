@@ -48,16 +48,18 @@ export async function recalculateAllStorageUsage(): Promise<{
             await getStorageUsage(user.id, true);
             processed++;
             details.push({ userId: user.id, success: true });
-          } catch (error: any) {
+          } catch (error: unknown) {
             errors++;
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
             details.push({
               userId: user.id,
               success: false,
-              error: error.message,
+              error: errorMessage,
             });
             console.error(
               `❌ [Job] Erro ao recalcular storage do usuário ${user.id}:`,
-              error.message,
+              errorMessage,
             );
           }
         }),
@@ -72,7 +74,7 @@ export async function recalculateAllStorageUsage(): Promise<{
     console.log(
       `✅ [Job] Recálculo concluído: ${processed} processados, ${errors} erros`,
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(
       '❌ [Job] Erro crítico no recálculo de armazenamento:',
       error,
@@ -90,10 +92,11 @@ export async function recalculateUserStorage(userId: number): Promise<boolean> {
   try {
     await getStorageUsage(userId, true);
     return true;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(
       `❌ Erro ao recalcular storage do usuário ${userId}:`,
-      error.message,
+      errorMessage,
     );
     return false;
   }
