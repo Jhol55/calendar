@@ -152,7 +152,7 @@ export function DatabaseSpreadsheet({
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const [duplicatesData, setDuplicatesData] = useState<{
     columnName: string;
-    duplicates: Array<{ value: any; count: number; ids: string[] }>;
+    duplicates: Array<{ value: unknown; count: number; ids: string[] }>;
   } | null>(null);
   const [deletingColumn, setDeletingColumn] = useState<string>('');
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
@@ -916,7 +916,7 @@ export function DatabaseSpreadsheet({
     }
 
     // Se ativou UNIQUE, verificar duplicatas
-    const wasUnique = (editingColumnData as any).unique || false;
+    const wasUnique = editingColumnData.unique || false;
     const isNowUnique = updatedColumn.unique || false;
 
     if (isNowUnique && !wasUnique) {
@@ -928,16 +928,22 @@ export function DatabaseSpreadsheet({
       if (
         response.success &&
         response.data &&
-        (response.data as any[]).length > 0
+        Array.isArray(response.data) &&
+        response.data.length > 0
       ) {
         // Mostrar modal de confirmação
         setDuplicatesData({
           columnName: oldName,
-          duplicates: response.data as any[],
+          duplicates: response.data as Array<{
+            value: unknown;
+            count: number;
+            ids: string[];
+          }>,
         });
         setShowDuplicatesDialog(true);
         // Guardar updatedColumn temporariamente para usar após confirmação
-        (window as any).__pendingColumnUpdate = updatedColumn;
+        (window as Record<string, unknown>).__pendingColumnUpdate =
+          updatedColumn;
         return; // Aguardar decisão do usuário
       }
     }
@@ -971,8 +977,7 @@ export function DatabaseSpreadsheet({
       updatedColumn.type !== editingColumnData.type ||
       updatedColumn.required !== editingColumnData.required ||
       updatedColumn.default !== editingColumnData.default ||
-      (updatedColumn.unique || false) !==
-        ((editingColumnData as any).unique || false)
+      (updatedColumn.unique || false) !== (editingColumnData.unique || false)
     ) {
       const existingMetadataIndex =
         pendingChanges.columnMetadataUpdates.findIndex(
@@ -1048,11 +1053,20 @@ export function DatabaseSpreadsheet({
 
     if (response.success) {
       // Continuar com a atualização da coluna
-      const pendingUpdate = (window as any).__pendingColumnUpdate;
+      const pendingUpdate = (window as Record<string, unknown>)
+        .__pendingColumnUpdate;
       if (pendingUpdate) {
-        delete (window as any).__pendingColumnUpdate;
+        delete (window as Record<string, unknown>).__pendingColumnUpdate;
         // Chamar handleEditColumn novamente, mas agora sem duplicatas
-        await handleEditColumn(pendingUpdate);
+        await handleEditColumn(
+          pendingUpdate as {
+            name: string;
+            type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
+            required: boolean;
+            default: string;
+            unique?: boolean;
+          },
+        );
       }
 
       await loadTableData();
@@ -1067,7 +1081,7 @@ export function DatabaseSpreadsheet({
   const handleCancelRemoveDuplicates = () => {
     setShowDuplicatesDialog(false);
     setDuplicatesData(null);
-    delete (window as any).__pendingColumnUpdate;
+    delete (window as Record<string, unknown>).__pendingColumnUpdate;
   };
 
   // Funções de drag and drop
@@ -1600,7 +1614,9 @@ export function DatabaseSpreadsheet({
                                     | 'object',
                                   required: column.required,
                                   default: String(column.default || ''),
-                                  unique: (column as any).unique || false,
+                                  unique:
+                                    (column as { unique?: boolean }).unique ||
+                                    false,
                                 });
                                 setShowEditColumnDialog(true);
                               }

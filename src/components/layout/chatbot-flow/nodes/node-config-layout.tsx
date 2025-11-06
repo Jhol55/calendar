@@ -72,7 +72,7 @@ function NodeConfigLayoutContent({
       source: edge.source,
       target: edge.target,
     }));
-  }, [edgesKey]);
+  }, [edgesKey, allEdges]);
 
   const liveNodes = useMemo(() => {
     return allNodes.map((n) => ({
@@ -80,7 +80,7 @@ function NodeConfigLayoutContent({
       type: n.type,
       data: n.data,
     }));
-  }, [nodesKey]);
+  }, [nodesKey, allNodes]);
 
   const [tempLabel, setTempLabel] = useState(nodeLabel || '');
 
