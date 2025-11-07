@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
+import { Prisma } from '../../../../../generated/prisma';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function PUT(request: NextRequest) {
         await prisma.dataTable.update({
           where: { id: record.id },
           data: {
-            data: data,
+            data: data as Prisma.InputJsonValue,
             updatedAt: new Date(),
           },
         });
