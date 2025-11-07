@@ -705,7 +705,7 @@ export async function createTable(
     if (tableCount >= DATABASE_CONFIG.MAX_TABLES_PER_USER) {
       return {
         success: false,
-        message: `Maximum number of tables reached (${DATABASE_NODE_CONFIG.MAX_TABLES_PER_USER})`,
+        message: `Maximum number of tables reached (${DATABASE_CONFIG.MAX_TABLES_PER_USER})`,
         code: 400,
       };
     }
