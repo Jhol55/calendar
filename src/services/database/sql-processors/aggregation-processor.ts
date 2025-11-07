@@ -4,7 +4,7 @@
 
 import type { AggregateFunction } from '../sql-types';
 import { FilterTranslator } from './filter-translator';
-import { databaseService } from '../database.service';
+import type { FilterConfig } from '../database.types';
 
 export class AggregationProcessor {
   private filterTranslator = new FilterTranslator();
@@ -12,10 +12,10 @@ export class AggregationProcessor {
    * Processa agregações em um conjunto de registros
    */
   aggregate(
-    records: any[],
+    records: Record<string, unknown>[],
     groupByFields: string[],
     aggregations: AggregateFunction[],
-  ): any[] {
+  ): Record<string, unknown>[] {
     if (groupByFields.length === 0) {
       // Sem GROUP BY: agregar todos os registros em um único resultado
       return [this.applyAggregations([records], aggregations)[0]];
@@ -33,8 +33,11 @@ export class AggregationProcessor {
   /**
    * Agrupa registros pelos campos especificados
    */
-  private groupRecords(records: any[], fields: string[]): Map<string, any[]> {
-    const groups = new Map<string, any[]>();
+  private groupRecords(
+    records: Record<string, unknown>[],
+    fields: string[],
+  ): Map<string, Record<string, unknown>[]> {
+    const groups = new Map<string, Record<string, unknown>[]>();
 
     for (const record of records) {
       // Criar chave do grupo concatenando valores dos campos
@@ -63,11 +66,11 @@ export class AggregationProcessor {
    * Aplica agregações em cada grupo
    */
   private applyAggregations(
-    groups: any[][],
+    groups: Record<string, unknown>[][],
     aggregations: AggregateFunction[],
     groupByFields: string[] = [],
-  ): any[] {
-    const results: any[] = [];
+  ): Record<string, unknown>[] {
+    const results: Record<string, unknown>[] = [];
 
     for (const group of groups) {
       // Se o grupo está vazio mas temos agregações, ainda precisamos retornar um resultado
@@ -77,7 +80,7 @@ export class AggregationProcessor {
         continue;
       }
 
-      const result: any = {};
+      const result: Record<string, unknown> = {};
 
       // Incluir campos do GROUP BY (usar valores do primeiro registro)
       for (const field of groupByFields) {
@@ -111,9 +114,9 @@ export class AggregationProcessor {
    * Executa uma função de agregação em um grupo
    */
   private executeAggregateFunction(
-    records: any[],
+    records: Record<string, unknown>[],
     agg: AggregateFunction,
-  ): number | string | any[] | null {
+  ): number | string | unknown[] | null {
     switch (agg.function) {
       case 'COUNT':
         return this.count(records, agg.field, agg.distinct);
@@ -142,7 +145,11 @@ export class AggregationProcessor {
   /**
    * COUNT - conta registros (ou valores distintos)
    */
-  private count(records: any[], field?: string, distinct?: boolean): number {
+  private count(
+    records: Record<string, unknown>[],
+    field?: string,
+    distinct?: boolean,
+  ): number {
     if (!field || field === '*') {
       // COUNT(*) - conta todos os registros
       return records.length;
@@ -164,7 +171,7 @@ export class AggregationProcessor {
   /**
    * SUM - soma valores numéricos
    */
-  private sum(records: any[], field: string): number {
+  private sum(records: Record<string, unknown>[], field: string): number {
     let sum = 0;
 
     for (const record of records) {
@@ -185,7 +192,10 @@ export class AggregationProcessor {
   /**
    * AVG - média de valores numéricos
    */
-  private avg(records: any[], field: string): number | null {
+  private avg(
+    records: Record<string, unknown>[],
+    field: string,
+  ): number | null {
     const values = records
       .map((r) => {
         const value = r[field];
@@ -207,7 +217,10 @@ export class AggregationProcessor {
   /**
    * MIN - valor mínimo
    */
-  private min(records: any[], field: string): number | string | null {
+  private min(
+    records: Record<string, unknown>[],
+    field: string,
+  ): number | string | null {
     const values = records
       .map((r) => r[field])
       .filter((v) => v !== null && v !== undefined);
@@ -222,7 +235,10 @@ export class AggregationProcessor {
   /**
    * MAX - valor máximo
    */
-  private max(records: any[], field: string): number | string | null {
+  private max(
+    records: Record<string, unknown>[],
+    field: string,
+  ): number | string | null {
     const values = records
       .map((r) => r[field])
       .filter((v) => v !== null && v !== undefined);
@@ -237,7 +253,11 @@ export class AggregationProcessor {
   /**
    * STRING_AGG / GROUP_CONCAT - Concatena strings com separador
    */
-  private stringAgg(records: any[], field: string, separator: string): string {
+  private stringAgg(
+    records: Record<string, unknown>[],
+    field: string,
+    separator: string,
+  ): string {
     const values = records
       .map((r) => r[field])
       .filter((v) => v !== null && v !== undefined)
@@ -249,7 +269,10 @@ export class AggregationProcessor {
   /**
    * ARRAY_AGG - Agrupa valores em array
    */
-  private arrayAgg(records: any[], field: string): any[] {
+  private arrayAgg(
+    records: Record<string, unknown>[],
+    field: string,
+  ): unknown[] {
     return records
       .map((r) => r[field])
       .filter((v) => v !== null && v !== undefined);
@@ -258,7 +281,10 @@ export class AggregationProcessor {
   /**
    * JSON_AGG - Agrupa rows como array de objetos JSON
    */
-  private jsonAgg(records: any[], field?: string): any[] {
+  private jsonAgg(
+    records: Record<string, unknown>[],
+    field?: string,
+  ): unknown[] {
     if (field) {
       // Se especificou um campo, retornar array dos valores desse campo
       return records.map((r) => r[field]);
@@ -266,7 +292,7 @@ export class AggregationProcessor {
     // Sem campo específico, retornar array de objetos (rows completas)
     return records.map((r) => {
       // Remover campos internos (_id, etc)
-      const obj: any = {};
+      const obj: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(r)) {
         if (!key.startsWith('_')) {
           obj[key] = value;
@@ -280,11 +306,11 @@ export class AggregationProcessor {
    * JSON_OBJECT_AGG - Agrupa key-value pairs em objeto JSON
    */
   private jsonObjectAgg(
-    records: any[],
+    records: Record<string, unknown>[],
     keyField: string,
     valueField: string,
-  ): any {
-    const result: any = {};
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
     for (const record of records) {
       const key = record[keyField];
       const value = record[valueField];
@@ -299,10 +325,9 @@ export class AggregationProcessor {
    * Aplica cláusula HAVING (filtra grupos após agregação)
    */
   applyHaving(
-    aggregatedRecords: any[],
-    havingCondition: any,
-    userId: string,
-  ): any[] {
+    aggregatedRecords: Record<string, unknown>[],
+    havingCondition: unknown,
+  ): Record<string, unknown>[] {
     if (!havingCondition) {
       return aggregatedRecords;
     }
@@ -320,10 +345,13 @@ export class AggregationProcessor {
   /**
    * Verifica se um registro match um filtro (similar ao DatabaseService.matchesFilters)
    */
-  private matchesFilter(record: any, filter: any): boolean {
+  private matchesFilter(
+    record: Record<string, unknown>,
+    filter: FilterConfig,
+  ): boolean {
     if (!filter.rules || filter.rules.length === 0) return true;
 
-    const results = filter.rules.map((rule: any) => {
+    const results = filter.rules.map((rule) => {
       // Se a regra é aninhada (tem condition e rules), processar recursivamente
       if ('condition' in rule && 'rules' in rule) {
         return this.matchesFilter(record, rule);

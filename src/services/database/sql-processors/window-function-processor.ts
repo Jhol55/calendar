@@ -2,6 +2,8 @@
 // WINDOW FUNCTION PROCESSOR - Handles RANK, ROW_NUMBER, OVER, PARTITION BY
 // ============================================
 
+type DatabaseRecord = Record<string, unknown>;
+
 export interface WindowFunction {
   function:
     | 'RANK'
@@ -25,7 +27,7 @@ export interface WindowFunction {
   partitionBy?: string[]; // PARTITION BY columns
   orderBy?: Array<{ field: string; order: 'ASC' | 'DESC' }>;
   offset?: number; // Para LEAD/LAG
-  defaultValue?: any; // Para LEAD/LAG
+  defaultValue?: unknown; // Para LEAD/LAG
   nth?: number; // Para NTH_VALUE
   buckets?: number; // Para NTILE
 }
@@ -35,9 +37,9 @@ export class WindowFunctionProcessor {
    * Processa window functions em um conjunto de registros
    */
   processWindowFunctions(
-    records: any[],
+    records: DatabaseRecord[],
     windowFunctions: WindowFunction[],
-  ): any[] {
+  ): DatabaseRecord[] {
     console.log(`🪟 Processing ${windowFunctions.length} window functions...`);
 
     // Criar cópia dos registros para adicionar colunas calculadas
@@ -54,14 +56,17 @@ export class WindowFunctionProcessor {
   /**
    * Aplica uma window function específica
    */
-  private applyWindowFunction(records: any[], wf: WindowFunction): any[] {
+  private applyWindowFunction(
+    records: DatabaseRecord[],
+    wf: WindowFunction,
+  ): DatabaseRecord[] {
     console.log(`   Window Function: ${wf.function} AS ${wf.alias}`);
 
     // Agrupar por PARTITION BY (se houver)
     const partitions = this.partitionRecords(records, wf.partitionBy || []);
 
     // Processar cada partição
-    for (const [partitionKey, partitionRecords] of partitions.entries()) {
+    for (const [, partitionRecords] of partitions.entries()) {
       // Ordenar partição se ORDER BY estiver presente
       if (wf.orderBy && wf.orderBy.length > 0) {
         partitionRecords.sort((a, b) =>
@@ -80,10 +85,10 @@ export class WindowFunctionProcessor {
    * Particiona registros por campos PARTITION BY
    */
   private partitionRecords(
-    records: any[],
+    records: DatabaseRecord[],
     partitionFields: string[],
-  ): Map<string, any[]> {
-    const partitions = new Map<string, any[]>();
+  ): Map<string, DatabaseRecord[]> {
+    const partitions = new Map<string, DatabaseRecord[]>();
 
     if (partitionFields.length === 0) {
       // Sem PARTITION BY: todos os registros em uma única partição
@@ -111,8 +116,8 @@ export class WindowFunctionProcessor {
    * Compara dois registros para ordenação
    */
   private compareByOrderBy(
-    a: any,
-    b: any,
+    a: DatabaseRecord,
+    b: DatabaseRecord,
     orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
   ): number {
     for (const { field, order } of orderBy) {
@@ -131,7 +136,7 @@ export class WindowFunctionProcessor {
    * Aplica a função window em uma partição
    */
   private applyFunctionToPartition(
-    partitionRecords: any[],
+    partitionRecords: DatabaseRecord[],
     wf: WindowFunction,
   ): void {
     switch (wf.function) {
@@ -234,7 +239,7 @@ export class WindowFunctionProcessor {
   /**
    * ROW_NUMBER() - Número sequencial dentro da partição
    */
-  private applyRowNumber(records: any[], alias: string): void {
+  private applyRowNumber(records: DatabaseRecord[], alias: string): void {
     records.forEach((record, index) => {
       record[alias] = index + 1;
     });
@@ -244,12 +249,12 @@ export class WindowFunctionProcessor {
    * RANK() - Ranking com gaps para empates
    */
   private applyRank(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
   ): void {
     let currentRank = 1;
-    let previousValues: any[] = [];
+    let previousValues: unknown[] = [];
 
     records.forEach((record, index) => {
       // Valores atuais para comparação
@@ -269,12 +274,12 @@ export class WindowFunctionProcessor {
    * DENSE_RANK() - Ranking sem gaps
    */
   private applyDenseRank(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
   ): void {
     let currentRank = 1;
-    let previousValues: any[] = [];
+    let previousValues: unknown[] = [];
 
     records.forEach((record, index) => {
       const currentValues = orderBy.map((o) => record[o.field]);
@@ -292,7 +297,7 @@ export class WindowFunctionProcessor {
    * SUM/AVG/COUNT OVER - Agregação na partição completa
    */
   private applyRunningSumOrAggregate(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     field: string | undefined,
     func: 'SUM' | 'AVG' | 'COUNT',
@@ -324,7 +329,7 @@ export class WindowFunctionProcessor {
    * MIN/MAX OVER - Valor mínimo/máximo na partição
    */
   private applyRunningMinMax(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     field: string,
     func: 'MIN' | 'MAX',
@@ -341,11 +346,11 @@ export class WindowFunctionProcessor {
    * LEAD() - Valor de N linhas à frente
    */
   private applyLead(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     field: string,
     offset: number,
-    defaultValue: any = null,
+    defaultValue: unknown = null,
   ): void {
     records.forEach((record, index) => {
       const targetIndex = index + offset;
@@ -361,11 +366,11 @@ export class WindowFunctionProcessor {
    * LAG() - Valor de N linhas atrás
    */
   private applyLag(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     field: string,
     offset: number,
-    defaultValue: any = null,
+    defaultValue: unknown = null,
   ): void {
     records.forEach((record, index) => {
       const targetIndex = index - offset;
@@ -380,7 +385,11 @@ export class WindowFunctionProcessor {
   /**
    * FIRST_VALUE() - Primeiro valor da janela
    */
-  private applyFirstValue(records: any[], alias: string, field: string): void {
+  private applyFirstValue(
+    records: DatabaseRecord[],
+    alias: string,
+    field: string,
+  ): void {
     const firstValue = records.length > 0 ? records[0][field] : null;
     records.forEach((record) => {
       record[alias] = firstValue;
@@ -390,7 +399,11 @@ export class WindowFunctionProcessor {
   /**
    * LAST_VALUE() - Último valor da janela
    */
-  private applyLastValue(records: any[], alias: string, field: string): void {
+  private applyLastValue(
+    records: DatabaseRecord[],
+    alias: string,
+    field: string,
+  ): void {
     const lastValue =
       records.length > 0 ? records[records.length - 1][field] : null;
     records.forEach((record) => {
@@ -402,7 +415,7 @@ export class WindowFunctionProcessor {
    * NTH_VALUE() - N-ésimo valor da janela
    */
   private applyNthValue(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     field: string,
     nth: number,
@@ -417,7 +430,11 @@ export class WindowFunctionProcessor {
   /**
    * NTILE() - Dividir em N grupos (buckets)
    */
-  private applyNtile(records: any[], alias: string, buckets: number): void {
+  private applyNtile(
+    records: DatabaseRecord[],
+    alias: string,
+    buckets: number,
+  ): void {
     const totalRecords = records.length;
     const bucketSize = Math.ceil(totalRecords / buckets);
 
@@ -431,13 +448,13 @@ export class WindowFunctionProcessor {
    * CUME_DIST() - Distribuição cumulativa (0 a 1)
    */
   private applyCumeDist(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
   ): void {
     const totalRecords = records.length;
 
-    records.forEach((record, index) => {
+    records.forEach((record) => {
       // Número de linhas com valor <= valor atual
       const currentValues = orderBy.map((o) => record[o.field]);
       let countLessOrEqual = 0;
@@ -463,7 +480,7 @@ export class WindowFunctionProcessor {
    * PERCENT_RANK() - Rank percentual (0 a 1)
    */
   private applyPercentRank(
-    records: any[],
+    records: DatabaseRecord[],
     alias: string,
     orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
   ): void {
@@ -478,7 +495,7 @@ export class WindowFunctionProcessor {
 
     // Primeiro, aplicar RANK
     let currentRank = 1;
-    let previousValues: any[] = [];
+    let previousValues: unknown[] = [];
     const ranks: number[] = [];
 
     records.forEach((record, index) => {
@@ -502,8 +519,8 @@ export class WindowFunctionProcessor {
    * Compara valores considerando ORDER BY
    */
   private compareValues(
-    a: any[],
-    b: any[],
+    a: unknown[],
+    b: unknown[],
     orderBy: Array<{ field: string; order: 'ASC' | 'DESC' }>,
   ): number {
     for (let i = 0; i < a.length; i++) {
@@ -521,7 +538,7 @@ export class WindowFunctionProcessor {
   /**
    * Compara dois arrays
    */
-  private arraysEqual(a: any[], b: any[]): boolean {
+  private arraysEqual(a: unknown[], b: unknown[]): boolean {
     if (a.length !== b.length) return false;
     return a.every((val, index) => val === b[index]);
   }

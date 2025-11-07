@@ -4,18 +4,20 @@
 
 import type { JoinCondition, JoinType } from '../sql-types';
 
+type DatabaseRecord = Record<string, unknown>;
+
 export class JoinProcessor {
   /**
    * Processa JOIN entre duas tabelas
    */
   processJoin(
-    leftRecords: any[],
-    rightRecords: any[],
+    leftRecords: DatabaseRecord[],
+    rightRecords: DatabaseRecord[],
     joinCondition: JoinCondition | null,
     joinType: JoinType,
     leftTableAlias?: string,
     rightTableAlias?: string,
-  ): any[] {
+  ): DatabaseRecord[] {
     // CROSS JOIN não tem condição
     if (joinType === 'CROSS JOIN') {
       console.log(
@@ -89,13 +91,13 @@ export class JoinProcessor {
    * INNER JOIN - apenas registros que têm correspondência em ambas as tabelas
    */
   private innerJoin(
-    leftRecords: any[],
-    rightRecords: any[],
+    leftRecords: DatabaseRecord[],
+    rightRecords: DatabaseRecord[],
     leftKey: string,
     rightKey: string,
     leftTableAlias: string,
     rightTableAlias: string,
-  ): any[] {
+  ): DatabaseRecord[] {
     // Build hash table for smaller table (optimization)
     const [smaller, larger, smallerKey, largerKey, isLeftSmaller] =
       leftRecords.length < rightRecords.length
@@ -103,7 +105,7 @@ export class JoinProcessor {
         : [rightRecords, leftRecords, rightKey, leftKey, false];
 
     const hashTable = this.buildHashTable(smaller, smallerKey);
-    const results: any[] = [];
+    const results: DatabaseRecord[] = [];
 
     for (const largerRow of larger) {
       const largerKeyValue = largerRow[largerKey];
@@ -136,15 +138,15 @@ export class JoinProcessor {
    * LEFT JOIN - todos os registros da esquerda + correspondências da direita (ou null)
    */
   private leftJoin(
-    leftRecords: any[],
-    rightRecords: any[],
+    leftRecords: DatabaseRecord[],
+    rightRecords: DatabaseRecord[],
     leftKey: string,
     rightKey: string,
     leftTableAlias: string,
     rightTableAlias: string,
-  ): any[] {
+  ): DatabaseRecord[] {
     const rightHashTable = this.buildHashTable(rightRecords, rightKey);
-    const results: any[] = [];
+    const results: DatabaseRecord[] = [];
 
     for (const leftRow of leftRecords) {
       const leftKeyValue = leftRow[leftKey];
@@ -172,13 +174,13 @@ export class JoinProcessor {
    * RIGHT JOIN - todos os registros da direita + correspondências da esquerda (ou null)
    */
   private rightJoin(
-    leftRecords: any[],
-    rightRecords: any[],
+    leftRecords: DatabaseRecord[],
+    rightRecords: DatabaseRecord[],
     leftKey: string,
     rightKey: string,
     leftTableAlias: string,
     rightTableAlias: string,
-  ): any[] {
+  ): DatabaseRecord[] {
     // RIGHT JOIN é como LEFT JOIN invertido
     return this.leftJoin(
       rightRecords,
@@ -194,16 +196,16 @@ export class JoinProcessor {
    * FULL OUTER JOIN - todos os registros de ambas as tabelas
    */
   private fullOuterJoin(
-    leftRecords: any[],
-    rightRecords: any[],
+    leftRecords: DatabaseRecord[],
+    rightRecords: DatabaseRecord[],
     leftKey: string,
     rightKey: string,
     leftTableAlias: string,
     rightTableAlias: string,
-  ): any[] {
-    const results: any[] = [];
+  ): DatabaseRecord[] {
+    const results: DatabaseRecord[] = [];
     const rightHashTable = this.buildHashTable(rightRecords, rightKey);
-    const matchedRightKeys = new Set<any>();
+    const matchedRightKeys = new Set<unknown>();
 
     // Processar todas as left rows
     for (const leftRow of leftRecords) {
@@ -242,12 +244,12 @@ export class JoinProcessor {
    * CROSS JOIN - produto cartesiano de duas tabelas (cada linha da esquerda com cada linha da direita)
    */
   private crossJoin(
-    leftRecords: any[],
-    rightRecords: any[],
+    leftRecords: DatabaseRecord[],
+    rightRecords: DatabaseRecord[],
     leftTableAlias: string,
     rightTableAlias: string,
-  ): any[] {
-    const results: any[] = [];
+  ): DatabaseRecord[] {
+    const results: DatabaseRecord[] = [];
 
     // Produto cartesiano: cada linha da esquerda com cada linha da direita
     for (const leftRow of leftRecords) {
@@ -267,8 +269,11 @@ export class JoinProcessor {
   /**
    * Build hash table para lookup rápido
    */
-  private buildHashTable(records: any[], keyField: string): Map<any, any[]> {
-    const hashTable = new Map<any, any[]>();
+  private buildHashTable(
+    records: DatabaseRecord[],
+    keyField: string,
+  ): Map<unknown, DatabaseRecord[]> {
+    const hashTable = new Map<unknown, DatabaseRecord[]>();
 
     for (const record of records) {
       const keyValue = record[keyField];
@@ -285,12 +290,12 @@ export class JoinProcessor {
    * Merge dois registros em um único registro com prefixos de tabela
    */
   private mergeRows(
-    leftRow: any | null,
-    rightRow: any | null,
+    leftRow: DatabaseRecord | null,
+    rightRow: DatabaseRecord | null,
     leftTableAlias: string,
     rightTableAlias: string,
-  ): any {
-    const merged: any = {};
+  ): DatabaseRecord {
+    const merged: DatabaseRecord = {};
 
     // Adicionar campos da left table com prefixo
     if (leftRow) {
@@ -347,14 +352,14 @@ export class JoinProcessor {
    * Processa múltiplos JOINs sequencialmente
    */
   processMultipleJoins(
-    tables: Map<string, any[]>,
+    tables: Map<string, DatabaseRecord[]>,
     joins: Array<{
       type: JoinType;
       table: string;
       alias: string;
       condition: JoinCondition;
     }>,
-  ): any[] {
+  ): DatabaseRecord[] {
     if (joins.length === 0) {
       // Sem JOINs, retornar apenas a primeira tabela
       const firstTable = Array.from(tables.values())[0];

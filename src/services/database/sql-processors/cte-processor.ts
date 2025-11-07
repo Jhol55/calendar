@@ -2,23 +2,29 @@
 // CTE PROCESSOR - Handles Common Table Expressions (WITH clause)
 // ============================================
 
+type QueryAST = Record<string, unknown>;
+type CteDefinition = {
+  name: string | { value: string };
+  stmt?: { ast?: QueryAST } | QueryAST;
+};
+
 export class CteProcessor {
   /**
    * Processa CTEs (WITH clause) e retorna resultados mapeados
    * Suporta CTEs recursivas (WITH RECURSIVE)
    */
   async processCtes(
-    ctes: any[],
+    ctes: CteDefinition[],
     userId: string,
     executeQuery: (
-      ast: any,
+      ast: QueryAST,
       userId: string,
-      cteContext: Map<string, any[]>,
-    ) => Promise<any[]>,
+      cteContext: Map<string, Record<string, unknown>[]>,
+    ) => Promise<Record<string, unknown>[]>,
     isRecursive: boolean = false,
     maxIterations: number = 1000,
-  ): Promise<Map<string, any[]>> {
-    const cteResults = new Map<string, any[]>();
+  ): Promise<Map<string, Record<string, unknown>[]>> {
+    const cteResults = new Map<string, Record<string, unknown>[]>();
 
     console.log(
       `📎 Processing ${ctes.length} CTEs${isRecursive ? ' (RECURSIVE)' : ''}...`,
@@ -31,7 +37,11 @@ export class CteProcessor {
         typeof cte.name === 'string' ? cte.name : cte.name?.value || 'unknown';
 
       // O AST da query está em cte.stmt.ast (não em cte.stmt diretamente)
-      const cteQuery = cte.stmt?.ast || cte.stmt;
+      const cteQuery = (
+        cte.stmt && typeof cte.stmt === 'object' && 'ast' in cte.stmt
+          ? cte.stmt.ast
+          : cte.stmt
+      ) as QueryAST;
 
       console.log(`   CTE: ${cteName}`);
 
@@ -57,8 +67,10 @@ export class CteProcessor {
           cteResults.set(cteName, results);
           console.log(`   ✅ CTE ${cteName} produced ${results.length} rows`);
         }
-      } catch (error: any) {
-        console.error(`   ❌ Error processing CTE ${cteName}:`, error.message);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error(`   ❌ Error processing CTE ${cteName}:`, errorMessage);
         console.error(`   CTE Query AST:`, JSON.stringify(cteQuery, null, 2));
         throw error;
       }
@@ -72,26 +84,26 @@ export class CteProcessor {
    */
   private async processRecursiveCte(
     cteName: string,
-    unionAst: any,
+    unionAst: QueryAST,
     userId: string,
     executeQuery: (
-      ast: any,
+      ast: QueryAST,
       userId: string,
-      cteContext: Map<string, any[]>,
-    ) => Promise<any[]>,
-    cteContext: Map<string, any[]>,
+      cteContext: Map<string, Record<string, unknown>[]>,
+    ) => Promise<Record<string, unknown>[]>,
+    cteContext: Map<string, Record<string, unknown>[]>,
     maxIterations: number = 1000,
-  ): Promise<any[]> {
+  ): Promise<Record<string, unknown>[]> {
     const MAX_ITERATIONS = maxIterations;
     let iteration = 0;
-    let allResults: any[] = [];
-    let previousResults: any[] = [];
+    let allResults: Record<string, unknown>[] = [];
+    let previousResults: Record<string, unknown>[] = [];
 
     // A primeira query é o anchor (no próprio unionAst)
     // A segunda query (recursiva) está em unionAst._next
 
-    const anchorQuery = { ...unionAst }; // Clone to avoid mutation
-    const recursiveQuery = unionAst._next;
+    const anchorQuery = { ...unionAst } as QueryAST; // Clone to avoid mutation
+    const recursiveQuery = unionAst._next as QueryAST | undefined;
 
     if (!recursiveQuery) {
       console.log(
@@ -142,7 +154,7 @@ export class CteProcessor {
       // Renomear colunas para usar os mesmos nomes do anchor
       // Isso é necessário porque em WITH RECURSIVE, as colunas devem ter os mesmos nomes
       const newResults = rawNewResults.map((row) => {
-        const renamedRow: any = {};
+        const renamedRow: Record<string, unknown> = {};
         const rowKeys = Object.keys(row);
 
         // Mapear cada chave do row para o nome correto do anchor
@@ -190,8 +202,8 @@ export class CteProcessor {
    */
   resolveCteReference(
     tableName: string,
-    cteResults: Map<string, any[]>,
-  ): any[] | null {
+    cteResults: Map<string, Record<string, unknown>[]>,
+  ): Record<string, unknown>[] | null {
     return cteResults.get(tableName) || null;
   }
 }

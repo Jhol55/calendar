@@ -8,11 +8,15 @@ import type {
   FilterOperator,
 } from '@/services/database/database.types';
 
+type ASTNode = Record<string, unknown>;
+
 export class FilterTranslator {
   /**
    * Converte cláusula WHERE do AST para FilterConfig
    */
-  translateToFilterConfig(whereClause: any): FilterConfig {
+  translateToFilterConfig(
+    whereClause: ASTNode | null | undefined,
+  ): FilterConfig {
     if (!whereClause) {
       return { condition: 'AND', rules: [] };
     }
@@ -23,7 +27,7 @@ export class FilterTranslator {
   /**
    * Processa uma condição (AND/OR/comparação)
    */
-  private processCondition(node: any): FilterConfig {
+  private processCondition(node: ASTNode): FilterConfig {
     // Condições lógicas (AND/OR)
     if (
       node.type === 'binary_expr' &&
@@ -100,7 +104,7 @@ export class FilterTranslator {
   /**
    * Traduz comparação simples (=, !=, >, <, >=, <=)
    */
-  private translateComparison(node: any): FilterRule {
+  private translateComparison(node: ASTNode): FilterRule {
     const field = this.extractFieldName(node.left);
     const value = this.extractValue(node.right);
     const operator = this.translateOperator(node.operator);
@@ -132,11 +136,14 @@ export class FilterTranslator {
   /**
    * Traduz operador IN / NOT IN
    */
-  private translateInOperator(node: any): FilterConfig {
+  private translateInOperator(node: ASTNode): FilterConfig {
     // node deve ser: { left: { column }, right: { type: 'expr_list', value: [...] } }
     const parent = node; // O node já contém left e right
-    const field = this.extractFieldName(parent.left);
-    const values = parent.right.value.map((v: any) => this.extractValue(v));
+    const field = this.extractFieldName(parent.left as ASTNode);
+    const rightValue = parent.right as { value?: unknown[] };
+    const values = (rightValue.value || []).map((v) =>
+      this.extractValue(v as ASTNode),
+    );
     const operator = parent.operator === 'IN' ? 'in' : 'notIn';
 
     return {
@@ -154,7 +161,7 @@ export class FilterTranslator {
   /**
    * Traduz IS NULL / IS NOT NULL
    */
-  private translateNullCheck(node: any): FilterRule {
+  private translateNullCheck(node: ASTNode): FilterRule {
     const field = this.extractFieldName(node.left);
     const operator = node.operator === 'IS' ? 'isNull' : 'isNotNull';
 
@@ -168,9 +175,9 @@ export class FilterTranslator {
   /**
    * Traduz LIKE / NOT LIKE / ILIKE / NOT ILIKE
    */
-  private translateLike(node: any): FilterRule {
-    const field = this.extractFieldName(node.left);
-    let value = this.extractValue(node.right);
+  private translateLike(node: ASTNode): FilterRule {
+    const field = this.extractFieldName(node.left as ASTNode);
+    const value = this.extractValue(node.right as ASTNode);
 
     // Converter wildcards SQL (%) para string simples
     // LIKE 'test%' → contains 'test'
@@ -221,7 +228,7 @@ export class FilterTranslator {
         operator: operator as FilterOperator,
         value: cleanValue,
         caseInsensitive: true,
-      } as any;
+      } as FilterRule & { caseInsensitive?: boolean };
     }
 
     return {
@@ -234,10 +241,15 @@ export class FilterTranslator {
   /**
    * Traduz BETWEEN / NOT BETWEEN
    */
-  private translateBetween(node: any): FilterConfig {
-    const field = this.extractFieldName(node.left);
-    const minValue = this.extractValue(node.right.value[0]);
-    const maxValue = this.extractValue(node.right.value[1]);
+  private translateBetween(node: ASTNode): FilterConfig {
+    const field = this.extractFieldName(node.left as ASTNode);
+    const rightValue = node.right as { value?: unknown[] };
+    const minValue = this.extractValue(
+      (rightValue.value?.[0] || null) as ASTNode | null,
+    );
+    const maxValue = this.extractValue(
+      (rightValue.value?.[1] || null) as ASTNode | null,
+    );
 
     if (node.operator === 'BETWEEN') {
       // BETWEEN = (field >= min AND field <= max)
@@ -279,7 +291,7 @@ export class FilterTranslator {
   /**
    * Extrai nome do campo do AST
    */
-  private extractFieldName(node: any): string {
+  private extractFieldName(node: ASTNode | null | undefined): string {
     if (!node) return '';
 
     // Função de agregação (ex: SUM(amount), COUNT(*), AVG(value))
@@ -325,7 +337,7 @@ export class FilterTranslator {
   /**
    * Extrai valor do AST
    */
-  private extractValue(node: any): any {
+  private extractValue(node: ASTNode | null | undefined): unknown {
     if (!node) return null;
 
     // Valor direto
