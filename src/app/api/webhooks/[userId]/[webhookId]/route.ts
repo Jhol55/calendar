@@ -143,11 +143,20 @@ async function findWebhookInFlows(webhookId: string, userId: number) {
         webhookConfig: node.data.webhookConfig,
       });
 
-      matches.push({
-        flow,
-        node,
-        config: node.data.webhookConfig,
-      });
+      // Verificar se userId não é null (já filtrado pela query, mas TypeScript não sabe)
+      if (flow.userId !== null) {
+        matches.push({
+          flow: {
+            id: flow.id,
+            name: flow.name,
+            nodes: flow.nodes,
+            edges: flow.edges,
+            userId: flow.userId,
+          },
+          node,
+          config: node.data.webhookConfig,
+        });
+      }
     }
   }
 
@@ -258,11 +267,20 @@ async function findWebhookByInstance(instanceToken: string) {
         id: string;
         data: { webhookConfig: unknown };
       };
-      matches.push({
-        flow,
-        node,
-        config: node.data.webhookConfig,
-      });
+      // Verificar se userId não é null antes de adicionar
+      if (flow.userId !== null) {
+        matches.push({
+          flow: {
+            id: flow.id,
+            name: flow.name,
+            nodes: flow.nodes,
+            edges: flow.edges,
+            userId: flow.userId,
+          },
+          node,
+          config: node.data.webhookConfig,
+        });
+      }
     }
   }
 
