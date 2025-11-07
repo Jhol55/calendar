@@ -1500,7 +1500,7 @@ export function DatabaseSpreadsheet({
                   {selectedTable && (
                     <Button
                       type="button"
-                      onClick={loadTableData}
+                      onClick={() => loadTableData()}
                       variant="gradient"
                       bgHexColor="#65b8f4"
                       disabled={loading}
@@ -2149,8 +2149,8 @@ export function DatabaseSpreadsheet({
 
       {/* Modal de Duplicatas */}
       <Dialog
-        open={showDuplicatesDialog}
-        onOpenChange={setShowDuplicatesDialog}
+        isOpen={showDuplicatesDialog}
+        onClose={() => setShowDuplicatesDialog(false)}
       >
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
@@ -2193,16 +2193,10 @@ export function DatabaseSpreadsheet({
                 </Typography>
 
                 <div className="flex gap-3 justify-end">
-                  <Button
-                    variant="outline"
-                    onClick={handleCancelRemoveDuplicates}
-                  >
+                  <Button onClick={handleCancelRemoveDuplicates}>
                     Cancelar
                   </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={handleRemoveDuplicates}
-                  >
+                  <Button onClick={handleRemoveDuplicates}>
                     Remover Duplicatas e Ativar UNIQUE
                   </Button>
                 </div>
