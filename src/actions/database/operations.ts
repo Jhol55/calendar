@@ -601,26 +601,33 @@ export async function addRow(
 
     // Atualizar armazenamento usado automaticamente
     try {
-      const { updateStorageUsageIncremental } = await import(
-        '@/services/subscription/subscription.service'
-      );
-      // Calcular tamanho aproximado do registro inserido
-      const recordSizeBytes = Buffer.byteLength(
-        JSON.stringify(typedData),
-        'utf8',
-      );
-      const recordSizeMB = recordSizeBytes / (1024 * 1024);
-
-      // Atualizar storage incrementalmente (async, não bloquear resposta)
-      updateStorageUsageIncremental(user.id, recordSizeMB).catch((err) => {
-        console.warn(
-          '⚠️ [ADD-ROW] Failed to update storage incrementally:',
-          err,
-        );
+      const user = await prisma.user.findUnique({
+        where: { email: userId },
+        select: { id: true },
       });
-      console.log(
-        `📊 [ADD-ROW] Storage updated: +${recordSizeMB.toFixed(4)}MB`,
-      );
+
+      if (user) {
+        const { updateStorageUsageIncremental } = await import(
+          '@/services/subscription/subscription.service'
+        );
+        // Calcular tamanho aproximado do registro inserido
+        const recordSizeBytes = Buffer.byteLength(
+          JSON.stringify(typedData),
+          'utf8',
+        );
+        const recordSizeMB = recordSizeBytes / (1024 * 1024);
+
+        // Atualizar storage incrementalmente (async, não bloquear resposta)
+        updateStorageUsageIncremental(user.id, recordSizeMB).catch((err) => {
+          console.warn(
+            '⚠️ [ADD-ROW] Failed to update storage incrementally:',
+            err,
+          );
+        });
+        console.log(
+          `📊 [ADD-ROW] Storage updated: +${recordSizeMB.toFixed(4)}MB`,
+        );
+      }
     } catch (error) {
       // Não bloquear inserção se atualização de storage falhar
       console.warn(
