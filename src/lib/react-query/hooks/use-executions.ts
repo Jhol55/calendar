@@ -138,11 +138,21 @@ export function useExecution(
  * Hook para parar execução em andamento
  */
 export function useStopExecution(
-  options?: CustomMutationOptions<void, ApiError, string>,
+  options?: CustomMutationOptions<
+    void,
+    ApiError,
+    string,
+    { previousExecution: Execution | undefined; executionId: string }
+  >,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<
+    void,
+    ApiError,
+    string,
+    { previousExecution: Execution | undefined; executionId: string }
+  >({
     mutationFn: async (executionId: string) => {
       await safeQueryFn(async () => {
         const response = await stopExecution(executionId);
@@ -155,7 +165,12 @@ export function useStopExecution(
       });
     },
 
-    onMutate: async (executionId) => {
+    onMutate: async (
+      executionId: string,
+    ): Promise<{
+      previousExecution: Execution | undefined;
+      executionId: string;
+    }> => {
       // Cancelar queries relacionadas
       await queryClient.cancelQueries({
         queryKey: executionKeys.detail(executionId),
