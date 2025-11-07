@@ -167,7 +167,12 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
             name: col.name,
             type: col.type,
             required: col.required || false,
-            default: col.default || '',
+            default:
+              col.default !== undefined && col.default !== null
+                ? typeof col.default === 'string'
+                  ? col.default
+                  : JSON.stringify(col.default)
+                : '',
           }));
           setColumns(normalizedColumns);
           setValue('columns', JSON.stringify(normalizedColumns));
