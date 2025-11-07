@@ -50,8 +50,14 @@ function NodeConfigLayoutContent({
 
   // ✅ Buscar edges e nodes atuais do ReactFlow (sempre usa estado atual do editor)
   const reactFlowInstance = useReactFlow();
-  const allEdgesRaw = reactFlowInstance?.getEdges() || [];
-  const allNodesRaw = reactFlowInstance?.getNodes() || [];
+  const allEdgesRaw = useMemo(
+    () => reactFlowInstance?.getEdges() || [],
+    [reactFlowInstance],
+  );
+  const allNodesRaw = useMemo(
+    () => reactFlowInstance?.getNodes() || [],
+    [reactFlowInstance],
+  );
 
   // Calcular chaves baseadas nos IDs
   const edgesKeyStr = useMemo(
