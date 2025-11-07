@@ -465,6 +465,7 @@ export async function updateStorageUsageIncremental(
  * Invalidar cache de armazenamento (não necessário mais)
  * @deprecated Mantido para compatibilidade, mas não faz nada
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function invalidateStorageCache(_userId: number): Promise<void> {
   // Não necessário - getStorageUsage sempre calcula valor real
   return;
