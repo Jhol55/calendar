@@ -17,8 +17,9 @@ export async function createCheckoutSession(
   url?: string;
   message?: string;
 }> {
+  let userId: number | null = null;
   try {
-    const userId = await getUserIdFromSession();
+    userId = await getUserIdFromSession();
 
     if (!userId) {
       return {
@@ -296,7 +297,7 @@ export async function createCheckoutSession(
       error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
     console.error('Error creating checkout session:', {
-      userId,
+      ...(userId && { userId }),
       error: errorMessage,
       ...(errorStack && { stack: errorStack }),
       timestamp: new Date().toISOString(),
