@@ -223,44 +223,57 @@ function TransformationFormFields({
 
     if (field === 'type') {
       // Quando mudar o tipo, resetar a operação para a primeira do novo tipo
+      // Garantir que value é um TransformationType válido
+      const typeValue =
+        typeof value === 'string' &&
+        ['string', 'number', 'date', 'array', 'object', 'validation'].includes(
+          value,
+        )
+          ? (value as TransformationType)
+          : 'string';
       const operations =
-        OPERATIONS_BY_TYPE[value as keyof typeof OPERATIONS_BY_TYPE];
+        OPERATIONS_BY_TYPE[typeValue as keyof typeof OPERATIONS_BY_TYPE];
       const newOperation = operations[0]?.value || '';
 
       newSteps[index] = {
         ...newSteps[index],
-        type: value,
+        type: typeValue,
         operation: newOperation,
         params: {},
       };
-      setSelectedTypes({ ...selectedTypes, [newSteps[index].id]: value });
+      setSelectedTypes({ ...selectedTypes, [newSteps[index].id]: typeValue });
 
       // Atualizar valores dos selects
-      setValue(`step_type_${index}`, value);
+      setValue(`step_type_${index}`, typeValue);
       setValue(`step_operation_${index}`, newOperation);
     } else if (field === 'operation') {
+      // Garantir que value é uma string (TransformationOperation é uma string)
+      const operationValue =
+        typeof value === 'string' ? (value as TransformationOperation) : '';
       newSteps[index] = {
         ...newSteps[index],
-        operation: value,
+        operation: operationValue,
         params: {},
       };
 
       // Atualizar valor do select
-      setValue(`step_operation_${index}`, value);
+      setValue(`step_operation_${index}`, operationValue);
     } else if (field === 'params') {
       newSteps[index] = {
         ...newSteps[index],
         params: { ...newSteps[index].params, ...value },
       };
     } else {
+      // Para outros campos como 'input', garantir que seja string
+      const fieldValue = typeof value === 'string' ? value : String(value);
       newSteps[index] = {
         ...newSteps[index],
-        [field]: value,
+        [field]: fieldValue,
       };
 
       // Atualizar valor se for input
       if (field === 'input') {
-        setValue(`step_input_${index}`, value);
+        setValue(`step_input_${index}`, fieldValue);
       }
     }
 
