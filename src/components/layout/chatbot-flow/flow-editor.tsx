@@ -23,7 +23,6 @@ import { Sidebar } from './modules-sidebar';
 import { MessageNodeConfig } from './nodes/message-node/message-node-config';
 import { FlowsListSidebar } from './flow-list-sidebar/flows-list-sidebar';
 import {
-  EndNode,
   MessageNode,
   ConditionNode,
   WebhookNode,
@@ -74,7 +73,6 @@ import { getExecution } from '@/actions/executions';
 
 // Definir nodeTypes base FORA do componente
 const baseNodeTypes = {
-  end: EndNode,
   message: MessageNode,
   condition: ConditionNode,
   webhook: WebhookNode,
