@@ -4,12 +4,13 @@
 
 import { prisma } from './prisma';
 import { ChatMessage } from './openai.service';
+import { Prisma } from '@prisma/client';
 
 export interface ConversationMessage {
   role: 'system' | 'user' | 'assistant' | 'tool' | 'function';
   content: string;
   timestamp: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -26,8 +27,8 @@ export async function getOrCreateConversation(
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: (flowId || null) as any,
-        nodeId: (nodeId || null) as any,
+        flowId: flowId || null,
+        nodeId: nodeId || null,
       },
     },
   });
@@ -40,8 +41,8 @@ export async function getOrCreateConversation(
   return prisma.agent_conversations.create({
     data: {
       userId,
-      flowId: (flowId || null) as any,
-      nodeId: (nodeId || null) as any,
+      flowId: flowId || null,
+      nodeId: nodeId || null,
       messages: [],
       maxLength,
       lastMessageAt: new Date(),
@@ -100,12 +101,12 @@ export async function addMessagesToHistory(
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: (flowId || null) as any,
-        nodeId: (nodeId || null) as any,
+        flowId: flowId || null,
+        nodeId: nodeId || null,
       },
     },
     data: {
-      messages: finalMessages as any,
+      messages: finalMessages as unknown as Prisma.JsonValue,
       lastMessageAt: new Date(),
     },
   });
@@ -123,8 +124,8 @@ export async function getConversationHistory(
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: (flowId || null) as any,
-        nodeId: (nodeId || null) as any,
+        flowId: flowId || null,
+        nodeId: nodeId || null,
       },
     },
   });

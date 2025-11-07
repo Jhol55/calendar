@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { executionKeys, ExecutionFilters } from '../query-keys';
 import { CACHE_TIMES } from '../config';
 import { safeQueryFn } from '../utils';
-import { CustomQueryOptions, CustomMutationOptions } from '../types';
+import { CustomQueryOptions, CustomMutationOptions, ApiError } from '../types';
 import {
   listExecutions,
   getExecution as getExecutionAction,
@@ -27,9 +27,9 @@ export interface Execution {
   endTime?: string;
   duration?: number;
   error?: string;
-  data?: any;
-  result?: any;
-  nodeExecutions?: any;
+  data?: unknown;
+  result?: unknown;
+  nodeExecutions?: unknown;
 }
 
 /**
@@ -84,7 +84,8 @@ export function useFlowExecutions(
     ...CACHE_TIMES.REALTIME,
     // Refetch automático para execuções em andamento
     refetchInterval: (data) => {
-      const hasRunning = (data as any)?.some?.(
+      const executions = data as Execution[] | undefined;
+      const hasRunning = executions?.some(
         (exec: Execution) => exec.status === 'running',
       );
       return hasRunning ? 3000 : false; // Poll a cada 3 segundos se houver execuções ativas
@@ -121,7 +122,8 @@ export function useExecution(
     ...CACHE_TIMES.REALTIME,
     // Refetch automático se execução estiver em andamento
     refetchInterval: (data) => {
-      const status = (data as any)?.status;
+      const execution = data as Execution | undefined;
+      const status = execution?.status;
       return status === 'running' ? 2000 : false;
     },
     ...options,
@@ -132,7 +134,7 @@ export function useExecution(
  * Hook para parar execução em andamento
  */
 export function useStopExecution(
-  options?: CustomMutationOptions<void, any, string>,
+  options?: CustomMutationOptions<void, ApiError, string>,
 ) {
   const queryClient = useQueryClient();
 

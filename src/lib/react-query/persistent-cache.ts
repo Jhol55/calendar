@@ -11,7 +11,7 @@ import {
   PersistedClient,
   Persister,
 } from '@tanstack/react-query-persist-client';
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryKey } from '@tanstack/react-query';
 
 /**
  * Configurações de persistência
@@ -222,14 +222,14 @@ export class CrossTabSync {
     });
   }
 
-  invalidate(queryKey: any[]): void {
+  invalidate(queryKey: QueryKey): void {
     this.channel?.postMessage({
       type: 'invalidate',
       payload: { queryKey },
     });
   }
 
-  refetch(queryKey: any[]): void {
+  refetch(queryKey: QueryKey): void {
     this.channel?.postMessage({
       type: 'refetch',
       payload: { queryKey },
@@ -265,7 +265,7 @@ export function clearOldCache(): void {
     if (age > PERSIST_CONFIG.maxAge) {
       localStorage.removeItem(PERSIST_CONFIG.key);
     }
-  } catch (error) {
+  } catch {
     // Limpar em caso de erro
     localStorage.removeItem(PERSIST_CONFIG.key);
   }

@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userKeys } from '../query-keys';
 import { CACHE_TIMES } from '../config';
 import { safeQueryFn } from '../utils';
-import { CustomQueryOptions, CustomMutationOptions } from '../types';
+import { CustomQueryOptions, CustomMutationOptions, ApiError } from '../types';
 import { getUser } from '@/services/user';
 import { getInstances } from '@/actions/uazapi/instance';
 
@@ -23,7 +23,7 @@ export interface User {
   name?: string;
   avatar?: string;
   onboardingCompleted?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -56,7 +56,7 @@ export interface Instance {
   created: string;
   updated: string;
   currentTime: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -130,7 +130,7 @@ export function useInstance(
  * Hook para atualizar dados do usuário
  */
 export function useUpdateUser(
-  options?: CustomMutationOptions<User, any, Partial<User>>,
+  options?: CustomMutationOptions<User, ApiError, Partial<User>>,
 ) {
   const queryClient = useQueryClient();
 

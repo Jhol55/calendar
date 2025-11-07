@@ -7,16 +7,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workflowKeys } from '../query-keys';
 import { CACHE_TIMES } from '../config';
-import {
-  safeQueryFn,
-  optimisticUpdate,
-  rollbackOptimisticUpdate,
-} from '../utils';
-import {
-  CustomQueryOptions,
-  CustomMutationOptions,
-  ApiResponse,
-} from '../types';
+import { safeQueryFn, rollbackOptimisticUpdate } from '../utils';
+import { CustomQueryOptions, CustomMutationOptions, ApiError } from '../types';
 import {
   listFlows,
   getFlow,
@@ -90,7 +82,7 @@ export function useWorkflow(
 export function useCreateWorkflow(
   options?: CustomMutationOptions<
     ChatbotFlow,
-    any,
+    ApiError,
     Omit<ChatbotFlow, 'id' | 'createdAt' | 'updatedAt'>
   >,
 ) {
@@ -180,7 +172,7 @@ export function useCreateWorkflow(
 export function useUpdateWorkflow(
   options?: CustomMutationOptions<
     ChatbotFlow,
-    any,
+    ApiError,
     { id: string; data: Partial<ChatbotFlow> }
   >,
 ) {
@@ -264,7 +256,7 @@ export function useUpdateWorkflow(
  * Hook para deletar workflow
  */
 export function useDeleteWorkflow(
-  options?: CustomMutationOptions<void, any, string>,
+  options?: CustomMutationOptions<void, ApiError, string>,
 ) {
   const queryClient = useQueryClient();
 
