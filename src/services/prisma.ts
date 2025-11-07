@@ -68,7 +68,7 @@ async function reconnectPrisma(): Promise<void> {
   // Testar conexão
   try {
     await prisma.$connect();
-  } catch (connectError: unknown) {
+  } catch {
     // Se ainda não conseguir conectar, aguardar um pouco antes de tentar novamente
     await new Promise((resolve) => setTimeout(resolve, 1000));
     await prisma.$connect();

@@ -53,26 +53,26 @@ export interface WebhookJobData {
   method: string;
   headers: Record<string, string>;
   queryParams: Record<string, string>;
-  body: any;
+  body: unknown;
   timestamp: string;
   flowId: string;
   nodeId: string;
-  config: any;
+  config: unknown;
   stopAtNodeId?: string; // Para execução parcial: parar neste node
 }
 
 export interface FlowJobData {
   executionId: string;
   flowId: string;
-  triggerData: any;
-  data: any;
+  triggerData: unknown;
+  data: unknown;
 }
 
 export interface NotificationJobData {
   type: 'email' | 'webhook' | 'sms';
   recipient: string;
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 // Eventos da fila de webhooks
@@ -107,7 +107,10 @@ notificationQueue.on('failed', (job, err) => {
 });
 
 // Função para adicionar job de webhook
-export async function addWebhookJob(data: WebhookJobData, options?: any) {
+export async function addWebhookJob(
+  data: WebhookJobData,
+  options?: Queue.JobOptions,
+) {
   return await webhookQueue.add('process-webhook', data, {
     priority: 1, // Prioridade alta
     delay: 0, // Processar imediatamente
@@ -116,7 +119,10 @@ export async function addWebhookJob(data: WebhookJobData, options?: any) {
 }
 
 // Função para adicionar job de fluxo
-export async function addFlowJob(data: FlowJobData, options?: any) {
+export async function addFlowJob(
+  data: FlowJobData,
+  options?: Queue.JobOptions,
+) {
   return await flowQueue.add('process-flow', data, {
     priority: 2, // Prioridade média
     delay: 0,
@@ -127,7 +133,7 @@ export async function addFlowJob(data: FlowJobData, options?: any) {
 // Função para adicionar job de notificação
 export async function addNotificationJob(
   data: NotificationJobData,
-  options?: any,
+  options?: Queue.JobOptions,
 ) {
   return await notificationQueue.add('send-notification', data, {
     priority: 3, // Prioridade baixa

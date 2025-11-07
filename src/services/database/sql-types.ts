@@ -2,6 +2,8 @@
 // SQL TYPES FOR SQL ENGINE
 // ============================================
 
+type ASTNode = Record<string, unknown>;
+
 export type JoinType =
   | 'INNER JOIN'
   | 'LEFT JOIN'
@@ -45,7 +47,7 @@ export interface AggregateFunction {
   distinct?: boolean; // for COUNT(DISTINCT field)
   separator?: string; // for STRING_AGG/GROUP_CONCAT
   valueField?: string; // for JSON_OBJECT_AGG
-  caseExpr?: any; // AST da expressão CASE para agregações com CASE
+  caseExpr?: ASTNode; // AST da expressão CASE para agregações com CASE
 }
 
 export interface SelectColumn {
@@ -73,9 +75,9 @@ export interface SelectOperation extends SqlOperation {
   type: 'SELECT';
   columns: SelectColumn[];
   joins?: JoinClause[];
-  where?: any; // AST from node-sql-parser
+  where?: ASTNode; // AST from node-sql-parser
   groupBy?: string[];
-  having?: any; // AST from node-sql-parser
+  having?: ASTNode; // AST from node-sql-parser
   orderBy?: OrderByClause[];
   limit?: number;
   offset?: number;
@@ -85,18 +87,18 @@ export interface SelectOperation extends SqlOperation {
 export interface InsertOperation extends SqlOperation {
   type: 'INSERT';
   columns: string[];
-  values: any[][];
+  values: unknown[][];
 }
 
 export interface UpdateOperation extends SqlOperation {
   type: 'UPDATE';
-  set: Record<string, any>;
-  where?: any;
+  set: Record<string, unknown>;
+  where?: ASTNode;
 }
 
 export interface DeleteOperation extends SqlOperation {
   type: 'DELETE';
-  where?: any;
+  where?: ASTNode;
 }
 
 export type SqlOperationType =
@@ -107,7 +109,7 @@ export type SqlOperationType =
 
 export interface SqlExecutionResult {
   success: boolean;
-  data?: any[];
+  data?: Record<string, unknown>[];
   affected?: number;
   error?: string;
 }

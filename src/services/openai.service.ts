@@ -35,7 +35,7 @@ export interface ChatCompletionParams {
     function: {
       name: string;
       description: string;
-      parameters: Record<string, any>;
+      parameters: Record<string, unknown>;
     };
   }>;
   tool_choice?:
@@ -101,7 +101,7 @@ export function formatToolsForOpenAI(
   tools: Array<{
     name: string;
     description: string;
-    parameters?: Record<string, any>;
+    parameters?: Record<string, unknown>;
   }>,
 ): ChatCompletionParams['tools'] {
   return tools.map((tool) => ({
@@ -147,7 +147,7 @@ export function truncateHistory(
  */
 export function injectContext(
   prompt: string,
-  context: Record<string, any>,
+  context: Record<string, unknown>,
 ): string {
   if (!context || Object.keys(context).length === 0) {
     return prompt;

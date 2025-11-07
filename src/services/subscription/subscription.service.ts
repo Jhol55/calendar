@@ -1,6 +1,4 @@
 import { prisma } from '@/services/prisma';
-import { SubscriptionStatus } from '@/types/subscription';
-import { redis } from '@/services/queue';
 
 /**
  * Buscar plano atual do usuário (incluindo trial)
@@ -144,13 +142,9 @@ export async function checkPlanLimit(
  * - Atualiza cache após cálculo para UI
  *
  * @param userId ID do usuário
- * @param _forceRecalc Deprecated - mantido para compatibilidade com testes (ignorado)
  * @returns Armazenamento usado em MB (com 2 casas decimais)
  */
-export async function getStorageUsage(
-  userId: number,
-  _forceRecalc?: boolean,
-): Promise<number> {
+export async function getStorageUsage(userId: number): Promise<number> {
   try {
     const userIdStr = String(userId); // userId na tabela é o ID numérico como string
 
@@ -471,7 +465,7 @@ export async function updateStorageUsageIncremental(
  * Invalidar cache de armazenamento (não necessário mais)
  * @deprecated Mantido para compatibilidade, mas não faz nada
  */
-export async function invalidateStorageCache(userId: number): Promise<void> {
+export async function invalidateStorageCache(_userId: number): Promise<void> {
   // Não necessário - getStorageUsage sempre calcula valor real
   return;
 }

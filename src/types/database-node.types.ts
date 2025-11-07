@@ -66,7 +66,7 @@ export interface ColumnDefinition {
   name: string;
   type: ColumnType;
   required?: boolean;
-  default?: any;
+  default?: unknown;
 }
 
 /**
@@ -82,7 +82,7 @@ export interface TableSchema {
 export interface FilterRule {
   field: string;
   operator: FilterOperator;
-  value: any;
+  value: unknown;
 }
 
 /**
@@ -132,10 +132,10 @@ export interface DatabaseNodeConfig {
   columnsToRemove?: string[];
 
   // Para insert
-  record?: Record<string, any>;
+  record?: Record<string, unknown>;
 
   // Para update
-  updates?: Record<string, any>;
+  updates?: Record<string, unknown>;
 
   // Para update, delete, get
   filters?: FilterConfig;
@@ -152,7 +152,7 @@ export interface DatabaseRecord {
   _id: string;
   _createdAt: string;
   _updatedAt: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -183,7 +183,7 @@ export class DatabaseNodeError extends Error {
   constructor(
     message: string,
     public code: string,
-    public details?: any,
+    public details?: unknown,
   ) {
     super(message);
     this.name = 'DatabaseNodeError';
