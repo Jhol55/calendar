@@ -1,4 +1,3 @@
-export { EndNode } from './end-node';
 export { MessageNode } from './message-node/message-node';
 export { ConditionNode } from './condition-node/condition-node';
 export { WebhookNode } from './webhook-node/webhook-node';
