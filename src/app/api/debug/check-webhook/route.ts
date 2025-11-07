@@ -73,12 +73,20 @@ export async function GET() {
       stripe: {
         customerId: customer.id,
         subscriptionsCount: stripeSubscriptions.data.length,
-        subscriptions: stripeSubscriptions.data.map((sub) => ({
-          id: sub.id,
-          status: sub.status,
-          currentPeriodStart: new Date(sub.current_period_start * 1000),
-          currentPeriodEnd: new Date(sub.current_period_end * 1000),
-        })),
+        subscriptions: stripeSubscriptions.data.map((sub) => {
+          const subWithPeriod = sub as typeof sub & {
+            current_period_start: number;
+            current_period_end: number;
+          };
+          return {
+            id: sub.id,
+            status: sub.status,
+            currentPeriodStart: new Date(
+              subWithPeriod.current_period_start * 1000,
+            ),
+            currentPeriodEnd: new Date(subWithPeriod.current_period_end * 1000),
+          };
+        }),
       },
       mismatch: {
         hasSubscriptionInDB: !!user.subscription,
