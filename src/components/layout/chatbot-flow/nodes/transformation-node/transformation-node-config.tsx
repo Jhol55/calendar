@@ -262,9 +262,17 @@ function TransformationFormFields({
       // Atualizar valor do select
       setValue(`step_operation_${index}`, operationValue);
     } else if (field === 'params') {
+      // Garantir que value é um objeto antes de fazer spread
+      const paramsValue =
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        value !== null
+          ? (value as Record<string, unknown>)
+          : {};
       newSteps[index] = {
         ...newSteps[index],
-        params: { ...newSteps[index].params, ...value },
+        params: { ...newSteps[index].params, ...paramsValue },
       };
     } else {
       // Para outros campos como 'input', garantir que seja string
