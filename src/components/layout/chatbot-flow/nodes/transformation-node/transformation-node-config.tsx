@@ -451,7 +451,16 @@ function TransformationFormFields({
                     {isJsonTemplate ? (
                       <Textarea
                         fieldName={`step_param_${index}_${param}`}
-                        value={step.params?.[param] || ''}
+                        value={
+                          step.params?.[param] !== undefined &&
+                          step.params?.[param] !== null
+                            ? typeof step.params[param] === 'string'
+                              ? step.params[param]
+                              : typeof step.params[param] === 'object'
+                                ? JSON.stringify(step.params[param])
+                                : String(step.params[param])
+                            : ''
+                        }
                         onChange={(e) =>
                           updateStep(index, 'params', {
                             [param]: e.target.value,
@@ -465,7 +474,16 @@ function TransformationFormFields({
                       <Input
                         type="text"
                         fieldName={`step_param_${index}_${param}`}
-                        value={step.params?.[param] || ''}
+                        value={
+                          step.params?.[param] !== undefined &&
+                          step.params?.[param] !== null
+                            ? typeof step.params[param] === 'string'
+                              ? step.params[param]
+                              : typeof step.params[param] === 'object'
+                                ? JSON.stringify(step.params[param])
+                                : String(step.params[param])
+                            : ''
+                        }
                         onChange={(e) =>
                           updateStep(index, 'params', {
                             [param]: e.target.value,
