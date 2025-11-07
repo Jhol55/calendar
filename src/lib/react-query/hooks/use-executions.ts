@@ -83,8 +83,10 @@ export function useFlowExecutions(
     enabled: !!flowId,
     ...CACHE_TIMES.REALTIME,
     // Refetch automático para execuções em andamento
-    refetchInterval: (data) => {
-      const executions = data as Execution[] | undefined;
+    refetchInterval: (query) => {
+      const executions = (
+        query.state.data as unknown as { data: Execution[] } | undefined
+      )?.data;
       const hasRunning = executions?.some(
         (exec: Execution) => exec.status === 'running',
       );
@@ -121,8 +123,10 @@ export function useExecution(
     enabled: !!executionId,
     ...CACHE_TIMES.REALTIME,
     // Refetch automático se execução estiver em andamento
-    refetchInterval: (data) => {
-      const execution = data as Execution | undefined;
+    refetchInterval: (query) => {
+      const execution = (
+        query.state.data as unknown as { data: Execution } | undefined
+      )?.data;
       const status = execution?.status;
       return status === 'running' ? 2000 : false;
     },
