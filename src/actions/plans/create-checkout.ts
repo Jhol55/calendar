@@ -28,9 +28,12 @@ export async function createCheckoutSession(
       };
     }
 
+    // Criar variável local para garantir que TypeScript entenda que userId não é null
+    const validUserId = userId;
+
     // Buscar usuário
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: validUserId },
       select: { id: true, email: true, name: true },
     });
 
@@ -101,7 +104,7 @@ export async function createCheckoutSession(
     if (isFreePlan) {
       // Validação de segurança: Verificar se usuário já tem subscription ativa
       const existingSubscription = await prisma.subscription.findUnique({
-        where: { userId },
+        where: { userId: validUserId },
         include: {
           plan: true,
         },
@@ -132,7 +135,7 @@ export async function createCheckoutSession(
       // Verificar se já teve Trial verificando histórico de planos do usuário
       // Se o usuário já teve um Trial no passado, não permitir novo Trial
       const userWithPlanHistory = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: validUserId },
         include: {
           plan: true,
         },
@@ -155,15 +158,15 @@ export async function createCheckoutSession(
         '@/services/subscription/subscription.service'
       );
 
-      const currentStorageMB = await getStorageUsage(userId);
-      const currentInstances = await getInstanceCount(userId);
+      const currentStorageMB = await getStorageUsage(validUserId);
+      const currentInstances = await getInstanceCount(validUserId);
 
       await prisma.$transaction(async (tx) => {
         // Criar ou atualizar assinatura
         await tx.subscription.upsert({
-          where: { userId },
+          where: { userId: validUserId },
           create: {
-            userId,
+            userId: validUserId,
             planId: plan.id,
             status: 'trialing',
             billingPeriod: finalBillingPeriod as 'monthly' | 'yearly',
@@ -185,15 +188,15 @@ export async function createCheckoutSession(
 
         // Atualizar plano do usuário
         await tx.user.update({
-          where: { id: userId },
+          where: { id: validUserId },
           data: { planId: plan.id },
         });
 
         // Criar ou atualizar limites com valores reais calculados (não zerar!)
         await tx.user_plan_limits.upsert({
-          where: { userId },
+          where: { userId: validUserId },
           create: {
-            userId,
+            userId: validUserId,
             currentStorageMB,
             currentInstances,
           },
@@ -220,7 +223,7 @@ export async function createCheckoutSession(
     // Para planos pagos: Validações de segurança antes do Stripe
     // Verificar se usuário já tem subscription ativa
     const existingSubscriptionPaid = await prisma.subscription.findUnique({
-      where: { userId },
+      where: { userId: validUserId },
     });
 
     // Permitir troca de plano mesmo com subscription ativa
@@ -279,7 +282,7 @@ export async function createCheckoutSession(
     const session = await createStripeCheckoutSession({
       customerId: customer.id,
       priceId,
-      userId,
+      userId: validUserId,
       planId: plan.id,
       successUrl: `${baseUrl}/billing?success=true`,
       cancelUrl: `${baseUrl}/plans?canceled=true`,
