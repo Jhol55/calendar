@@ -942,7 +942,7 @@ export function DatabaseSpreadsheet({
         });
         setShowDuplicatesDialog(true);
         // Guardar updatedColumn temporariamente para usar após confirmação
-        (window as Record<string, unknown>).__pendingColumnUpdate =
+        (window as unknown as Record<string, unknown>).__pendingColumnUpdate =
           updatedColumn;
         return; // Aguardar decisão do usuário
       }
@@ -1053,10 +1053,11 @@ export function DatabaseSpreadsheet({
 
     if (response.success) {
       // Continuar com a atualização da coluna
-      const pendingUpdate = (window as Record<string, unknown>)
+      const pendingUpdate = (window as unknown as Record<string, unknown>)
         .__pendingColumnUpdate;
       if (pendingUpdate) {
-        delete (window as Record<string, unknown>).__pendingColumnUpdate;
+        delete (window as unknown as Record<string, unknown>)
+          .__pendingColumnUpdate;
         // Chamar handleEditColumn novamente, mas agora sem duplicatas
         await handleEditColumn(
           pendingUpdate as {
@@ -1081,7 +1082,7 @@ export function DatabaseSpreadsheet({
   const handleCancelRemoveDuplicates = () => {
     setShowDuplicatesDialog(false);
     setDuplicatesData(null);
-    delete (window as Record<string, unknown>).__pendingColumnUpdate;
+    delete (window as unknown as Record<string, unknown>).__pendingColumnUpdate;
   };
 
   // Funções de drag and drop
