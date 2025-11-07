@@ -15,7 +15,7 @@ export async function POST() {
     }
 
     // Forçar recálculo completo (ignorar cache)
-    const storageMB = await getStorageUsage(userId, true);
+    const storageMB = await getStorageUsage(userId);
 
     return NextResponse.json({
       success: true,
