@@ -20,8 +20,8 @@ interface ProcessAgentNodeParams {
   userId: string; // ID do usuário final (WhatsApp)
   flowId?: string;
   nodeId?: string;
-  variableContext: Record<string, any>; // Contexto de variáveis do fluxo
-  replaceVariables: (text: string, context: Record<string, any>) => string;
+  variableContext: Record<string, unknown>; // Contexto de variáveis do fluxo
+  replaceVariables: (text: string, context: Record<string, unknown>) => string;
 }
 
 export async function processAgentNode(params: ProcessAgentNodeParams) {
@@ -135,7 +135,24 @@ export async function processAgentNode(params: ProcessAgentNodeParams) {
   }
 
   // 7. Processar resposta
-  const result: any = {
+  const result: {
+    response: string;
+    finish_reason: string;
+    usage: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
+    model: string;
+    tool_calls?: Array<{
+      id: string;
+      type: string;
+      function: {
+        name: string;
+        arguments: string;
+      };
+    }>;
+  } = {
     response: assistantMessage.content,
     finish_reason: choice.finish_reason,
     usage: response.usage,

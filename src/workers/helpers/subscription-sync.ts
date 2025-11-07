@@ -47,10 +47,12 @@ export function iniciarJobSincronizacaoAssinaturas() {
       } else {
         console.log('✅ [Job] Todas as assinaturas estão sincronizadas');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Erro desconhecido';
       console.error(
         '❌ [Job] Erro na sincronização de assinaturas:',
-        error.message,
+        errorMessage,
       );
     }
   });
@@ -81,10 +83,12 @@ export function iniciarJobRecalculoArmazenamento() {
           `✅ [Job] Recálculo concluído: ${result.processed} usuários processados`,
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Erro desconhecido';
       console.error(
         '❌ [Job] Erro no recálculo de armazenamento:',
-        error.message,
+        errorMessage,
       );
     }
   });

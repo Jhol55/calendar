@@ -4,15 +4,17 @@ import { CodeExecutionConfig } from '@/components/layout/chatbot-flow/types';
  * Substitui variáveis em um JSON template garantindo formato válido
  * Adiciona aspas automaticamente em strings quando necessário
  */
-function replaceVariablesInJSON(jsonTemplate: string, context: any): any {
+function replaceVariablesInJSON(
+  jsonTemplate: string,
+  context: Record<string, unknown>,
+): unknown {
   // Substituir variáveis usando uma regex que detecta o contexto
   const replaced = jsonTemplate.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
     try {
       const cleanPath = path.trim();
       const parts = cleanPath.split('.');
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let value: any = context;
+      let value: unknown = context;
       for (const part of parts) {
         if (value && typeof value === 'object' && part in value) {
           value = value[part];
@@ -107,7 +109,7 @@ export async function processCodeExecutionNode(
     }
 
     // 2. Resolver variáveis de entrada
-    let inputVars: Record<string, any> = {};
+    let inputVars: Record<string, unknown> = {};
     if (config.inputVariables) {
       console.log(
         '🔷 [CODE-EXECUTION] Original input vars:',

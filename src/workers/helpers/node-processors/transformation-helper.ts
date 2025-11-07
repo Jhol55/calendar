@@ -157,7 +157,7 @@ export function now(): string {
 // ==================== ARRAY OPERATIONS ====================
 
 // Função auxiliar para parsear input que pode ser string JSON ou array
-function parseArrayInput(input: any): any[] {
+function parseArrayInput(input: unknown): unknown[] {
   if (Array.isArray(input)) {
     return input;
   }
@@ -210,7 +210,7 @@ function parseArrayInput(input: any): any[] {
   );
 }
 
-export function filterArray(input: any, condition: string): any[] {
+export function filterArray(input: unknown): unknown[] {
   const array = parseArrayInput(input);
   // Nota: condition seria algo como "value > 10" ou "value === 'ativo'"
   // Aqui simplificamos para demonstração
@@ -219,14 +219,17 @@ export function filterArray(input: any, condition: string): any[] {
   return array;
 }
 
-export function mapArray(input: any, transformation: string): any[] {
+export function mapArray(input: unknown): unknown[] {
   const array = parseArrayInput(input);
   // Por enquanto retorna o array original
   // TODO: Implementar transformação
   return array;
 }
 
-export function sortArray(input: any, order: 'asc' | 'desc' = 'asc'): any[] {
+export function sortArray(
+  input: unknown,
+  order: 'asc' | 'desc' = 'asc',
+): unknown[] {
   const array = parseArrayInput(input);
 
   const sorted = [...array].sort((a, b) => {
@@ -242,32 +245,32 @@ export function sortArray(input: any, order: 'asc' | 'desc' = 'asc'): any[] {
   return sorted;
 }
 
-export function firstElement(input: any): any {
+export function firstElement(input: unknown): unknown {
   const array = parseArrayInput(input);
   return array[0];
 }
 
-export function lastElement(input: any): any {
+export function lastElement(input: unknown): unknown {
   const array = parseArrayInput(input);
   return array[array.length - 1];
 }
 
-export function joinArray(input: any, separator: string = ','): string {
+export function joinArray(input: unknown, separator: string = ','): string {
   const array = parseArrayInput(input);
   return array.join(separator);
 }
 
-export function uniqueArray(input: any): any[] {
+export function uniqueArray(input: unknown): unknown[] {
   const array = parseArrayInput(input);
   return [...new Set(array)];
 }
 
-export function arrayLength(input: any): number {
+export function arrayLength(input: unknown): number {
   const array = parseArrayInput(input);
   return array.length;
 }
 
-export function sumArray(input: any): number {
+export function sumArray(input: unknown): number {
   const array = parseArrayInput(input);
   console.log(`🔢 sumArray input:`, array);
 
@@ -338,7 +341,7 @@ export function sumArray(input: any): number {
  * deleteKeys([{nome: "João", idade: 30, cpf: "123"}], "cpf")
  * // Retorna: [{nome: "João", idade: 30}]
  */
-export function deleteKeys(input: any, keysToDelete: string): any[] {
+export function deleteKeys(input: unknown, keysToDelete: string): unknown[] {
   const array = parseArrayInput(input);
 
   // Parsear chaves a deletar (remover espaços em branco)
@@ -380,7 +383,7 @@ export function deleteKeys(input: any, keysToDelete: string): any[] {
  * renameKeys([{nome: "João", valor: 100}], "valor:preco, nome:cliente")
  * // Retorna: [{cliente: "João", preco: 100}]
  */
-export function renameKeys(input: any, keyMappings: string): any[] {
+export function renameKeys(input: unknown, keyMappings: string): unknown[] {
   const array = parseArrayInput(input);
 
   // Parsear mapeamentos
@@ -413,7 +416,7 @@ export function renameKeys(input: any, keyMappings: string): any[] {
     }
 
     // Criar novo objeto com chaves renomeadas
-    const newItem: Record<string, any> = {};
+    const newItem: Record<string, unknown> = {};
 
     Object.keys(item).forEach((key) => {
       // Se a chave tem um mapeamento, usar o novo nome
@@ -446,7 +449,10 @@ export function renameKeys(input: any, keyMappings: string): any[] {
  * extractArrayField([["a", "b", "c"], ["d", "e", "f"]], "0")
  * // Retorna: ["a", "d"]
  */
-export function extractArrayField(input: any, fieldName: string): any[] {
+export function extractArrayField(
+  input: unknown,
+  fieldName: string,
+): unknown[] {
   const array = parseArrayInput(input);
 
   if (!fieldName || fieldName.trim() === '') {
@@ -503,7 +509,10 @@ export function extractArrayField(input: any, fieldName: string): any[] {
  * mapObjectArray([{nome: "Item"}], '{"title": "{{nome}}", "buttons": [{"text": "Comprar", "id": "{{nome}}"}]}')
  * // Retorna: [{title: "Item", buttons: [{text: "Comprar", id: "Item"}]}]
  */
-export function mapObjectArray(input: any, objectTemplate: string): any[] {
+export function mapObjectArray(
+  input: unknown,
+  objectTemplate: string,
+): unknown[] {
   const array = parseArrayInput(input);
 
   if (!objectTemplate || objectTemplate.trim() === '') {
@@ -513,7 +522,10 @@ export function mapObjectArray(input: any, objectTemplate: string): any[] {
   const trimmedTemplate = objectTemplate.trim();
 
   // Função recursiva para processar o template
-  const processTemplate = (template: any, sourceObj: any): any => {
+  const processTemplate = (
+    template: unknown,
+    sourceObj: Record<string, unknown>,
+  ): unknown => {
     // Se for string, substituir variáveis
     if (typeof template === 'string') {
       return template.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
@@ -546,7 +558,7 @@ export function mapObjectArray(input: any, objectTemplate: string): any[] {
 
     // Se for objeto, processar cada propriedade
     if (typeof template === 'object' && template !== null) {
-      const processed: Record<string, any> = {};
+      const processed: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(template)) {
         processed[key] = processTemplate(value, sourceObj);
       }
@@ -558,10 +570,10 @@ export function mapObjectArray(input: any, objectTemplate: string): any[] {
   };
 
   // Parsear o template
-  let templateObj: any;
+  let templateObj: unknown;
   try {
     templateObj = JSON.parse(trimmedTemplate);
-  } catch (error) {
+  } catch {
     throw new Error(
       'Template inválido. Use um objeto JSON válido: {"field": "{{value}}"}',
     );
@@ -594,7 +606,7 @@ export function mapObjectArray(input: any, objectTemplate: string): any[] {
  * flatMapArray([{title: "Produto", imageUrl: "http://..."}], '["[{{title}}]", "{{{imageUrl}}}"]')
  * // Retorna: ["[Produto]", "{http://...}"]
  */
-export function flatMapArray(input: any, template: string): any[] {
+export function flatMapArray(input: unknown, template: string): unknown[] {
   const array = parseArrayInput(input);
 
   if (!template || template.trim() === '') {
@@ -611,14 +623,17 @@ export function flatMapArray(input: any, template: string): any[] {
       throw new Error('Template deve ser um array JSON');
     }
     templateArray = parsed;
-  } catch (error) {
+  } catch {
     throw new Error(
       'Template inválido. Use formato JSON array: ["item1", "item2"]',
     );
   }
 
   // Função para substituir variáveis no template
-  const replaceVars = (templateStr: string, obj: any): string => {
+  const replaceVars = (
+    templateStr: string,
+    obj: Record<string, unknown>,
+  ): string => {
     return templateStr.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
       const trimmedKey = key.trim();
 
@@ -643,7 +658,7 @@ export function flatMapArray(input: any, template: string): any[] {
   };
 
   // Processar cada objeto e achatar os resultados
-  const result: any[] = [];
+  const result: unknown[] = [];
 
   array.forEach((item) => {
     // Se não for objeto, pular
@@ -663,7 +678,7 @@ export function flatMapArray(input: any, template: string): any[] {
 
 // ==================== OBJECT OPERATIONS ====================
 
-export function extractField(input: any, field: string): any {
+export function extractField(input: unknown, field: string): unknown {
   if (typeof input !== 'object' || input === null) {
     throw new Error('Input deve ser um objeto');
   }
@@ -682,7 +697,10 @@ export function extractField(input: any, field: string): any {
   return result;
 }
 
-export function mergeObjects(input: any, mergeWith: any): any {
+export function mergeObjects(
+  input: Record<string, unknown>,
+  mergeWith: Record<string, unknown>,
+): Record<string, unknown> {
   if (typeof input !== 'object' || input === null) {
     throw new Error('Input deve ser um objeto');
   }
@@ -692,28 +710,28 @@ export function mergeObjects(input: any, mergeWith: any): any {
   return { ...input, ...mergeWith };
 }
 
-export function objectKeys(input: any): string[] {
+export function objectKeys(input: unknown): string[] {
   if (typeof input !== 'object' || input === null) {
     throw new Error('Input deve ser um objeto');
   }
   return Object.keys(input);
 }
 
-export function objectValues(input: any): any[] {
+export function objectValues(input: unknown): unknown[] {
   if (typeof input !== 'object' || input === null) {
     throw new Error('Input deve ser um objeto');
   }
   return Object.values(input);
 }
 
-export function stringifyObject(input: any): string {
+export function stringifyObject(input: unknown): string {
   return JSON.stringify(input);
 }
 
-export function parseJSON(input: string): any {
+export function parseJSON(input: string): unknown {
   try {
     return JSON.parse(input);
-  } catch (error) {
+  } catch {
     throw new Error('JSON inválido');
   }
 }
