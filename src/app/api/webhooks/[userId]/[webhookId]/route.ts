@@ -132,15 +132,16 @@ async function findWebhookInFlows(webhookId: string, userId: number) {
 
     if (webhookNode) {
       console.log('✅ MATCH FOUND!');
-      const node = webhookNode as {
+      const nodeData = webhookNode as {
         id: string;
+        type?: string;
         data: { webhookConfig: unknown };
       };
       console.log('🎯 Found webhook match:', {
         flowId: flow.id,
         flowName: flow.name,
-        nodeId: node.id,
-        webhookConfig: node.data.webhookConfig,
+        nodeId: nodeData.id,
+        webhookConfig: nodeData.data.webhookConfig,
       });
 
       // Verificar se userId não é null (já filtrado pela query, mas TypeScript não sabe)
@@ -153,8 +154,12 @@ async function findWebhookInFlows(webhookId: string, userId: number) {
             edges: flow.edges,
             userId: flow.userId,
           },
-          node,
-          config: node.data.webhookConfig,
+          node: {
+            id: nodeData.id,
+            type: nodeData.type || 'webhook',
+            data: nodeData.data,
+          },
+          config: nodeData.data.webhookConfig,
         });
       }
     }
@@ -263,8 +268,9 @@ async function findWebhookByInstance(instanceToken: string) {
 
     if (webhookNode) {
       console.log('✅ WHATSAPP WEBHOOK FOUND!');
-      const node = webhookNode as {
+      const nodeData = webhookNode as {
         id: string;
+        type?: string;
         data: { webhookConfig: unknown };
       };
       // Verificar se userId não é null antes de adicionar
@@ -277,8 +283,12 @@ async function findWebhookByInstance(instanceToken: string) {
             edges: flow.edges,
             userId: flow.userId,
           },
-          node,
-          config: node.data.webhookConfig,
+          node: {
+            id: nodeData.id,
+            type: nodeData.type || 'webhook',
+            data: nodeData.data,
+          },
+          config: nodeData.data.webhookConfig,
         });
       }
     }
