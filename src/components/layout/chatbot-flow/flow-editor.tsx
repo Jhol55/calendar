@@ -1282,10 +1282,11 @@ function FlowEditorContent() {
 
           // Destacar nós executados
           if (execution.nodeExecutions) {
-            const executedNodeIds = Object.keys(execution.nodeExecutions);
+            const nodeExecutions = execution.nodeExecutions;
+            const executedNodeIds = Object.keys(nodeExecutions);
 
             const updatedNodes = nodes.map((node) => {
-              const nodeExecution = execution.nodeExecutions[node.id];
+              const nodeExecution = nodeExecutions[node.id];
               if (nodeExecution) {
                 return {
                   ...node,
@@ -1327,8 +1328,8 @@ function FlowEditorContent() {
               const targetExecuted = executedNodeIds.includes(edge.target);
 
               if (sourceExecuted && targetExecuted) {
-                const sourceExecution = execution.nodeExecutions[edge.source];
-                const targetExecution = execution.nodeExecutions[edge.target];
+                const sourceExecution = nodeExecutions[edge.source];
+                const targetExecution = nodeExecutions[edge.target];
 
                 // Determinar a cor baseada no status
                 const hasError =
