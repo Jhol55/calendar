@@ -498,11 +498,12 @@ export async function addRow(
           continue;
 
         // Converter o valor para o tipo correto da coluna antes de validar
-        let typedValue: string | number | boolean = value;
+        const stringValue = String(value);
+        let typedValue: string | number | boolean = stringValue;
         if (column.type === 'number') {
-          typedValue = Number(value);
+          typedValue = Number(stringValue);
         } else if (column.type === 'boolean') {
-          typedValue = value === 'true' || value === true;
+          typedValue = stringValue === 'true';
         }
 
         // Verificar se já existe em todas as partições
