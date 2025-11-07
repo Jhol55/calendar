@@ -271,6 +271,15 @@ export async function updateCell(
       }
     }
 
+    // Verificar se a coluna existe
+    if (!columnDef) {
+      return {
+        success: false,
+        message: `Column "${column}" not found`,
+        code: 404,
+      };
+    }
+
     // Encontrar a partição que contém o registro
     for (const record of dataRecords) {
       const data = record.data as Array<Record<string, unknown>>;
