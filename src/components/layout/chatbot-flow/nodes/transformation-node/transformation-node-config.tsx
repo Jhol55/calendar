@@ -20,6 +20,8 @@ import {
 import {
   TransformationConfig,
   TransformationStep,
+  TransformationType,
+  TransformationOperation,
   MemoryItem,
 } from '../../types';
 import { Plus, Trash2, MoveUp, MoveDown } from 'lucide-react';
