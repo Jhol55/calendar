@@ -45,11 +45,18 @@ export async function POST(request: NextRequest) {
     const stripeSubscription =
       await stripe.subscriptions.retrieve(subscriptionId);
 
+    // Type assertion para acessar propriedades de período
+    const subscriptionWithPeriod =
+      stripeSubscription as typeof stripeSubscription & {
+        current_period_start: number;
+        current_period_end: number;
+      };
+
     // Buscar customer
     const customerId =
-      typeof stripeSubscription.customer === 'string'
-        ? stripeSubscription.customer
-        : stripeSubscription.customer.id;
+      typeof subscriptionWithPeriod.customer === 'string'
+        ? subscriptionWithPeriod.customer
+        : subscriptionWithPeriod.customer.id;
 
     // Criar ou atualizar subscription no banco
     const subscriptionRecord = await prisma.subscription.upsert({
@@ -59,37 +66,39 @@ export async function POST(request: NextRequest) {
         planId: parseInt(planId),
         stripeSubscriptionId: subscriptionId,
         stripeCustomerId: customerId,
-        status: stripeSubscription.status,
+        status: subscriptionWithPeriod.status,
         billingPeriod:
-          stripeSubscription.items.data[0]?.price.recurring?.interval === 'year'
+          subscriptionWithPeriod.items.data[0]?.price.recurring?.interval ===
+          'year'
             ? 'yearly'
             : 'monthly',
-        trialEndsAt: stripeSubscription.trial_end
-          ? new Date(stripeSubscription.trial_end * 1000)
+        trialEndsAt: subscriptionWithPeriod.trial_end
+          ? new Date(subscriptionWithPeriod.trial_end * 1000)
           : null,
         currentPeriodStart: new Date(
-          stripeSubscription.current_period_start * 1000,
+          subscriptionWithPeriod.current_period_start * 1000,
         ),
         currentPeriodEnd: new Date(
-          stripeSubscription.current_period_end * 1000,
+          subscriptionWithPeriod.current_period_end * 1000,
         ),
       },
       update: {
         stripeSubscriptionId: subscriptionId,
         stripeCustomerId: customerId,
-        status: stripeSubscription.status,
+        status: subscriptionWithPeriod.status,
         billingPeriod:
-          stripeSubscription.items.data[0]?.price.recurring?.interval === 'year'
+          subscriptionWithPeriod.items.data[0]?.price.recurring?.interval ===
+          'year'
             ? 'yearly'
             : 'monthly',
-        trialEndsAt: stripeSubscription.trial_end
-          ? new Date(stripeSubscription.trial_end * 1000)
+        trialEndsAt: subscriptionWithPeriod.trial_end
+          ? new Date(subscriptionWithPeriod.trial_end * 1000)
           : null,
         currentPeriodStart: new Date(
-          stripeSubscription.current_period_start * 1000,
+          subscriptionWithPeriod.current_period_start * 1000,
         ),
         currentPeriodEnd: new Date(
-          stripeSubscription.current_period_end * 1000,
+          subscriptionWithPeriod.current_period_end * 1000,
         ),
       },
     });
