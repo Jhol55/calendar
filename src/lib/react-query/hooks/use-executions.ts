@@ -144,7 +144,7 @@ export function useStopExecution(
 
   return useMutation({
     mutationFn: async (executionId: string) => {
-      return safeQueryFn(async () => {
+      await safeQueryFn(async () => {
         const response = await stopExecution(executionId);
 
         if (!response.success) {
