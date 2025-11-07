@@ -141,7 +141,68 @@ function NodeConfigLayoutContent({
   // Atualizar execução no contexto quando mudar
   useEffect(() => {
     if (execution) {
-      setSelectedExecution(execution);
+      // Converter Execution para ExecutionData
+      const executionData = {
+        id: execution.id,
+        status: execution.status,
+        nodeExecutions: execution.nodeExecutions
+          ? Object.entries(execution.nodeExecutions).reduce(
+              (acc, [nodeId, nodeExec]) => {
+                // Converter nodeExec (unknown) para NodeExecution
+                if (
+                  nodeExec &&
+                  typeof nodeExec === 'object' &&
+                  'status' in nodeExec
+                ) {
+                  const nodeExecObj = nodeExec as {
+                    status?: string;
+                    startTime?: string;
+                    endTime?: string;
+                    data?: unknown;
+                    result?: unknown;
+                    error?: string;
+                  };
+                  acc[nodeId] = {
+                    nodeId,
+                    status:
+                      nodeExecObj.status === 'running'
+                        ? 'running'
+                        : nodeExecObj.status === 'completed'
+                          ? 'completed'
+                          : 'error',
+                    startTime: nodeExecObj.startTime || execution.startTime,
+                    endTime: nodeExecObj.endTime,
+                    data: nodeExecObj.data,
+                    result: nodeExecObj.result,
+                    error: nodeExecObj.error,
+                  };
+                } else {
+                  acc[nodeId] = {
+                    nodeId,
+                    status: 'error' as const,
+                    startTime: execution.startTime,
+                  };
+                }
+                return acc;
+              },
+              {} as Record<
+                string,
+                {
+                  nodeId?: string;
+                  status: 'running' | 'completed' | 'error';
+                  startTime: string;
+                  endTime?: string;
+                  data?: unknown;
+                  result?: unknown;
+                  error?: string;
+                }
+              >,
+            )
+          : {},
+        data: execution.data,
+        result: execution.result,
+      };
+      setSelectedExecution(executionData);
     }
   }, [execution, setSelectedExecution]);
 
