@@ -1286,7 +1286,9 @@ function FlowEditorContent() {
             const executedNodeIds = Object.keys(nodeExecutions);
 
             const updatedNodes = nodes.map((node) => {
-              const nodeExecution = nodeExecutions[node.id];
+              const nodeExecution = nodeExecutions[node.id] as
+                | { status: string }
+                | undefined;
               if (nodeExecution) {
                 return {
                   ...node,
@@ -1328,8 +1330,12 @@ function FlowEditorContent() {
               const targetExecuted = executedNodeIds.includes(edge.target);
 
               if (sourceExecuted && targetExecuted) {
-                const sourceExecution = nodeExecutions[edge.source];
-                const targetExecution = nodeExecutions[edge.target];
+                const sourceExecution = nodeExecutions[edge.source] as
+                  | { status: string }
+                  | undefined;
+                const targetExecution = nodeExecutions[edge.target] as
+                  | { status: string }
+                  | undefined;
 
                 // Determinar a cor baseada no status
                 const hasError =
