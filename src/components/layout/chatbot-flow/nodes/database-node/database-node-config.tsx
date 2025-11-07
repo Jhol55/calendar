@@ -205,7 +205,20 @@ function DatabaseFormFields({ config }: { config?: DatabaseConfig }) {
 
         if (config.filters) {
           setFilterCondition(config.filters.condition);
-          setFilterRules(config.filters.rules);
+          const normalizedRules: FilterRule[] = config.filters.rules.map(
+            (rule) => ({
+              field: rule.field,
+              operator:
+                typeof rule.operator === 'string' ? rule.operator : 'equals',
+              value:
+                rule.value !== undefined && rule.value !== null
+                  ? typeof rule.value === 'string'
+                    ? rule.value
+                    : JSON.stringify(rule.value)
+                  : '',
+            }),
+          );
+          setFilterRules(normalizedRules);
           setValue('filters', JSON.stringify(config.filters));
         }
 
