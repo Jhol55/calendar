@@ -66,9 +66,15 @@ export function useUser(options?: CustomQueryOptions<User>) {
   return useQuery({
     queryKey: userKeys.profile(),
     queryFn: () =>
-      safeQueryFn(async () => {
+      safeQueryFn<User>(async () => {
         const response = await getUser();
-        return response;
+        return {
+          success: response.success,
+          data: response.data as User,
+          error: response.success
+            ? undefined
+            : response.statusText || 'Failed to fetch user',
+        };
       }),
     ...CACHE_TIMES.USER,
     retry: 3,
