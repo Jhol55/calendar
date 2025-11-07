@@ -288,7 +288,7 @@ export async function createCheckoutSession(
     return {
       success: true,
       sessionId: session.id,
-      url: session.url,
+      url: session.url ?? undefined,
     };
   } catch (error: unknown) {
     // Log detalhado no servidor para debugging (não expor ao cliente)
