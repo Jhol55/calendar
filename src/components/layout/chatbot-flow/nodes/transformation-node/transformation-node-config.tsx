@@ -248,8 +248,11 @@ function TransformationFormFields({
       setValue(`step_operation_${index}`, newOperation);
     } else if (field === 'operation') {
       // Garantir que value é uma string (TransformationOperation é uma string)
+      // Se não for string, usar a operação atual do step como fallback
       const operationValue =
-        typeof value === 'string' ? (value as TransformationOperation) : '';
+        typeof value === 'string' && value.trim() !== ''
+          ? (value as TransformationOperation)
+          : newSteps[index].operation || 'uppercase';
       newSteps[index] = {
         ...newSteps[index],
         operation: operationValue,
