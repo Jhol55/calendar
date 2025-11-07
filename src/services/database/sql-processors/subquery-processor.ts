@@ -13,11 +13,7 @@ export class SubqueryProcessor {
   /**
    * Resolve subqueries no AST antes da execução principal
    */
-  async resolveSubqueries(
-    ast: ASTNode,
-    _userId: string,
-    _executeQuery: ExecuteQueryFn,
-  ): Promise<ASTNode> {
+  async resolveSubqueries(ast: ASTNode): Promise<ASTNode> {
     // TODO: Implementar resolução de subqueries
     // Por enquanto, apenas retornar o AST original
 
@@ -32,7 +28,7 @@ export class SubqueryProcessor {
   /**
    * Detecta se uma subquery é correlacionada (depende da query pai)
    */
-  isCorrelated(_subquery: ASTNode): boolean {
+  isCorrelated(): boolean {
     // Subquery correlacionada referencia colunas da query pai
     // Exemplo: SELECT * FROM users WHERE age > (SELECT AVG(age) FROM users u2 WHERE u2.city = users.city)
 
@@ -55,12 +51,7 @@ export class SubqueryProcessor {
   /**
    * Executa subquery correlacionada (re-executa para cada row da query pai)
    */
-  async executeCorrelatedSubquery(
-    _subquery: ASTNode,
-    _parentRow: DatabaseRecord,
-    _userId: string,
-    _executeQuery: ExecuteQueryFn,
-  ): Promise<DatabaseRecord[]> {
+  async executeCorrelatedSubquery(): Promise<DatabaseRecord[]> {
     // Substituir referências da parent row no subquery
     // Executar subquery com contexto da parent row
 
