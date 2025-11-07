@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Typography } from '@/components/ui/typography';
@@ -52,20 +53,14 @@ function NodeConfigLayoutContent({
   const allEdgesRaw = reactFlowInstance?.getEdges() || [];
   const allNodesRaw = reactFlowInstance?.getNodes() || [];
 
-  // Criar chaves estáveis para memoização baseadas apenas nos IDs
-  // Calcular a chave de forma estável sem usar JSON.stringify nas dependências
+  // Calcular chaves baseadas nos IDs
   const edgesKeyStr = useMemo(
     () =>
       allEdgesRaw
         .map((e) => `${e.source}-${e.target}`)
         .sort()
         .join(','),
-    [
-      allEdgesRaw
-        .map((e) => `${e.source}-${e.target}`)
-        .sort()
-        .join(','),
-    ],
+    [allEdgesRaw],
   );
   const nodesKeyStr = useMemo(
     () =>
@@ -73,19 +68,53 @@ function NodeConfigLayoutContent({
         .map((n) => n.id)
         .sort()
         .join(','),
-    [
-      allNodesRaw
-        .map((n) => n.id)
-        .sort()
-        .join(','),
-    ],
+    [allNodesRaw],
   );
 
-  // Memoizar os arrays baseados nas chaves estáveis para evitar loops infinitos
-  const allEdges = useMemo(() => allEdgesRaw, [edgesKeyStr]);
-  const allNodes = useMemo(() => allNodesRaw, [nodesKeyStr]);
+  // Usar refs para armazenar os arrays anteriores e as chaves
+  const prevEdgesRef = useRef<typeof allEdgesRaw>([]);
+  const prevNodesRef = useRef<typeof allNodesRaw>([]);
+  const prevEdgesKeyRef = useRef<string>('');
+  const prevNodesKeyRef = useRef<string>('');
 
-  // Memoizar edges e nodes apenas quando as chaves mudarem
+  // Atualizar refs quando as chaves mudarem
+  useEffect(() => {
+    if (edgesKeyStr !== prevEdgesKeyRef.current) {
+      prevEdgesKeyRef.current = edgesKeyStr;
+      prevEdgesRef.current = allEdgesRaw;
+    }
+  }, [edgesKeyStr, allEdgesRaw]);
+
+  useEffect(() => {
+    if (nodesKeyStr !== prevNodesKeyRef.current) {
+      prevNodesKeyRef.current = nodesKeyStr;
+      prevNodesRef.current = allNodesRaw;
+    }
+  }, [nodesKeyStr, allNodesRaw]);
+
+  // Memoizar os arrays apenas quando as chaves realmente mudarem
+  // Sempre retornar os valores atuais se as chaves mudaram ou se ainda não foram inicializadas
+  const allEdges = useMemo(() => {
+    if (
+      edgesKeyStr !== prevEdgesKeyRef.current ||
+      prevEdgesRef.current.length === 0
+    ) {
+      return allEdgesRaw;
+    }
+    return prevEdgesRef.current;
+  }, [edgesKeyStr, allEdgesRaw]);
+
+  const allNodes = useMemo(() => {
+    if (
+      nodesKeyStr !== prevNodesKeyRef.current ||
+      prevNodesRef.current.length === 0
+    ) {
+      return allNodesRaw;
+    }
+    return prevNodesRef.current;
+  }, [nodesKeyStr, allNodesRaw]);
+
+  // Memoizar edges e nodes transformados apenas quando os arrays memoizados mudarem
   const liveEdges = useMemo(() => {
     return allEdges.map((edge) => ({
       source: edge.source,
