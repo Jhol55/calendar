@@ -12,6 +12,7 @@ export async function POST() {
     const session = await getSession();
     const sessionData = session as {
       user?: { email?: string };
+      confirmed?: boolean;
     } | null;
 
     if (!sessionData?.user?.email) {
