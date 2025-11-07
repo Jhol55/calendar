@@ -249,7 +249,7 @@ export async function updateCell(
         if (columnDef.type === 'number') {
           typedValue = Number(value);
         } else if (columnDef.type === 'boolean') {
-          typedValue = value === 'true' || value === true;
+          typedValue = value === 'true';
         }
 
         // Verificar se já existe outro registro com esse valor
@@ -282,7 +282,7 @@ export async function updateCell(
         if (columnDef.type === 'number') {
           typedValue = value.trim() === '' ? null : Number(value);
         } else if (columnDef.type === 'boolean') {
-          typedValue = value === 'true' || value === true;
+          typedValue = value === 'true';
         } else if (columnDef.type === 'date') {
           typedValue = value.trim() === '' ? null : value;
         }
@@ -567,7 +567,7 @@ export async function addRow(
         if (column.type === 'number') {
           typedData[column.name] = Number(value);
         } else if (column.type === 'boolean') {
-          typedData[column.name] = value === 'true' || value === true;
+          typedData[column.name] = String(value) === 'true';
         }
       }
     }
