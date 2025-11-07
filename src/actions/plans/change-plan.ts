@@ -145,11 +145,16 @@ export async function changePlan(
       };
 
       // Converter períodos de Unix timestamp para Date de forma segura
+      const subscriptionWithPeriod =
+        updatedStripeSubscription as Stripe.Subscription & {
+          current_period_start: number;
+          current_period_end: number;
+        };
       const currentPeriodStart = safeUnixToDate(
-        updatedStripeSubscription.current_period_start,
+        subscriptionWithPeriod.current_period_start,
       );
       const currentPeriodEnd = safeUnixToDate(
-        updatedStripeSubscription.current_period_end,
+        subscriptionWithPeriod.current_period_end,
       );
 
       // Se aplicar imediatamente, atualizar tudo agora
