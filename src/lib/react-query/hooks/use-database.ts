@@ -7,12 +7,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { databaseKeys, TableFilters } from '../query-keys';
 import { CACHE_TIMES } from '../config';
-import {
-  safeQueryFn,
-  optimisticUpdate,
-  rollbackOptimisticUpdate,
-} from '../utils';
-import { CustomQueryOptions, CustomMutationOptions } from '../types';
+import { rollbackOptimisticUpdate } from '../utils';
+import { CustomQueryOptions, CustomMutationOptions, ApiError } from '../types';
 import {
   getAvailableTables,
   getTableData as getTableDataAction,
@@ -35,7 +31,7 @@ export interface Table {
 
 export interface TableRow {
   id?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface TableSchema {
@@ -43,7 +39,7 @@ export interface TableSchema {
     name: string;
     type: string;
     nullable?: boolean;
-    default?: any;
+    default?: unknown;
   }>;
 }
 
@@ -126,7 +122,12 @@ export function useTableSchema(
  */
 export function useInsertTableRow(
   tableName: string,
-  options?: CustomMutationOptions<TableRow, any, TableRow>,
+  options?: CustomMutationOptions<
+    TableRow,
+    ApiError,
+    TableRow,
+    { previousData: TableRow[] | undefined; tempRow: TableRow }
+  >,
 ) {
   const queryClient = useQueryClient();
 
@@ -139,7 +140,9 @@ export function useInsertTableRow(
       return response.data as TableRow;
     },
 
-    onMutate: async (newRow) => {
+    onMutate: async (
+      newRow,
+    ): Promise<{ previousData: TableRow[] | undefined; tempRow: TableRow }> => {
       // Cancelar queries da tabela
       await queryClient.cancelQueries({
         queryKey: databaseKeys.table(tableName),
@@ -206,22 +209,44 @@ export function useUpdateTableCell(
   tableName: string,
   options?: CustomMutationOptions<
     void,
-    any,
-    { rowId: string; column: string; value: any }
+    ApiError,
+    { rowId: string; column: string; value: unknown },
+    {
+      previousData:
+        | { data: TableRow[]; schema: TableSchema | null }
+        | undefined;
+      rowId: string;
+    }
   >,
 ) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ rowId, column, value }) => {
-      const response = await updateCell(tableName, rowId, column, value);
+      // Converter valor para string (a função updateCell espera string)
+      const stringValue =
+        value === null || value === undefined
+          ? ''
+          : typeof value === 'string'
+            ? value
+            : String(value);
+      const response = await updateCell(tableName, rowId, column, stringValue);
       if (!response.success) {
         throw new Error(response.message || 'Failed to update cell');
       }
       return undefined;
     },
 
-    onMutate: async ({ rowId, column, value }) => {
+    onMutate: async ({
+      rowId,
+      column,
+      value,
+    }): Promise<{
+      previousData:
+        | { data: TableRow[]; schema: TableSchema | null }
+        | undefined;
+      rowId: string;
+    }> => {
       await queryClient.cancelQueries({
         queryKey: databaseKeys.table(tableName),
       });
@@ -273,7 +298,17 @@ export function useUpdateTableCell(
  */
 export function useDeleteTableRow(
   tableName: string,
-  options?: CustomMutationOptions<void, any, string>,
+  options?: CustomMutationOptions<
+    void,
+    ApiError,
+    string,
+    {
+      previousData:
+        | { data: TableRow[]; schema: TableSchema | null }
+        | undefined;
+      rowId: string;
+    }
+  >,
 ) {
   const queryClient = useQueryClient();
 
@@ -286,7 +321,14 @@ export function useDeleteTableRow(
       return undefined;
     },
 
-    onMutate: async (rowId) => {
+    onMutate: async (
+      rowId,
+    ): Promise<{
+      previousData:
+        | { data: TableRow[]; schema: TableSchema | null }
+        | undefined;
+      rowId: string;
+    }> => {
       await queryClient.cancelQueries({
         queryKey: databaseKeys.table(tableName),
       });
@@ -338,7 +380,7 @@ export function useDeleteTableRow(
 export function useCreateTable(
   options?: CustomMutationOptions<
     { tableName: string; schema: TableSchema },
-    any,
+    ApiError,
     {
       tableName: string;
       columns: Array<{
@@ -376,7 +418,7 @@ export function useAddColumns(
   tableName: string,
   options?: CustomMutationOptions<
     void,
-    any,
+    ApiError,
     Array<{
       name: string;
       type: 'string' | 'number' | 'boolean' | 'date' | 'array' | 'object';
@@ -413,7 +455,7 @@ export function useRenameColumn(
   tableName: string,
   options?: CustomMutationOptions<
     void,
-    any,
+    ApiError,
     { oldColumnName: string; newColumnName: string }
   >,
 ) {
@@ -447,7 +489,7 @@ export function useRenameColumn(
  */
 export function useDeleteColumn(
   tableName: string,
-  options?: CustomMutationOptions<void, any, string>,
+  options?: CustomMutationOptions<void, ApiError, string>,
 ) {
   const queryClient = useQueryClient();
 

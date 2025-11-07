@@ -127,7 +127,7 @@ export const queryCache = new QueryCache({
 
     // Aqui você pode adicionar integração com Sentry, LogRocket, etc.
   },
-  onSuccess: (data, query) => {
+  onSuccess: (data) => {
     // Validação de dados recebidos (segurança)
     if (data && typeof data === 'object') {
       // Sanitizar dados se necessário

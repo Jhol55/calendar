@@ -4,12 +4,7 @@
  * Gerenciamento centralizado de erros com logging e recovery
  */
 
-import {
-  QueryCache,
-  MutationCache,
-  Query,
-  Mutation,
-} from '@tanstack/react-query';
+import { Query, Mutation } from '@tanstack/react-query';
 import { ApiError } from './types';
 import { getErrorMessage, hasStatus, hasCode } from '@/lib/types/error-guards';
 
@@ -128,11 +123,11 @@ export class ErrorLogger {
 
     // Para erros críticos, pode enviar para servidor
     if (category === ErrorCategory.SERVER) {
-      this.sendToServer(errorLog);
+      this.sendToServer();
     }
   }
 
-  private sendToServer(errorLog: ErrorLog): void {
+  private sendToServer(): void {
     // TODO: Implementar envio para servidor de logs
     // fetch('/api/logs/error', {
     //   method: 'POST',
