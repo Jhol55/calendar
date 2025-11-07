@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
+import { Prisma } from '../../../generated/prisma';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -39,7 +40,7 @@ export async function DELETE(request: NextRequest) {
         await prisma.dataTable.update({
           where: { id: record.id },
           data: {
-            data: data,
+            data: data as Prisma.InputJsonValue,
             recordCount: data.length,
             isFull: false, // Ao deletar, a partição não está mais cheia
             updatedAt: new Date(),
