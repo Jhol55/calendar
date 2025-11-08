@@ -23,17 +23,18 @@ export async function getOrCreateConversation(
   maxLength: number = 10,
 ) {
   // Tentar buscar conversa existente
-  // Para campos opcionais em chaves compostas, Prisma aceita null explicitamente
+  // Para campos opcionais em chaves compostas, sempre incluir (usar null quando undefined)
+  // Type assertion necessária devido à limitação do Prisma com campos opcionais em chaves compostas
   const existing = await prisma.agent_conversations.findUnique({
     where: {
       userId_flowId_nodeId: {
         userId,
         flowId: flowId ?? null,
         nodeId: nodeId ?? null,
-      } as {
+      } as unknown as {
         userId: string;
-        flowId: string | null;
-        nodeId: string | null;
+        flowId: string;
+        nodeId: string;
       },
     },
   });
@@ -46,8 +47,8 @@ export async function getOrCreateConversation(
   return prisma.agent_conversations.create({
     data: {
       userId,
-      flowId: flowId ?? null,
-      nodeId: nodeId ?? null,
+      ...(flowId !== undefined && { flowId: flowId ?? null }),
+      ...(nodeId !== undefined && { nodeId: nodeId ?? null }),
       messages: [],
       maxLength,
       lastMessageAt: new Date(),
@@ -108,10 +109,10 @@ export async function addMessagesToHistory(
         userId,
         flowId: flowId ?? null,
         nodeId: nodeId ?? null,
-      } as {
+      } as unknown as {
         userId: string;
-        flowId: string | null;
-        nodeId: string | null;
+        flowId: string;
+        nodeId: string;
       },
     },
     data: {
@@ -135,10 +136,10 @@ export async function getConversationHistory(
         userId,
         flowId: flowId ?? null,
         nodeId: nodeId ?? null,
-      } as {
+      } as unknown as {
         userId: string;
-        flowId: string | null;
-        nodeId: string | null;
+        flowId: string;
+        nodeId: string;
       },
     },
   });
