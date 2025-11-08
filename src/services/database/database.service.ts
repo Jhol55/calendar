@@ -2137,22 +2137,38 @@ export class DatabaseService {
 
       case 'greaterThan': {
         const numeric = tryNumericComparison(fieldValue, value);
-        return numeric ? numeric[0] > numeric[1] : fieldValue > value;
+        if (numeric) {
+          return numeric[0] > numeric[1];
+        }
+        // Fallback para comparação de strings
+        return String(fieldValue) > String(value);
       }
 
       case 'greaterThanOrEqual': {
         const numeric = tryNumericComparison(fieldValue, value);
-        return numeric ? numeric[0] >= numeric[1] : fieldValue >= value;
+        if (numeric) {
+          return numeric[0] >= numeric[1];
+        }
+        // Fallback para comparação de strings
+        return String(fieldValue) >= String(value);
       }
 
       case 'lessThan': {
         const numeric = tryNumericComparison(fieldValue, value);
-        return numeric ? numeric[0] < numeric[1] : fieldValue < value;
+        if (numeric) {
+          return numeric[0] < numeric[1];
+        }
+        // Fallback para comparação de strings
+        return String(fieldValue) < String(value);
       }
 
       case 'lessThanOrEqual': {
         const numeric = tryNumericComparison(fieldValue, value);
-        return numeric ? numeric[0] <= numeric[1] : fieldValue <= value;
+        if (numeric) {
+          return numeric[0] <= numeric[1];
+        }
+        // Fallback para comparação de strings
+        return String(fieldValue) <= String(value);
       }
 
       case 'contains':
