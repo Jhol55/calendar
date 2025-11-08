@@ -23,12 +23,17 @@ export async function getOrCreateConversation(
   maxLength: number = 10,
 ) {
   // Tentar buscar conversa existente
+  // Para campos opcionais em chaves compostas, Prisma aceita null explicitamente
   const existing = await prisma.agent_conversations.findUnique({
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: flowId || null,
-        nodeId: nodeId || null,
+        flowId: flowId ?? null,
+        nodeId: nodeId ?? null,
+      } as {
+        userId: string;
+        flowId: string | null;
+        nodeId: string | null;
       },
     },
   });
@@ -41,8 +46,8 @@ export async function getOrCreateConversation(
   return prisma.agent_conversations.create({
     data: {
       userId,
-      flowId: flowId || null,
-      nodeId: nodeId || null,
+      flowId: flowId ?? null,
+      nodeId: nodeId ?? null,
       messages: [],
       maxLength,
       lastMessageAt: new Date(),
@@ -101,8 +106,12 @@ export async function addMessagesToHistory(
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: flowId || null,
-        nodeId: nodeId || null,
+        flowId: flowId ?? null,
+        nodeId: nodeId ?? null,
+      } as {
+        userId: string;
+        flowId: string | null;
+        nodeId: string | null;
       },
     },
     data: {
@@ -124,8 +133,12 @@ export async function getConversationHistory(
     where: {
       userId_flowId_nodeId: {
         userId,
-        flowId: flowId || null,
-        nodeId: nodeId || null,
+        flowId: flowId ?? null,
+        nodeId: nodeId ?? null,
+      } as {
+        userId: string;
+        flowId: string | null;
+        nodeId: string | null;
       },
     },
   });
