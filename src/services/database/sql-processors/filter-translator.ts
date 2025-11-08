@@ -162,7 +162,7 @@ export class FilterTranslator {
    * Traduz IS NULL / IS NOT NULL
    */
   private translateNullCheck(node: ASTNode): FilterRule {
-    const field = this.extractFieldName(node.left);
+    const field = this.extractFieldName(node.left as ASTNode);
     const operator = node.operator === 'IS' ? 'isNull' : 'isNotNull';
 
     return {
