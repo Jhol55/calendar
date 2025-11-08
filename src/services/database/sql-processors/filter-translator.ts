@@ -297,7 +297,7 @@ export class FilterTranslator {
     // Função de agregação (ex: SUM(amount), COUNT(*), AVG(value))
     // No HAVING, essas já foram calculadas e estão disponíveis como campos no record
     if (node.type === 'aggr_func') {
-      const func = node.name.toUpperCase();
+      const func = String(node.name || '').toUpperCase();
       let field: string | undefined;
 
       // Extrair nome do campo da agregação
