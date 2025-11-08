@@ -91,9 +91,15 @@ export function useInstances(options?: CustomQueryOptions<Instance[]>) {
   return useQuery({
     queryKey: userKeys.instances(),
     queryFn: () =>
-      safeQueryFn(async () => {
+      safeQueryFn<Instance[]>(async () => {
         const response = await getInstances();
-        return response;
+        return {
+          success: response.success,
+          data: (response.data as Instance[]) || [],
+          error: response.success
+            ? undefined
+            : response.message || 'Failed to fetch instances',
+        };
       }),
     ...CACHE_TIMES.DYNAMIC,
     retry: 3,
