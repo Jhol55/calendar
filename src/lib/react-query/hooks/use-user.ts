@@ -142,15 +142,25 @@ export function useInstance(
  * Hook para atualizar dados do usuário
  */
 export function useUpdateUser(
-  options?: CustomMutationOptions<User, ApiError, Partial<User>>,
+  options?: CustomMutationOptions<
+    User,
+    ApiError,
+    Partial<User>,
+    { previousUser: User | undefined }
+  >,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<
+    User,
+    ApiError,
+    Partial<User>,
+    { previousUser: User | undefined }
+  >({
     mutationFn: async (data: Partial<User>) => {
       // Implementar chamada à API de atualização
       // Por enquanto, simula atualização
-      return safeQueryFn(async () => {
+      return safeQueryFn<User>(async () => {
         // TODO: Implementar endpoint de update user
         const currentUser = queryClient.getQueryData<User>(userKeys.profile());
         return {
@@ -160,7 +170,9 @@ export function useUpdateUser(
       });
     },
 
-    onMutate: async (updatedData) => {
+    onMutate: async (
+      updatedData: Partial<User>,
+    ): Promise<{ previousUser: User | undefined }> => {
       // Cancelar queries em andamento
       await queryClient.cancelQueries({ queryKey: userKeys.profile() });
 
