@@ -116,7 +116,7 @@ export async function addMessagesToHistory(
       },
     },
     data: {
-      messages: finalMessages as unknown as Prisma.JsonValue,
+      messages: finalMessages as Prisma.InputJsonValue,
       lastMessageAt: new Date(),
     },
   });
