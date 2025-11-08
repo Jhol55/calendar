@@ -4,7 +4,10 @@
 
 import { prisma } from './prisma';
 import { ChatMessage } from './openai.service';
-import { Prisma } from '@prisma/client';
+
+// Type helper para Prisma JSON fields
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PrismaJsonValue = any;
 
 export interface ConversationMessage {
   role: 'system' | 'user' | 'assistant' | 'tool' | 'function';
@@ -116,7 +119,7 @@ export async function addMessagesToHistory(
       },
     },
     data: {
-      messages: finalMessages as Prisma.InputJsonValue,
+      messages: finalMessages as PrismaJsonValue,
       lastMessageAt: new Date(),
     },
   });
