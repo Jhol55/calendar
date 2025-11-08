@@ -1,4 +1,4 @@
-import { PrismaClient } from '../../generated/prisma';
+import { PrismaClient, Prisma } from '../../generated/prisma';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -6,12 +6,12 @@ const globalForPrisma = globalThis as unknown as {
 
 let prisma: PrismaClient;
 
-// Configurações do Prisma Client
+// Configurações do Prisma Client - Arrays de log tipados explicitamente
+const productionLog: Prisma.LogLevel[] = ['error', 'warn'];
+const developmentLog: Prisma.LogLevel[] = ['query', 'error', 'warn'];
+
 const prismaConfig = {
-  log:
-    process.env.NODE_ENV === 'production'
-      ? ['error', 'warn']
-      : ['query', 'error', 'warn'],
+  log: process.env.NODE_ENV === 'production' ? productionLog : developmentLog,
   datasources: {
     db: {
       url: process.env.DATABASE_URL,
