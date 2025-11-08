@@ -17,6 +17,7 @@ import {
   deleteFlow,
   ChatbotFlow,
   CreateFlowData,
+  UpdateFlowData,
 } from '@/actions/chatbot-flows/flows';
 import { Node, Edge } from 'reactflow';
 import { NodeData } from '@/components/layout/chatbot-flow';
@@ -251,7 +252,19 @@ export function useUpdateWorkflow(
   return useMutation({
     mutationFn: async ({ id, data }) => {
       return safeQueryFn<ChatbotFlow>(async () => {
-        const response = await updateFlow(id, data);
+        // Converter dados para UpdateFlowData, convertendo null para undefined onde necessário
+        const updateData: UpdateFlowData = {
+          ...(data.name !== undefined && { name: data.name }),
+          ...(data.description !== undefined && {
+            description: data.description ?? undefined, // UpdateFlowData não aceita null, apenas undefined
+          }),
+          ...(data.nodes !== undefined && { nodes: data.nodes }),
+          ...(data.edges !== undefined && { edges: data.edges }),
+          ...(data.token !== undefined && { token: data.token }), // UpdateFlowData aceita null para token
+          ...(data.isActive !== undefined && { isActive: data.isActive }),
+        };
+
+        const response = await updateFlow(id, updateData);
 
         // A API retorna { success, flow } mas safeQueryFn espera { success, data }
         // Converter tipos do Prisma
