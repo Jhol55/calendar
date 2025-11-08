@@ -325,8 +325,12 @@ export class FilterTranslator {
       // Pode ser: { column: 'name' } ou { table: 'users', column: 'name' }
       const column = node.column;
       if (typeof column === 'string') return column;
-      if (column && typeof column === 'object' && column.expr) {
-        return column.expr.value || '';
+      if (column && typeof column === 'object') {
+        // Type assertion: column pode ter expr
+        const columnObj = column as { expr?: { value?: string } };
+        if (columnObj.expr) {
+          return columnObj.expr.value || '';
+        }
       }
       // Formato alternativo do parser
       if (Array.isArray(column)) {
