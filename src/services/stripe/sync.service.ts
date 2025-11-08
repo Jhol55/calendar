@@ -7,9 +7,39 @@ import Stripe from 'stripe';
 import { prisma } from '@/services/prisma';
 import { updateSessionWithPlanStatus } from '@/utils/security/session';
 
+// Usar a versão mais recente suportada pela biblioteca
+// O tipo esperado é '2025-10-29.clover', mas a API aceita '2024-12-18.acacia'
+// Vamos usar type assertion para garantir compatibilidade
+const STRIPE_API_VERSION = '2024-12-18.acacia' as Stripe.LatestApiVersion;
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: STRIPE_API_VERSION,
 });
+
+/**
+ * Interface auxiliar para propriedades de período de assinatura do Stripe
+ * Essas propriedades existem em runtime mas podem não estar nos tipos da biblioteca
+ */
+interface StripeSubscriptionWithPeriod extends Stripe.Subscription {
+  current_period_start: number;
+  current_period_end: number;
+}
+
+/**
+ * Type guard para verificar se subscription tem as propriedades de período
+ */
+function hasPeriodProperties(
+  subscription: Stripe.Subscription,
+): subscription is StripeSubscriptionWithPeriod {
+  return (
+    'current_period_start' in subscription &&
+    'current_period_end' in subscription &&
+    typeof (subscription as StripeSubscriptionWithPeriod)
+      .current_period_start === 'number' &&
+    typeof (subscription as StripeSubscriptionWithPeriod).current_period_end ===
+      'number'
+  );
+}
 
 interface SyncResult {
   success: boolean;
@@ -184,6 +214,13 @@ async function createSubscriptionFromStripe(
       ? 'yearly'
       : 'monthly';
 
+  const currentPeriodStart = hasPeriodProperties(subscription)
+    ? safeUnixToDate(subscription.current_period_start)
+    : null;
+  const currentPeriodEnd = hasPeriodProperties(subscription)
+    ? safeUnixToDate(subscription.current_period_end)
+    : null;
+
   await prisma.subscription.create({
     data: {
       userId,
@@ -193,8 +230,8 @@ async function createSubscriptionFromStripe(
       status: subscription.status,
       billingPeriod,
       trialEndsAt: safeUnixToDate(subscription.trial_end),
-      currentPeriodStart: safeUnixToDate(subscription.current_period_start),
-      currentPeriodEnd: safeUnixToDate(subscription.current_period_end),
+      currentPeriodStart,
+      currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       canceledAt: safeUnixToDate(subscription.cancel_at),
     },
@@ -260,8 +297,12 @@ async function updateSubscriptionFromStripe(
 
   // Adicionar datas apenas se não forem null
   const trialEndsAt = safeUnixToDate(subscription.trial_end);
-  const currentPeriodStart = safeUnixToDate(subscription.current_period_start);
-  const currentPeriodEnd = safeUnixToDate(subscription.current_period_end);
+  const currentPeriodStart = hasPeriodProperties(subscription)
+    ? safeUnixToDate(subscription.current_period_start)
+    : null;
+  const currentPeriodEnd = hasPeriodProperties(subscription)
+    ? safeUnixToDate(subscription.current_period_end)
+    : null;
   const canceledAt = safeUnixToDate(subscription.cancel_at);
 
   if (trialEndsAt !== null) updateData.trialEndsAt = trialEndsAt;
