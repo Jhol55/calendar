@@ -333,8 +333,10 @@ export class AggregationProcessor {
     }
 
     // Converter condição HAVING em FilterConfig usando FilterTranslator
-    const filterConfig =
-      this.filterTranslator.translateToFilterConfig(havingCondition);
+    // Type assertion: havingCondition é um ASTNode (Record<string, unknown>)
+    const filterConfig = this.filterTranslator.translateToFilterConfig(
+      havingCondition as Record<string, unknown>,
+    );
 
     // Aplicar filtros nos registros agregados
     return aggregatedRecords.filter((record) => {
