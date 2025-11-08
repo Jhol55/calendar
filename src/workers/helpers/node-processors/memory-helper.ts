@@ -532,7 +532,15 @@ export async function processNodeMemory(
       memoryConfig;
 
     // Resolver variáveis no memoryName
-    const resolvedMemoryName = replaceVariables(memoryName, variableContext);
+    const resolvedMemoryNameResult = replaceVariables(
+      memoryName,
+      variableContext,
+    );
+    const resolvedMemoryName =
+      resolvedMemoryNameResult === undefined ||
+      resolvedMemoryNameResult === null
+        ? memoryName
+        : String(resolvedMemoryNameResult);
 
     switch (action) {
       case 'save': {
@@ -559,11 +567,17 @@ export async function processNodeMemory(
               : [],
           });
 
-          const resolvedKey = replaceVariables(item.key, variableContext);
+          const resolvedKeyResult = replaceVariables(item.key, variableContext);
           const rawResolvedValue = replaceVariables(
             item.value,
             variableContext,
           );
+
+          // Converter resolvedKey para string de forma segura
+          const resolvedKey =
+            resolvedKeyResult === undefined || resolvedKeyResult === null
+              ? item.key
+              : String(resolvedKeyResult);
 
           // Se o valor não foi resolvido (undefined) para uma variável única não resolvida,
           // usar um placeholder especial que será convertido de volta para undefined ao recuperar
@@ -629,7 +643,7 @@ export async function processNodeMemory(
           // Buscar valor existente e adicionar à lista
           const existingMemory = await buscarMemoria(
             userId,
-            resolvedMemoryName,
+            String(resolvedMemoryName),
           );
           if (existingMemory.found && existingMemory.value) {
             // Se já existe, adicionar o novo valor à lista
@@ -646,7 +660,7 @@ export async function processNodeMemory(
         // Salvar na memória
         const saveResult = await salvarMemoria(
           userId,
-          resolvedMemoryName,
+          String(resolvedMemoryName),
           finalValue,
           ttl,
         );
@@ -669,13 +683,23 @@ export async function processNodeMemory(
 
       case 'fetch': {
         // Buscar memória
-        const searchResult = await buscarMemoria(userId, resolvedMemoryName);
+        const searchResult = await buscarMemoria(
+          userId,
+          String(resolvedMemoryName),
+        );
 
         let parsedValue = searchResult.value;
 
         // Se não encontrou, usar valor padrão
         if (!searchResult.found && defaultValue) {
-          parsedValue = replaceVariables(defaultValue, variableContext);
+          const defaultValueResult = replaceVariables(
+            defaultValue,
+            variableContext,
+          );
+          parsedValue =
+            defaultValueResult === undefined || defaultValueResult === null
+              ? defaultValue
+              : defaultValueResult;
         }
 
         // Parser inteligente para valores de memória
@@ -778,11 +802,14 @@ export async function processNodeMemory(
 
       case 'delete': {
         // Deletar memória
-        const deleteResult = await deletarMemoria(userId, resolvedMemoryName);
+        const deleteResult = await deletarMemoria(
+          userId,
+          String(resolvedMemoryName),
+        );
 
         return {
           action: 'delete',
-          name: resolvedMemoryName,
+          name: String(resolvedMemoryName),
           success: deleteResult.success,
           found: deleteResult.found,
         };
@@ -874,7 +901,12 @@ export async function processMemoryNode(
     }
 
     // Resolver variáveis no nome da memória
-    const resolvedMemoryName = replaceVariables(memoryName, context);
+    const resolvedMemoryNameResult = replaceVariables(memoryName, context);
+    const resolvedMemoryName =
+      resolvedMemoryNameResult === undefined ||
+      resolvedMemoryNameResult === null
+        ? memoryName
+        : String(resolvedMemoryNameResult);
 
     console.log(`🧠 Memory action: ${action} - name: ${resolvedMemoryName}`);
 
@@ -887,8 +919,18 @@ export async function processMemoryNode(
 
         // Processar cada item e substituir variáveis
         const resolvedItems = items.map((item) => {
-          const resolvedKey = replaceVariables(item.key, context);
-          const resolvedValue = replaceVariables(item.value, context);
+          const resolvedKeyResult = replaceVariables(item.key, context);
+          const resolvedValueResult = replaceVariables(item.value, context);
+
+          // Converter para string de forma segura
+          const resolvedKey =
+            resolvedKeyResult === undefined || resolvedKeyResult === null
+              ? item.key
+              : String(resolvedKeyResult);
+          const resolvedValue =
+            resolvedValueResult === undefined || resolvedValueResult === null
+              ? item.value
+              : resolvedValueResult;
 
           console.log('✅ [MEMORY-NODE] Resolved item:', {
             resolvedKey,
@@ -932,7 +974,7 @@ export async function processMemoryNode(
           // Modo APPEND: Adicionar à lista existente
           const existingMemory = await buscarMemoria(
             userId,
-            resolvedMemoryName,
+            String(resolvedMemoryName),
           );
           let existingItems: Array<{ key: string; value: string }> = [];
 
@@ -971,7 +1013,7 @@ export async function processMemoryNode(
         // Salvar memória
         const saveResult = await salvarMemoria(
           userId,
-          resolvedMemoryName,
+          String(resolvedMemoryName),
           finalValue,
           ttl,
         );
@@ -991,7 +1033,7 @@ export async function processMemoryNode(
         // Buscar memória
         const searchResult = await buscarMemoria(
           userId,
-          resolvedMemoryName,
+          String(resolvedMemoryName),
           defaultValue,
         );
 
@@ -1095,7 +1137,10 @@ export async function processMemoryNode(
 
       case 'delete': {
         // Deletar memória
-        const deleteResult = await deletarMemoria(userId, resolvedMemoryName);
+        const deleteResult = await deletarMemoria(
+          userId,
+          String(resolvedMemoryName),
+        );
 
         console.log(
           `🗑️ Memory deleted: ${resolvedMemoryName}, found: ${deleteResult.found}`,
@@ -1104,7 +1149,7 @@ export async function processMemoryNode(
         return {
           type: 'memory',
           action: 'delete',
-          name: resolvedMemoryName,
+          name: String(resolvedMemoryName),
           success: deleteResult.success,
           found: deleteResult.found,
         };

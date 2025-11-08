@@ -536,7 +536,22 @@ async function processAgentNode(
   }
 
   // Importar replaceVariables
-  const { replaceVariables } = await import('../helpers/variable-replacer');
+  const { replaceVariables: replaceVariablesOriginal } = await import(
+    '../helpers/variable-replacer'
+  );
+
+  // Wrapper para garantir que replaceVariables sempre retorna string
+  const replaceVariables = (
+    text: string,
+    context: Record<string, unknown>,
+  ): string => {
+    const result = replaceVariablesOriginal(text, context);
+    // Se retornar undefined, retornar string vazia; caso contrário, converter para string
+    if (result === undefined || result === null) {
+      return '';
+    }
+    return String(result);
+  };
 
   return await processAgentNodeHelper({
     config: agentConfig,

@@ -181,11 +181,17 @@ export async function processConditionNode(
           variableContext,
         );
 
-        const result = evaluateCondition(
-          resolvedVariable,
-          rule.operator,
-          resolvedValue,
-        );
+        // Converter para string de forma segura
+        const variableStr =
+          resolvedVariable === undefined || resolvedVariable === null
+            ? undefined
+            : String(resolvedVariable);
+        const valueStr =
+          resolvedValue === undefined || resolvedValue === null
+            ? ''
+            : String(resolvedValue);
+
+        const result = evaluateCondition(variableStr, rule.operator, valueStr);
         evaluationResults.push(result);
 
         console.log(
@@ -270,17 +276,27 @@ export async function processConditionNode(
               variableContext,
             );
 
+            // Converter para string de forma segura
+            const variableStr =
+              resolvedVariable === undefined || resolvedVariable === null
+                ? undefined
+                : String(resolvedVariable);
+            const valueStr =
+              resolvedValue === undefined || resolvedValue === null
+                ? ''
+                : String(resolvedValue);
+
             const result = evaluateCondition(
-              resolvedVariable,
+              variableStr,
               rule.operator,
-              resolvedValue,
+              valueStr,
             );
 
             ruleResults.push(result);
             ruleDetails.push({
-              variable: resolvedVariable,
+              variable: variableStr || '',
               operator: rule.operator,
-              value: resolvedValue,
+              value: valueStr,
               result,
             });
 
@@ -324,10 +340,20 @@ export async function processConditionNode(
             variableContext,
           );
 
+          // Converter para string de forma segura
+          const variableStr =
+            resolvedVariable === undefined || resolvedVariable === null
+              ? undefined
+              : String(resolvedVariable);
+          const valueStr =
+            resolvedValue === undefined || resolvedValue === null
+              ? ''
+              : String(resolvedValue);
+
           const result = evaluateCondition(
-            resolvedVariable,
+            variableStr,
             caseItem.operator || 'equals',
-            resolvedValue,
+            valueStr,
           );
 
           evaluationResults.push({
@@ -335,9 +361,9 @@ export async function processConditionNode(
             label: caseItem.label,
             rules: [
               {
-                variable: resolvedVariable,
+                variable: variableStr || '',
                 operator: caseItem.operator || 'equals',
-                value: resolvedValue,
+                value: valueStr,
                 result,
               },
             ],

@@ -78,10 +78,24 @@ export async function processAgentNode(params: ProcessAgentNodeParams) {
   // Se não tiver user prompt configurado, usar mensagem do webhook
   if (!userPrompt) {
     // Tentar pegar do input
+    // Type assertion para acessar propriedades aninhadas de forma segura
+    const nodeInput = (
+      variableContext.$node as {
+        input?:
+          | {
+              message?: { text?: unknown };
+              data?: { message?: { text?: unknown } };
+              body?: { message?: { text?: unknown } };
+            }
+          | undefined;
+      }
+    )?.input;
     const inputMessage =
-      variableContext.$node?.input?.message?.text ||
-      variableContext.$node?.input?.data?.message?.text ||
-      variableContext.$node?.input?.body?.message?.text ||
+      (nodeInput?.message as { text?: unknown } | undefined)?.text ||
+      (nodeInput?.data as { message?: { text?: unknown } } | undefined)?.message
+        ?.text ||
+      (nodeInput?.body as { message?: { text?: unknown } } | undefined)?.message
+        ?.text ||
       'Continue a conversa';
 
     userPrompt = String(inputMessage);

@@ -44,8 +44,8 @@ export async function recalculateAllStorageUsage(): Promise<{
       await Promise.all(
         batch.map(async (user) => {
           try {
-            // Forçar recálculo completo
-            await getStorageUsage(user.id, true);
+            // Recalcular storage usage
+            await getStorageUsage(user.id);
             processed++;
             details.push({ userId: user.id, success: true });
           } catch (error: unknown) {
@@ -90,7 +90,7 @@ export async function recalculateAllStorageUsage(): Promise<{
  */
 export async function recalculateUserStorage(userId: number): Promise<boolean> {
   try {
-    await getStorageUsage(userId, true);
+    await getStorageUsage(userId);
     return true;
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);

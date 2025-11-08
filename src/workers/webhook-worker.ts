@@ -12,6 +12,7 @@ import {
 } from '../services/queue';
 import { prisma } from '../services/prisma';
 import { executeFlow } from './helpers/flow-executor';
+import { Prisma } from '../../generated/prisma';
 
 // Processar job de webhook com concurrency configurável
 webhookQueue.process('process-webhook', WEBHOOK_CONCURRENCY, async (job) => {
@@ -42,8 +43,8 @@ webhookQueue.process('process-webhook', WEBHOOK_CONCURRENCY, async (job) => {
           headers: data.headers,
           queryParams: data.queryParams,
           timestamp: data.timestamp,
-        },
-        data: data.body,
+        } as Prisma.InputJsonValue,
+        data: data.body as Prisma.InputJsonValue,
         nodeExecutions: {
           [data.nodeId]: {
             status: 'completed',
@@ -52,7 +53,7 @@ webhookQueue.process('process-webhook', WEBHOOK_CONCURRENCY, async (job) => {
             data: data.body,
             result: data.body, // Salvar o body como resultado para o próximo node
           },
-        },
+        } as Prisma.InputJsonValue,
       },
     });
 

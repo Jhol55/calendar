@@ -175,25 +175,26 @@ function parseArrayInput(input: unknown): unknown[] {
 
   // Se for um objeto, tentar extrair valores ou chaves
   if (typeof input === 'object' && input !== null) {
+    const inputObj = input as Record<string, unknown>;
     // Se tem propriedade 'value' que é array
-    if (input.value && Array.isArray(input.value)) {
-      return input.value;
+    if (inputObj.value && Array.isArray(inputObj.value)) {
+      return inputObj.value;
     }
     // Se tem propriedade 'output' que é array
-    if (input.output && Array.isArray(input.output)) {
-      return input.output;
+    if (inputObj.output && Array.isArray(inputObj.output)) {
+      return inputObj.output;
     }
     // Se tem propriedade 'data' que é array
-    if (input.data && Array.isArray(input.data)) {
-      return input.data;
+    if (inputObj.data && Array.isArray(inputObj.data)) {
+      return inputObj.data;
     }
     // Se tem propriedade 'items' que é array
-    if (input.items && Array.isArray(input.items)) {
-      return input.items;
+    if (inputObj.items && Array.isArray(inputObj.items)) {
+      return inputObj.items;
     }
     // Se tem propriedade 'results' que é array
-    if (input.results && Array.isArray(input.results)) {
-      return input.results;
+    if (inputObj.results && Array.isArray(inputObj.results)) {
+      return inputObj.results;
     }
     // Se for um objeto com valores numéricos, converter para array
     const values = Object.values(input);
@@ -262,7 +263,7 @@ export function joinArray(input: unknown, separator: string = ','): string {
 
 export function uniqueArray(input: unknown): unknown[] {
   const array = parseArrayInput(input);
-  return [...new Set(array)];
+  return Array.from(new Set(array));
 }
 
 export function arrayLength(input: unknown): number {
@@ -274,19 +275,20 @@ export function sumArray(input: unknown): number {
   const array = parseArrayInput(input);
   console.log(`🔢 sumArray input:`, array);
 
-  const result = array.reduce((sum, val, index) => {
+  const result = array.reduce<number>((sum, val, index) => {
     console.log(`  🔢 Processing item ${index}:`, val, `(type: ${typeof val})`);
 
     // Se for objeto, tentar extrair valor numérico
     if (typeof val === 'object' && val !== null) {
+      const valObj = val as Record<string, unknown>;
       // Tentar propriedades comuns que podem conter números
       const numericValue =
-        val.value ||
-        val.amount ||
-        val.price ||
-        val.quantity ||
-        val.count ||
-        val.number;
+        valObj.value ||
+        valObj.amount ||
+        valObj.price ||
+        valObj.quantity ||
+        valObj.count ||
+        valObj.number;
       console.log(`    🔢 Found numeric value: ${numericValue}`);
       if (numericValue !== undefined) {
         const numVal = Number(numericValue);
@@ -294,7 +296,7 @@ export function sumArray(input: unknown): number {
         return sum + numVal;
       }
       // Se não encontrar propriedade numérica, tentar somar todos os valores numéricos do objeto
-      const objectValues = Object.values(val);
+      const objectValues = Object.values(valObj);
       const numericValues = objectValues.filter(
         (v) =>
           typeof v === 'number' || (typeof v === 'string' && !isNaN(Number(v))),
@@ -362,7 +364,7 @@ export function deleteKeys(input: unknown, keysToDelete: string): unknown[] {
     }
 
     // Criar cópia do objeto
-    const newItem = { ...item };
+    const newItem = { ...(item as Record<string, unknown>) };
 
     // Deletar as chaves especificadas
     keys.forEach((key) => {
@@ -417,11 +419,12 @@ export function renameKeys(input: unknown, keyMappings: string): unknown[] {
 
     // Criar novo objeto com chaves renomeadas
     const newItem: Record<string, unknown> = {};
+    const itemObj = item as Record<string, unknown>;
 
-    Object.keys(item).forEach((key) => {
+    Object.keys(itemObj).forEach((key) => {
       // Se a chave tem um mapeamento, usar o novo nome
       const newKey = mappings[key] || key;
-      newItem[newKey] = item[key];
+      newItem[newKey] = itemObj[key];
     });
 
     return newItem;
@@ -475,10 +478,18 @@ export function extractArrayField(
     if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
       // Suportar dot notation (ex: "user.name")
       const fields = trimmedField.split('.');
-      let result = item;
+      let result: unknown = item;
 
       for (const field of fields) {
-        result = result?.[field];
+        if (
+          typeof result === 'object' &&
+          result !== null &&
+          !Array.isArray(result)
+        ) {
+          result = (result as Record<string, unknown>)[field];
+        } else {
+          result = undefined;
+        }
         if (result === undefined) {
           return null;
         }
@@ -533,10 +544,18 @@ export function mapObjectArray(
 
         // Suportar dot notation
         const fields = trimmedKey.split('.');
-        let result = sourceObj;
+        let result: unknown = sourceObj;
 
         for (const field of fields) {
-          result = result?.[field];
+          if (
+            typeof result === 'object' &&
+            result !== null &&
+            !Array.isArray(result)
+          ) {
+            result = (result as Record<string, unknown>)[field];
+          } else {
+            result = undefined;
+          }
           if (result === undefined || result === null) {
             return '';
           }
@@ -582,11 +601,11 @@ export function mapObjectArray(
   // Aplicar template a cada item do array
   return array.map((item) => {
     // Se não for objeto, retornar vazio
-    if (typeof item !== 'object' || item === null) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
       return {};
     }
 
-    return processTemplate(templateObj, item);
+    return processTemplate(templateObj, item as Record<string, unknown>);
   });
 }
 
@@ -639,10 +658,18 @@ export function flatMapArray(input: unknown, template: string): unknown[] {
 
       // Suportar dot notation
       const fields = trimmedKey.split('.');
-      let result = obj;
+      let result: unknown = obj;
 
       for (const field of fields) {
-        result = result?.[field];
+        if (
+          typeof result === 'object' &&
+          result !== null &&
+          !Array.isArray(result)
+        ) {
+          result = (result as Record<string, unknown>)[field];
+        } else {
+          result = undefined;
+        }
         if (result === undefined || result === null) {
           return '';
         }
@@ -662,13 +689,16 @@ export function flatMapArray(input: unknown, template: string): unknown[] {
 
   array.forEach((item) => {
     // Se não for objeto, pular
-    if (typeof item !== 'object' || item === null) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
       return;
     }
 
     // Aplicar template a cada item
     templateArray.forEach((templateItem) => {
-      const processed = replaceVars(templateItem, item);
+      const processed = replaceVars(
+        templateItem,
+        item as Record<string, unknown>,
+      );
       result.push(processed);
     });
   });
@@ -679,16 +709,24 @@ export function flatMapArray(input: unknown, template: string): unknown[] {
 // ==================== OBJECT OPERATIONS ====================
 
 export function extractField(input: unknown, field: string): unknown {
-  if (typeof input !== 'object' || input === null) {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
     throw new Error('Input deve ser um objeto');
   }
 
   // Suporta nested fields com dot notation (ex: "user.name")
   const fields = field.split('.');
-  let result = input;
+  let result: unknown = input;
 
   for (const f of fields) {
-    result = result?.[f];
+    if (
+      typeof result === 'object' &&
+      result !== null &&
+      !Array.isArray(result)
+    ) {
+      result = (result as Record<string, unknown>)[f];
+    } else {
+      result = undefined;
+    }
     if (result === undefined) {
       return null;
     }

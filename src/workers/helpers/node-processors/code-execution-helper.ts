@@ -7,7 +7,7 @@ import { CodeExecutionConfig } from '@/components/layout/chatbot-flow/types';
 function replaceVariablesInJSON(
   jsonTemplate: string,
   context: Record<string, unknown>,
-): unknown {
+): Record<string, unknown> {
   // Substituir variáveis usando uma regex que detecta o contexto
   const replaced = jsonTemplate.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
     try {
@@ -16,8 +16,15 @@ function replaceVariablesInJSON(
 
       let value: unknown = context;
       for (const part of parts) {
-        if (value && typeof value === 'object' && part in value) {
-          value = value[part];
+        // Type guard para verificar se value é um objeto indexável
+        if (
+          value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          part in value
+        ) {
+          // Type assertion: sabemos que value é um objeto indexável
+          value = (value as Record<string, unknown>)[part];
         } else {
           return match; // Variável não encontrada
         }
@@ -36,7 +43,15 @@ function replaceVariablesInJSON(
   });
 
   // Agora parsear o JSON resultante
-  return JSON.parse(replaced);
+  const parsed = JSON.parse(replaced);
+
+  // Garantir que o resultado é um objeto
+  if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>;
+  }
+
+  // Se não for um objeto, retornar objeto vazio ou lançar erro
+  throw new Error('JSON template deve resultar em um objeto');
 }
 
 // Mapeamento de linguagens para IDs do Judge0
@@ -118,9 +133,10 @@ export async function processCodeExecutionNode(
 
       try {
         // Usar replaceVariablesInJSON para garantir JSON válido
+        // A função já retorna Record<string, unknown>, então não precisa de type assertion
         inputVars = replaceVariablesInJSON(
           config.inputVariables,
-          variableContext,
+          variableContext as Record<string, unknown>,
         );
 
         console.log(

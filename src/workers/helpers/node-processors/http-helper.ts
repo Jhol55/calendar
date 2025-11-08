@@ -80,7 +80,11 @@ export async function processHttpRequestNode(
     });
 
     // Substituir variáveis na URL
-    const resolvedUrl = replaceVariables(url, variableContext);
+    const resolvedUrlResult = replaceVariables(url, variableContext);
+    const resolvedUrl =
+      resolvedUrlResult === undefined || resolvedUrlResult === null
+        ? url
+        : String(resolvedUrlResult);
     console.log(`📝 Original URL: ${url}`);
     console.log(`📝 Resolved URL: ${resolvedUrl}`);
 
@@ -89,8 +93,22 @@ export async function processHttpRequestNode(
     if (headers && headers.length > 0) {
       headers.forEach((header) => {
         if (header.key && header.value) {
-          const resolvedKey = replaceVariables(header.key, variableContext);
-          const resolvedValue = replaceVariables(header.value, variableContext);
+          const resolvedKeyResult = replaceVariables(
+            header.key,
+            variableContext,
+          );
+          const resolvedValueResult = replaceVariables(
+            header.value,
+            variableContext,
+          );
+          const resolvedKey =
+            resolvedKeyResult === undefined || resolvedKeyResult === null
+              ? header.key
+              : String(resolvedKeyResult);
+          const resolvedValue =
+            resolvedValueResult === undefined || resolvedValueResult === null
+              ? header.value
+              : String(resolvedValueResult);
           requestHeaders[resolvedKey] = resolvedValue;
         }
       });
