@@ -703,11 +703,7 @@ export class SqlEngine {
 
       // HAVING clause
       if (ast.having) {
-        records = this.aggregationProcessor.applyHaving(
-          records,
-          ast.having,
-          userId,
-        );
+        records = this.aggregationProcessor.applyHaving(records, ast.having);
       }
     }
 
