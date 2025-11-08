@@ -116,7 +116,7 @@ export class AggregationProcessor {
   private executeAggregateFunction(
     records: Record<string, unknown>[],
     agg: AggregateFunction,
-  ): number | string | unknown[] | null {
+  ): number | string | unknown[] | Record<string, unknown> | null {
     switch (agg.function) {
       case 'COUNT':
         return this.count(records, agg.field, agg.distinct);
