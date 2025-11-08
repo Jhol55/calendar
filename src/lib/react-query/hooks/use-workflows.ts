@@ -367,11 +367,29 @@ export function useUpdateWorkflow(
  * Hook para deletar workflow
  */
 export function useDeleteWorkflow(
-  options?: CustomMutationOptions<void, ApiError, string>,
+  options?: CustomMutationOptions<
+    void,
+    ApiError,
+    string,
+    {
+      previousWorkflow: ChatbotFlow | undefined;
+      previousWorkflows: ChatbotFlow[] | undefined;
+      id: string;
+    }
+  >,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<
+    void,
+    ApiError,
+    string,
+    {
+      previousWorkflow: ChatbotFlow | undefined;
+      previousWorkflows: ChatbotFlow[] | undefined;
+      id: string;
+    }
+  >({
     mutationFn: async (id: string): Promise<void> => {
       const response = await deleteFlow(id);
 
@@ -387,7 +405,13 @@ export function useDeleteWorkflow(
       return;
     },
 
-    onMutate: async (id) => {
+    onMutate: async (
+      id: string,
+    ): Promise<{
+      previousWorkflow: ChatbotFlow | undefined;
+      previousWorkflows: ChatbotFlow[] | undefined;
+      id: string;
+    }> => {
       // Cancelar queries relacionadas
       await queryClient.cancelQueries({ queryKey: workflowKeys.detail(id) });
       await queryClient.cancelQueries({ queryKey: workflowKeys.lists() });
