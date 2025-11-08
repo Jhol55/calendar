@@ -372,14 +372,19 @@ export function useDeleteWorkflow(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      return safeQueryFn(async () => {
-        const response = await deleteFlow(id);
+    mutationFn: async (id: string): Promise<void> => {
+      const response = await deleteFlow(id);
 
-        // DELETE não retorna flow, apenas success/message
-        // Manter response como está
-        return response;
-      });
+      // Se não foi bem-sucedido, lançar erro
+      if (!response.success) {
+        throw {
+          message: response.error || 'Failed to delete workflow',
+          status: response.code,
+        } as ApiError;
+      }
+
+      // DELETE não retorna dados, apenas sucesso
+      return;
     },
 
     onMutate: async (id) => {
