@@ -244,12 +244,26 @@ export function useUpdateWorkflow(
   options?: CustomMutationOptions<
     ChatbotFlow,
     ApiError,
-    { id: string; data: Partial<ChatbotFlow> }
+    { id: string; data: Partial<ChatbotFlow> },
+    {
+      previousWorkflow: ChatbotFlow | undefined;
+      previousWorkflows: ChatbotFlow[] | undefined;
+      id: string;
+    }
   >,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<
+    ChatbotFlow,
+    ApiError,
+    { id: string; data: Partial<ChatbotFlow> },
+    {
+      previousWorkflow: ChatbotFlow | undefined;
+      previousWorkflows: ChatbotFlow[] | undefined;
+      id: string;
+    }
+  >({
     mutationFn: async ({ id, data }) => {
       return safeQueryFn<ChatbotFlow>(async () => {
         // Converter dados para UpdateFlowData, convertendo null para undefined onde necessário
@@ -282,7 +296,17 @@ export function useUpdateWorkflow(
       });
     },
 
-    onMutate: async ({ id, data }) => {
+    onMutate: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Partial<ChatbotFlow>;
+    }): Promise<{
+      previousWorkflow: ChatbotFlow | undefined;
+      previousWorkflows: ChatbotFlow[] | undefined;
+      id: string;
+    }> => {
       // Cancelar queries relacionadas
       await queryClient.cancelQueries({ queryKey: workflowKeys.detail(id) });
       await queryClient.cancelQueries({ queryKey: workflowKeys.lists() });
