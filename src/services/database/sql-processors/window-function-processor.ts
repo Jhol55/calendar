@@ -114,6 +114,30 @@ export class WindowFunctionProcessor {
   }
 
   /**
+   * Compara dois valores de forma segura
+   */
+  private compareUnknownValues(a: unknown, b: unknown): number {
+    // Se são iguais, retorna 0
+    if (a === b) return 0;
+
+    // Se um é null/undefined, trata como menor
+    if (a == null) return -1;
+    if (b == null) return 1;
+
+    // Tentar conversão numérica se ambos forem números ou strings numéricas
+    const aNum = Number(a);
+    const bNum = Number(b);
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+      return aNum < bNum ? -1 : 1;
+    }
+
+    // Comparação de strings
+    const aStr = String(a);
+    const bStr = String(b);
+    return aStr < bStr ? -1 : 1;
+  }
+
+  /**
    * Compara dois registros para ordenação
    */
   private compareByOrderBy(
@@ -125,9 +149,9 @@ export class WindowFunctionProcessor {
       const aVal = a[field];
       const bVal = b[field];
 
-      if (aVal === bVal) continue;
+      const comparison = this.compareUnknownValues(aVal, bVal);
+      if (comparison === 0) continue;
 
-      const comparison = aVal < bVal ? -1 : 1;
       return order === 'ASC' ? comparison : -comparison;
     }
     return 0;
@@ -528,9 +552,9 @@ export class WindowFunctionProcessor {
       const aVal = a[i];
       const bVal = b[i];
 
-      if (aVal === bVal) continue;
+      const comparison = this.compareUnknownValues(aVal, bVal);
+      if (comparison === 0) continue;
 
-      const comparison = aVal < bVal ? -1 : 1;
       return orderBy[i].order === 'ASC' ? comparison : -comparison;
     }
     return 0;
