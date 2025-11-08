@@ -228,7 +228,7 @@ export class AggregationProcessor {
     if (values.length === 0) return null;
 
     return Math.min(
-      ...values.map((v) => (typeof v === 'number' ? v : parseFloat(v))),
+      ...values.map((v) => (typeof v === 'number' ? v : parseFloat(String(v)))),
     );
   }
 
@@ -246,7 +246,7 @@ export class AggregationProcessor {
     if (values.length === 0) return null;
 
     return Math.max(
-      ...values.map((v) => (typeof v === 'number' ? v : parseFloat(v))),
+      ...values.map((v) => (typeof v === 'number' ? v : parseFloat(String(v)))),
     );
   }
 
