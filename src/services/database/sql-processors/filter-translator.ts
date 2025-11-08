@@ -301,11 +301,19 @@ export class FilterTranslator {
       let field: string | undefined;
 
       // Extrair nome do campo da agregação
-      if (node.args?.expr?.column) {
-        field = node.args.expr.column;
-      } else if (node.args?.value?.[0]?.column) {
-        field = node.args.value[0].column;
-      } else if (node.args?.expr?.type === 'star') {
+      // Type assertion: node.args pode ter expr ou value
+      const args = node.args as
+        | {
+            expr?: { column?: string; type?: string };
+            value?: Array<{ column?: string }>;
+          }
+        | undefined;
+
+      if (args?.expr?.column) {
+        field = args.expr.column;
+      } else if (args?.value?.[0]?.column) {
+        field = args.value[0].column;
+      } else if (args?.expr?.type === 'star') {
         field = undefined; // COUNT(*)
       }
 
