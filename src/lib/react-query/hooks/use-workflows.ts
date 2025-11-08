@@ -127,12 +127,18 @@ export function useCreateWorkflow(
   options?: CustomMutationOptions<
     ChatbotFlow,
     ApiError,
-    Omit<ChatbotFlow, 'id' | 'createdAt' | 'updatedAt'>
+    Omit<ChatbotFlow, 'id' | 'createdAt' | 'updatedAt'>,
+    { previousWorkflows: ChatbotFlow[] | undefined; tempWorkflow: ChatbotFlow }
   >,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<
+    ChatbotFlow,
+    ApiError,
+    Omit<ChatbotFlow, 'id' | 'createdAt' | 'updatedAt'>,
+    { previousWorkflows: ChatbotFlow[] | undefined; tempWorkflow: ChatbotFlow }
+  >({
     mutationFn: async (data) => {
       return safeQueryFn<ChatbotFlow>(async () => {
         // Converter dados para CreateFlowData, convertendo null para undefined onde necessário
@@ -164,7 +170,12 @@ export function useCreateWorkflow(
       });
     },
 
-    onMutate: async (newWorkflow) => {
+    onMutate: async (
+      newWorkflow: Omit<ChatbotFlow, 'id' | 'createdAt' | 'updatedAt'>,
+    ): Promise<{
+      previousWorkflows: ChatbotFlow[] | undefined;
+      tempWorkflow: ChatbotFlow;
+    }> => {
       // Cancelar queries em andamento
       await queryClient.cancelQueries({ queryKey: workflowKeys.lists() });
 
