@@ -17,6 +17,42 @@ import {
   deleteFlow,
   ChatbotFlow,
 } from '@/actions/chatbot-flows/flows';
+import { Node, Edge } from 'reactflow';
+import { NodeData } from '@/components/layout/chatbot-flow';
+
+/**
+ * Converter dados do Prisma para ChatbotFlow
+ * Prisma retorna nodes/edges como JsonValue, mas precisamos convertê-los
+ */
+function convertFlowFromPrisma(flow: {
+  id: string;
+  name: string;
+  description?: string | null;
+  nodes: unknown;
+  edges: unknown;
+  token?: string | null;
+  userId?: number | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  isTemporary?: boolean;
+  instance?: {
+    id: string;
+    name: string;
+    profileName: string;
+  } | null;
+  user?: {
+    id: number;
+    name: string | null;
+    email: string;
+  } | null;
+}): ChatbotFlow {
+  return {
+    ...flow,
+    nodes: (Array.isArray(flow.nodes) ? flow.nodes : []) as Node<NodeData>[],
+    edges: (Array.isArray(flow.edges) ? flow.edges : []) as Edge[],
+  };
+}
 
 /**
  * Hook para listar todos os workflows do usuário autenticado
@@ -26,19 +62,23 @@ export function useWorkflows(options?: CustomQueryOptions<ChatbotFlow[]>) {
   return useQuery({
     queryKey: workflowKeys.lists(),
     queryFn: () =>
-      safeQueryFn(async () => {
+      safeQueryFn<ChatbotFlow[]>(async () => {
         const response = await listFlows();
 
         // A API retorna { success, flows } mas safeQueryFn espera { success, data }
-        // Transformar para o formato esperado
+        // Transformar para o formato esperado e converter tipos do Prisma
         if (response.success && response.flows) {
+          const convertedFlows = response.flows.map(convertFlowFromPrisma);
           return {
             success: true,
-            data: response.flows,
+            data: convertedFlows,
           };
         }
 
-        return response;
+        return {
+          success: false,
+          error: response.error || 'Failed to fetch workflows',
+        };
       }),
     ...CACHE_TIMES.DYNAMIC,
     ...options,
@@ -55,20 +95,23 @@ export function useWorkflow(
   return useQuery({
     queryKey: workflowKeys.detail(flowId || ''),
     queryFn: () =>
-      safeQueryFn(async () => {
+      safeQueryFn<ChatbotFlow>(async () => {
         if (!flowId) throw new Error('Flow ID is required');
         const response = await getFlow(flowId);
 
         // A API retorna { success, flow } mas safeQueryFn espera { success, data }
-        // Transformar para o formato esperado
+        // Transformar para o formato esperado e converter tipos do Prisma
         if (response.success && response.flow) {
           return {
             success: true,
-            data: response.flow,
+            data: convertFlowFromPrisma(response.flow),
           };
         }
 
-        return response;
+        return {
+          success: false,
+          error: response.error || 'Failed to fetch workflow',
+        };
       }),
     enabled: !!flowId,
     ...CACHE_TIMES.DYNAMIC,
@@ -90,18 +133,22 @@ export function useCreateWorkflow(
 
   return useMutation({
     mutationFn: async (data) => {
-      return safeQueryFn(async () => {
+      return safeQueryFn<ChatbotFlow>(async () => {
         const response = await createFlow(data);
 
         // A API retorna { success, flow } mas safeQueryFn espera { success, data }
+        // Converter tipos do Prisma
         if (response.success && response.flow) {
           return {
             success: true,
-            data: response.flow,
+            data: convertFlowFromPrisma(response.flow),
           };
         }
 
-        return response;
+        return {
+          success: false,
+          error: response.error || 'Failed to create workflow',
+        };
       });
     },
 
@@ -180,18 +227,22 @@ export function useUpdateWorkflow(
 
   return useMutation({
     mutationFn: async ({ id, data }) => {
-      return safeQueryFn(async () => {
+      return safeQueryFn<ChatbotFlow>(async () => {
         const response = await updateFlow(id, data);
 
         // A API retorna { success, flow } mas safeQueryFn espera { success, data }
+        // Converter tipos do Prisma
         if (response.success && response.flow) {
           return {
             success: true,
-            data: response.flow,
+            data: convertFlowFromPrisma(response.flow),
           };
         }
 
-        return response;
+        return {
+          success: false,
+          error: response.error || 'Failed to update workflow',
+        };
       });
     },
 
@@ -333,9 +384,18 @@ export function usePrefetchWorkflow() {
     return queryClient.prefetchQuery({
       queryKey: workflowKeys.detail(flowId),
       queryFn: () =>
-        safeQueryFn(async () => {
+        safeQueryFn<ChatbotFlow>(async () => {
           const response = await getFlow(flowId);
-          return response;
+          if (response.success && response.flow) {
+            return {
+              success: true,
+              data: convertFlowFromPrisma(response.flow),
+            };
+          }
+          return {
+            success: false,
+            error: response.error || 'Failed to fetch workflow',
+          };
         }),
       staleTime: CACHE_TIMES.DYNAMIC.staleTime,
     });
