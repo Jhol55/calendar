@@ -33,8 +33,8 @@ export class FilterTranslator {
       node.type === 'binary_expr' &&
       (node.operator === 'AND' || node.operator === 'OR')
     ) {
-      const leftFilter = this.processCondition(node.left);
-      const rightFilter = this.processCondition(node.right);
+      const leftFilter = this.processCondition(node.left as ASTNode);
+      const rightFilter = this.processCondition(node.right as ASTNode);
 
       // Flatten se mesmo operador
       if (
@@ -105,8 +105,8 @@ export class FilterTranslator {
    * Traduz comparação simples (=, !=, >, <, >=, <=)
    */
   private translateComparison(node: ASTNode): FilterRule {
-    const field = this.extractFieldName(node.left);
-    const value = this.extractValue(node.right);
+    const field = this.extractFieldName(node.left as ASTNode);
+    const value = this.extractValue(node.right as ASTNode);
     const operator = this.translateOperator(node.operator);
 
     return {
