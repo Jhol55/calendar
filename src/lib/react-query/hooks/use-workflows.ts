@@ -16,6 +16,7 @@ import {
   updateFlow,
   deleteFlow,
   ChatbotFlow,
+  CreateFlowData,
 } from '@/actions/chatbot-flows/flows';
 import { Node, Edge } from 'reactflow';
 import { NodeData } from '@/components/layout/chatbot-flow';
@@ -134,7 +135,18 @@ export function useCreateWorkflow(
   return useMutation({
     mutationFn: async (data) => {
       return safeQueryFn<ChatbotFlow>(async () => {
-        const response = await createFlow(data);
+        // Converter dados para CreateFlowData, convertendo null para undefined onde necessário
+        const createData: CreateFlowData = {
+          name: data.name,
+          description: data.description ?? undefined, // CreateFlowData não aceita null, apenas undefined
+          nodes: data.nodes,
+          edges: data.edges,
+          token: data.token, // CreateFlowData aceita null para token, não precisa converter
+          userId: data.userId ?? undefined, // CreateFlowData não aceita null, apenas undefined
+          isActive: data.isActive,
+        };
+
+        const response = await createFlow(createData);
 
         // A API retorna { success, flow } mas safeQueryFn espera { success, data }
         // Converter tipos do Prisma
