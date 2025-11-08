@@ -66,7 +66,8 @@ export class WindowFunctionProcessor {
     const partitions = this.partitionRecords(records, wf.partitionBy || []);
 
     // Processar cada partição
-    for (const [, partitionRecords] of partitions.entries()) {
+    // Usar Array.from para evitar problemas com iterators
+    for (const partitionRecords of Array.from(partitions.values())) {
       // Ordenar partição se ORDER BY estiver presente
       if (wf.orderBy && wf.orderBy.length > 0) {
         partitionRecords.sort((a, b) =>
