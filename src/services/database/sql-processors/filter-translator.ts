@@ -107,7 +107,7 @@ export class FilterTranslator {
   private translateComparison(node: ASTNode): FilterRule {
     const field = this.extractFieldName(node.left as ASTNode);
     const value = this.extractValue(node.right as ASTNode);
-    const operator = this.translateOperator(node.operator);
+    const operator = this.translateOperator(String(node.operator || ''));
 
     return {
       field,
