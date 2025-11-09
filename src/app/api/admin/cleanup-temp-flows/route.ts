@@ -6,6 +6,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
 
+// Forçar rota dinâmica para evitar problemas durante o build
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET() {
   try {
     // TODO: Adicionar autenticação de admin aqui
