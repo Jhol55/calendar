@@ -25,6 +25,8 @@ import { NodeConfigLayout } from '../node-config-layout';
 import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { MemoryConfigSection } from '../memory-config-section';
 import { cn } from '@/lib/utils';
+import { TemplateManagerModal } from '@/components/features/whatsapp-templates/template-manager-modal';
+import { Settings } from 'lucide-react';
 
 interface MessageNodeConfigProps {
   isOpen: boolean;
@@ -38,11 +40,12 @@ interface MessageNodeConfigProps {
 }
 
 const messageTypes: { value: MessageType; label: string }[] = [
-  { value: 'text', label: 'Texto' },
-  { value: 'media', label: 'Mídia' },
-  { value: 'contact', label: 'Contato' },
-  { value: 'location', label: 'Localização' },
-  { value: 'interactive_menu', label: 'Menu Interativo' },
+  { value: 'text', label: '📝 Texto' },
+  { value: 'media', label: '🖼️ Mídia' },
+  { value: 'contact', label: '👤 Contato' },
+  { value: 'location', label: '📍 Localização' },
+  { value: 'interactive_menu', label: '📋 Menu Interativo' },
+  { value: 'template', label: '📄 Template' },
 ];
 
 // Modelo JSON de exemplo para cartões de carrossel
@@ -144,6 +147,8 @@ function MessageFormFields({
   setListCategories,
   carouselCards,
   setCarouselCards,
+  setShowTemplateManager,
+  setSelectedInstanceToken,
 }: {
   instances: InstanceProps[];
   config?: MessageConfig;
@@ -221,14 +226,50 @@ function MessageFormFields({
       }[]
     >
   >;
+  setShowTemplateManager: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedInstanceToken: React.Dispatch<React.SetStateAction<string>>;
 }) {
-  const { form, setValue, errors } = useForm();
+  const { form, setValue, register, errors } = useForm();
   const messageType = (form.messageType as MessageType) || 'text';
   const interactiveMenuType =
     (form.interactiveMenuType as InteractiveMenuType) || 'button';
 
   // Estado local para rastrear se o JSON foi editado manualmente
   const [jsonManuallyEdited, setJsonManuallyEdited] = useState(false);
+
+  // Estados para templates (WhatsApp Cloud API)
+  const [isCloudInstance, setIsCloudInstance] = useState(false);
+  const [templates, setTemplates] = useState<
+    Array<{
+      id: string;
+      name: string;
+      status: string;
+      category: string;
+      language: string;
+      components: Array<{
+        type: string;
+        text?: string;
+        example?: {
+          body_text?: string[][];
+          header_text?: string[];
+        };
+      }>;
+      quality_score?: string;
+      rejection_reason?: string;
+    }>
+  >([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<
+    (typeof templates)[0] | null
+  >(null);
+  const [templateVariables, setTemplateVariables] = useState<
+    Record<string, string>
+  >({});
+
+  useEffect(() => {
+    register('templateLanguage');
+    register('templateVariables');
+  }, [register]);
 
   // Gerenciar choices do menu interativo como objetos estruturados
   interface Choice {
@@ -337,10 +378,64 @@ function MessageFormFields({
     }
   }, [configMode, interactiveMenuType, jsonConfig, setValue]);
 
+  // Detectar se a instância selecionada é Cloud API e buscar templates
+  useEffect(() => {
+    const selectedToken = form.token;
+    if (!selectedToken) {
+      setIsCloudInstance(false);
+      setTemplates([]);
+      return;
+    }
+
+    const selectedInstance = instances.find(
+      (inst) => inst.token === selectedToken,
+    );
+    if (
+      selectedInstance &&
+      selectedInstance.plataform === 'cloud' &&
+      selectedInstance.whatsapp_official_enabled
+    ) {
+      setIsCloudInstance(true);
+      // Buscar templates
+      setLoadingTemplates(true);
+      fetch(`/api/whatsapp-templates?instanceToken=${selectedToken}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            setTemplates(data.data || []);
+          }
+        })
+        .catch((err) => {
+          console.error('Error fetching templates:', err);
+        })
+        .finally(() => {
+          setLoadingTemplates(false);
+        });
+    } else {
+      setIsCloudInstance(false);
+      setTemplates([]);
+    }
+  }, [form.token, instances]);
+
+  // Detectar mudanças no template selecionado
+  useEffect(() => {
+    if (form.templateName && templates.length > 0) {
+      const template = templates.find((t) => t.name === form.templateName);
+      setSelectedTemplate(template || null);
+      if (template) {
+        setValue('templateLanguage', template.language);
+      }
+    }
+  }, [form.templateName, templates, setValue]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (config) {
-        setValue('token', config.token || '');
+        // Setar token primeiro - delay maior para garantir que FormSelect está completamente montado
+        if (config.token) {
+          setValue('token', config.token, { shouldValidate: false });
+          setSelectedInstanceToken(config.token);
+        }
         setValue('phoneNumber', config.phoneNumber || '');
         setValue('messageType', config.messageType || 'text');
         setValue('text', config.text || '');
@@ -370,6 +465,26 @@ function MessageFormFields({
         setValue('forward', config.forward || false);
         setValue('trackSource', config.trackSource || '');
         setValue('trackId', config.trackId || '');
+
+        // Carregar configuração de template (WhatsApp Cloud API)
+        if (config.templateName) {
+          setValue('templateName', config.templateName);
+          setValue('templateLanguage', config.templateLanguage || '');
+          if (config.templateVariables) {
+            setValue(
+              'templateVariables',
+              typeof config.templateVariables === 'string'
+                ? config.templateVariables
+                : JSON.stringify(config.templateVariables),
+            );
+            // Restaurar variáveis para o estado local
+            setTemplateVariables(
+              typeof config.templateVariables === 'string'
+                ? JSON.parse(config.templateVariables)
+                : config.templateVariables,
+            );
+          }
+        }
 
         // Carregar configuração de menu interativo
         if (config.interactiveMenu) {
@@ -692,17 +807,18 @@ function MessageFormFields({
           }
         }
       }
-    }, 0);
+    }, 700);
     return () => clearTimeout(timer);
   }, [
     config,
-    setValue,
+    setCarouselCards,
+    setChoices,
     setConfigMode,
     setJsonConfig,
-    setMemoryItems,
-    setChoices,
     setListCategories,
-    setCarouselCards,
+    setMemoryItems,
+    setSelectedInstanceToken,
+    setValue,
   ]);
 
   // 🔧 CORREÇÃO: Sincronizar valores dos inputs com o formulário
@@ -1075,6 +1191,9 @@ function MessageFormFields({
             label: instance.name || instance.profileName || instance.id,
           }))}
           className="w-full"
+          onValueChange={(value) => {
+            setSelectedInstanceToken(value);
+          }}
         />
       </div>
 
@@ -1090,7 +1209,16 @@ function MessageFormFields({
         <FormSelect
           fieldName="messageType"
           placeholder="Selecione o tipo"
-          options={messageTypes}
+          options={messageTypes.filter((type) => {
+            if (type.value !== 'template') {
+              return true;
+            }
+            // Manter opção template se instância for Cloud ou se já estiver selecionado
+            return (
+              isCloudInstance ||
+              (form.messageType as MessageType | undefined) === 'template'
+            );
+          })}
           className="w-full"
         />
       </div>
@@ -2506,6 +2634,150 @@ function MessageFormFields({
         </div>
       )}
 
+      {/* Configuração de Template (WhatsApp Cloud API) */}
+      {messageType === 'template' && (
+        <div className="space-y-4 border-t pt-4">
+          <div className="flex justify-between items-center">
+            <Typography variant="h5" className="font-semibold">
+              📄 Configuração de Template
+            </Typography>
+            <Button
+              variant="gradient"
+              onClick={() => setShowTemplateManager(true)}
+              className="w-fit"
+            >
+              <Settings size={16} />
+              Gerenciar Templates
+            </Button>
+          </div>
+
+          {/* Select de Template */}
+          <div className="p-1">
+            <FormControl variant="label">Template *</FormControl>
+            {loadingTemplates ? (
+              <div className="text-sm text-gray-500 py-2">
+                Carregando templates...
+              </div>
+            ) : (
+              (() => {
+                // Filtrar apenas templates aprovados para o select
+                const approvedTemplates = templates.filter(
+                  (t) => t.status === 'APPROVED',
+                );
+                return approvedTemplates.length === 0 ? (
+                  <div className="text-sm text-amber-600 py-2">
+                    Nenhum template aprovado encontrado. Crie templates no Meta
+                    Business Manager.
+                  </div>
+                ) : (
+                  <FormSelect
+                    fieldName="templateName"
+                    placeholder="Selecione um template"
+                    options={approvedTemplates.map((template) => ({
+                      value: template.name,
+                      label: `${template.name} (${template.language})`,
+                    }))}
+                    className="w-full"
+                  />
+                );
+              })()
+            )}
+          </div>
+
+          {/* Mostrar variáveis do template selecionado */}
+          {selectedTemplate && selectedTemplate.components && (
+            <div className="space-y-3 border p-3 rounded bg-gray-50">
+              <Typography variant="h6" className="font-semibold text-sm">
+                Variáveis do Template
+              </Typography>
+
+              {selectedTemplate.components.map(
+                (component, compIndex: number) => {
+                  // Para BODY, extrair variáveis
+                  if (component.type === 'BODY' && component.text) {
+                    const matches = component.text.match(/\{\{(\d+)\}\}/g);
+                    if (matches && matches.length > 0) {
+                      return matches.map((match: string, index: number) => {
+                        const varNumber = match.replace(/[{}]/g, '');
+                        const key = `body_${varNumber}`;
+                        return (
+                          <div key={`${compIndex}-${index}`} className="p-1">
+                            <FormControl variant="label">
+                              Variável {varNumber}{' '}
+                              {component.example?.body_text?.[0]?.[index] && (
+                                <span className="text-xs text-gray-500">
+                                  (ex: {component.example.body_text[0][index]})
+                                </span>
+                              )}
+                            </FormControl>
+                            <Input
+                              type="text"
+                              fieldName={`template_var_${key}`}
+                              placeholder={
+                                component.example?.body_text?.[0]?.[index] ||
+                                `Valor para {{${varNumber}}}`
+                              }
+                              value={templateVariables[key] || ''}
+                              onChange={(e) => {
+                                const newVars = {
+                                  ...templateVariables,
+                                  [key]: e.target.value,
+                                };
+                                setTemplateVariables(newVars);
+                                setValue(
+                                  'templateVariables',
+                                  JSON.stringify(newVars),
+                                );
+                              }}
+                            />
+                          </div>
+                        );
+                      });
+                    }
+                  }
+                  return null;
+                },
+              )}
+
+              {/* Preview do template */}
+              {Object.keys(templateVariables).length > 0 && (
+                <div className="mt-3 p-3 bg-white border rounded">
+                  <Typography
+                    variant="span"
+                    className="text-xs text-gray-600 mb-2 block"
+                  >
+                    Preview:
+                  </Typography>
+                  <div className="text-sm whitespace-pre-wrap">
+                    {selectedTemplate.components
+                      .map((comp) => {
+                        if (comp.type === 'BODY' && comp.text) {
+                          let preview = comp.text;
+                          Object.entries(templateVariables).forEach(
+                            ([key, value]) => {
+                              if (key.startsWith('body_')) {
+                                const varNum = key.replace('body_', '');
+                                preview = preview.replace(
+                                  `{{${varNum}}}`,
+                                  value,
+                                );
+                              }
+                            },
+                          );
+                          return preview;
+                        }
+                        return null;
+                      })
+                      .filter(Boolean)
+                      .join('\n')}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Opções Avançadas para Mídia */}
       {messageType === 'media' && (
         <div className="border-t pt-4 mt-4">
@@ -2808,6 +3080,9 @@ export function MessageNodeConfig({
     'manual',
   );
   const [currentJsonConfig, setCurrentJsonConfig] = useState<string>('');
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [selectedInstanceToken, setSelectedInstanceToken] =
+    useState<string>('');
 
   // 🔧 Estados para armazenar choices, categorias e cartões (necessários para o submit)
   interface Choice {
@@ -3090,7 +3365,7 @@ export function MessageNodeConfig({
       token: data.token,
       phoneNumber: data.phoneNumber,
       messageType: data.messageType as MessageType,
-      text: data.text,
+      text: data.messageType === 'text' ? data.text : undefined,
       mediaUrl: data.mediaUrl,
       mediaType: data.mediaType as
         | 'image'
@@ -3125,6 +3400,26 @@ export function MessageNodeConfig({
       trackSource: data.trackSource || undefined,
       trackId: data.trackId || undefined,
     };
+
+    if (data.messageType === 'template') {
+      messageConfig.templateName = data.templateName || undefined;
+      messageConfig.templateLanguage = data.templateLanguage || undefined;
+      if (data.templateVariables && data.templateVariables.trim() !== '') {
+        try {
+          const parsed = JSON.parse(data.templateVariables);
+          messageConfig.templateVariables = parsed;
+        } catch (error) {
+          console.error('Erro ao parsear templateVariables:', error);
+          messageConfig.templateVariables = undefined;
+        }
+      } else {
+        messageConfig.templateVariables = undefined;
+      }
+    } else {
+      messageConfig.templateName = undefined;
+      messageConfig.templateLanguage = undefined;
+      messageConfig.templateVariables = undefined;
+    }
 
     // Se for menu interativo, adicionar configuração
     if (data.messageType === 'interactive_menu') {
@@ -3224,8 +3519,21 @@ export function MessageNodeConfig({
           setListCategories={setCurrentListCategories}
           carouselCards={currentCarouselCards}
           setCarouselCards={setCurrentCarouselCards}
+          setShowTemplateManager={setShowTemplateManager}
+          setSelectedInstanceToken={setSelectedInstanceToken}
         />
       </Form>
+
+      {/* Modal de Gerenciamento de Templates */}
+      <TemplateManagerModal
+        isOpen={showTemplateManager}
+        onClose={() => setShowTemplateManager(false)}
+        instanceToken={selectedInstanceToken}
+        onTemplateCreated={() => {
+          // Fechar o modal e a lógica de reload já está no useEffect do MessageFormFields
+          setShowTemplateManager(false);
+        }}
+      />
     </NodeConfigLayout>
   );
 }

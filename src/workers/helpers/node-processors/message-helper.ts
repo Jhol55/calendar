@@ -2,6 +2,8 @@
 import type { MessageConfig } from '@/components/layout/chatbot-flow/types';
 import type { WebhookJobData } from '@/services/queue';
 import { replaceVariables } from '../variable-replacer';
+import { prisma } from '../../../services/prisma';
+import * as WhatsAppCloudService from '../../../services/whatsapp-cloud/whatsapp-cloud.service';
 
 interface FlowNode {
   id: string;
@@ -19,8 +21,35 @@ interface MemoryConfig {
 }
 
 /**
+ * Verifica se uma instância é do tipo WhatsApp Cloud API (oficial)
+ */
+async function isWhatsAppCloudInstance(token: string): Promise<boolean> {
+  try {
+    const instance = await prisma.instances.findUnique({
+      where: { token },
+      select: {
+        plataform: true,
+        whatsapp_official_enabled: true,
+      },
+    });
+
+    return (
+      instance?.plataform === 'cloud' &&
+      instance?.whatsapp_official_enabled === true
+    );
+  } catch (error) {
+    console.error('Error checking instance type:', error);
+    return false;
+  }
+}
+
+/**
  * Processa um nó de mensagem (Message Node)
- * Envia mensagens via WhatsApp/Telegram usando UAZAPI
+ * Envia mensagens via WhatsApp usando UAZAPI ou WhatsApp Cloud API (oficial)
+ *
+ * Detecta automaticamente o tipo de instância e roteia para o serviço apropriado:
+ * - UAZAPI: para instâncias tradicionais
+ * - WhatsApp Cloud API: para instâncias oficiais (plataform: 'cloud')
  *
  * Suporta múltiplos tipos de mensagem:
  * - text: Mensagem de texto simples
@@ -28,6 +57,7 @@ interface MemoryConfig {
  * - contact: Compartilhar contato
  * - location: Compartilhar localização
  * - interactive_menu: Menus interativos (botões, listas, carousels)
+ * - template: Templates aprovados (apenas WhatsApp Cloud API)
  */
 export async function processMessageNode(
   executionId: string,
@@ -67,6 +97,10 @@ export async function processMessageNode(
     latitude,
     longitude,
     interactiveMenu,
+    // Template (WhatsApp Cloud API)
+    templateName,
+    templateLanguage,
+    templateVariables: rawTemplateVariables,
     // Opções avançadas
     linkPreview,
     linkPreviewTitle,
@@ -90,6 +124,12 @@ export async function processMessageNode(
   try {
     console.log(
       `📤 Sending ${messageType || 'text'} message to ${phoneNumber}`,
+    );
+
+    // Verificar se é instância WhatsApp Cloud API
+    const isCloudInstance = await isWhatsAppCloudInstance(token);
+    console.log(
+      `🔍 Instance type: ${isCloudInstance ? 'WhatsApp Cloud API' : 'UAZAPI'}`,
     );
 
     // Debug: Log do contexto disponível
@@ -395,6 +435,11 @@ export async function processMessageNode(
         });
         break;
 
+      case 'template':
+        // Configuração de template é tratada especificamente na lógica de WhatsApp Cloud API.
+        // Não exige texto nesta etapa. Apenas garantir que fluxo continue.
+        break;
+
       default:
         // Se não especificar tipo, assume texto
         if (!resolvedText) throw new Error('Text message content is required');
@@ -458,43 +503,512 @@ export async function processMessageNode(
 
     console.log('📦 FormData:', formData);
 
-    // Determinar endpoint baseado no tipo de mensagem
-    let endpoint = '/send/text';
-    if (messageType === 'interactive_menu') {
-      endpoint = '/send/menu';
-    } else if (messageType === 'media') {
-      endpoint = '/send/media';
-    } else if (messageType === 'contact') {
-      endpoint = '/send/contact';
-    }
+    let result: any;
 
-    console.log(`🔗 Using endpoint: ${endpoint}`);
+    // Rotear para o serviço apropriado baseado no tipo de instância
+    if (isCloudInstance) {
+      // ✅ WhatsApp Cloud API (Oficial)
+      console.log('🌐 Using WhatsApp Cloud API');
 
-    // Chamar API diretamente (sem usar Server Action)
-    const response = await fetch(`${process.env.UAZAPI_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        token: token,
-      },
-      body: JSON.stringify(formData),
-    });
+      switch (messageType) {
+        case 'text':
+          result = await WhatsAppCloudService.sendTextMessage(
+            token,
+            String(resolvedPhoneNumber),
+            String(resolvedText || ''),
+            {
+              previewUrl: linkPreview || false,
+            },
+          );
+          break;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: errorText };
+        case 'media':
+          if (!resolvedMediaUrl) throw new Error('Media URL is required');
+          if (!mediaType) throw new Error('Media type is required');
+
+          // Mapear tipos de mídia específicos para os suportados pela API oficial
+          let cloudMediaType: 'image' | 'video' | 'document' | 'audio' =
+            'document';
+          if (
+            mediaType === 'image' ||
+            mediaType === 'video' ||
+            mediaType === 'audio'
+          ) {
+            cloudMediaType = mediaType;
+          } else if (mediaType === 'document') {
+            cloudMediaType = 'document';
+          } else if (mediaType === 'myaudio' || mediaType === 'ptt') {
+            cloudMediaType = 'audio';
+          }
+
+          result = await WhatsAppCloudService.sendMediaMessage(
+            token,
+            String(resolvedPhoneNumber),
+            String(resolvedMediaUrl),
+            cloudMediaType,
+            {
+              caption: resolvedCaption ? String(resolvedCaption) : undefined,
+              filename: docName
+                ? String(replaceVariables(docName, variableContext))
+                : undefined,
+            },
+          );
+          break;
+
+        case 'location':
+          if (!latitude || !longitude) {
+            throw new Error('Latitude and longitude are required');
+          }
+          result = await WhatsAppCloudService.sendLocationMessage(
+            token,
+            String(resolvedPhoneNumber),
+            latitude,
+            longitude,
+          );
+          break;
+
+        case 'contact':
+          if (!resolvedContactName || !resolvedContactPhone) {
+            throw new Error('Contact name and phone are required');
+          }
+
+          // Formatar contato para o formato da API oficial
+          const cloudContactName = String(resolvedContactName);
+          const cloudContactPhone = String(resolvedContactPhone);
+          const cloudContacts = [
+            {
+              name: {
+                formatted_name: cloudContactName,
+                first_name: cloudContactName.split(' ')[0],
+                last_name: cloudContactName.split(' ').slice(1).join(' '),
+              },
+              phones: cloudContactPhone.split(',').map((phone: string) => ({
+                phone: phone.trim(),
+                type: 'CELL',
+              })),
+              emails: resolvedContactEmail
+                ? [
+                    {
+                      email: String(resolvedContactEmail),
+                      type: 'WORK',
+                    },
+                  ]
+                : undefined,
+              org: resolvedContactOrganization
+                ? {
+                    company: String(resolvedContactOrganization),
+                  }
+                : undefined,
+              urls: resolvedContactUrl
+                ? [
+                    {
+                      url: String(resolvedContactUrl),
+                      type: 'WORK',
+                    },
+                  ]
+                : undefined,
+            },
+          ];
+
+          result = await WhatsAppCloudService.sendContactMessage(
+            token,
+            String(resolvedPhoneNumber),
+            cloudContacts,
+          );
+          break;
+
+        case 'interactive_menu':
+          if (!interactiveMenu) {
+            throw new Error('Interactive menu configuration is required');
+          }
+
+          // Resolver variáveis dinâmicas nos campos do menu
+          const cloudResolvedMenuText = replaceVariables(
+            interactiveMenu.text,
+            variableContext,
+          );
+
+          // Resolver choices - verificar se já é um array parseado
+          let cloudResolvedMenuChoices: any[];
+
+          // Se choices for um array com 1 item que é uma variável
+          if (interactiveMenu.choices.length === 1) {
+            const firstChoice = replaceVariables(
+              interactiveMenu.choices[0],
+              variableContext,
+            );
+
+            // Se replaceVariables já retornou um array parseado, usar diretamente
+            if (Array.isArray(firstChoice)) {
+              cloudResolvedMenuChoices = [firstChoice];
+            } else {
+              cloudResolvedMenuChoices = [firstChoice];
+            }
+          } else {
+            // Se choices tiver múltiplos itens, resolver cada um
+            cloudResolvedMenuChoices = interactiveMenu.choices.map(
+              (choice: string) => replaceVariables(choice, variableContext),
+            );
+          }
+
+          // Se o primeiro choice for uma variável (string JSON ou array), processar
+          if (cloudResolvedMenuChoices.length === 1) {
+            const firstItem = cloudResolvedMenuChoices[0];
+
+            try {
+              let parsedValue: any;
+
+              if (typeof firstItem === 'string') {
+                parsedValue = JSON.parse(firstItem);
+              } else {
+                throw new Error('Invalid choice format - expected string');
+              }
+
+              // Se for array de objetos com 'category', converter para choices
+              if (Array.isArray(parsedValue) && parsedValue.length > 0) {
+                if (
+                  typeof parsedValue[0] === 'object' &&
+                  parsedValue[0].category
+                ) {
+                  // FORMATO LIST
+                  const listChoices: string[] = [];
+                  parsedValue.forEach((categoryObj: any) => {
+                    // Adicionar categoria
+                    if (
+                      categoryObj.category &&
+                      categoryObj.category.trim() !== ''
+                    ) {
+                      listChoices.push(`[${categoryObj.category}]`);
+                    }
+
+                    // Adicionar items da categoria
+                    if (categoryObj.items && Array.isArray(categoryObj.items)) {
+                      categoryObj.items.forEach((item: any) => {
+                        if (item.text && item.text.trim() !== '') {
+                          listChoices.push(
+                            `${item.text}|${item.id || ''}|${item.description || ''}`,
+                          );
+                        }
+                      });
+                    }
+                  });
+                  cloudResolvedMenuChoices = listChoices;
+                }
+              }
+            } catch {
+              // Se não for JSON válido, manter como está
+            }
+          }
+
+          const cloudResolvedMenuFooter = interactiveMenu.footerText
+            ? replaceVariables(interactiveMenu.footerText, variableContext)
+            : undefined;
+          const cloudResolvedMenuListButton = interactiveMenu.listButton
+            ? replaceVariables(interactiveMenu.listButton, variableContext)
+            : undefined;
+
+          // Converter formato UAZAPI para formato WhatsApp Cloud API
+          if (interactiveMenu.type === 'button') {
+            // Botões: converter choices para botões
+            const buttons = cloudResolvedMenuChoices
+              .slice(0, 3) // Max 3 botões na API oficial
+              .map((choice: string) => {
+                const parts = String(choice).split('|');
+                return {
+                  id: parts[1] || parts[0], // ID ou texto como fallback
+                  title: parts[0], // Texto do botão
+                };
+              });
+
+            result = await WhatsAppCloudService.sendInteractiveButtonMessage(
+              token,
+              String(resolvedPhoneNumber),
+              String(cloudResolvedMenuText),
+              buttons,
+              {
+                footer: cloudResolvedMenuFooter
+                  ? String(cloudResolvedMenuFooter)
+                  : undefined,
+              },
+            );
+          } else if (interactiveMenu.type === 'list') {
+            // Listas: converter choices hierárquicos para sections
+            type ListSection = {
+              title?: string;
+              rows: Array<{
+                id: string;
+                title: string;
+                description?: string;
+              }>;
+            };
+
+            const sections: ListSection[] = [];
+            let currentSection: ListSection | null = null;
+
+            cloudResolvedMenuChoices.forEach((choice: any) => {
+              const choiceStr = String(choice);
+              // Se começa com [, é uma categoria
+              if (choiceStr.startsWith('[') && choiceStr.endsWith(']')) {
+                // Salvar seção anterior se existir
+                if (currentSection !== null) {
+                  sections.push(currentSection);
+                }
+
+                // Criar nova seção
+                const categoryName = choiceStr.slice(1, -1);
+                currentSection = {
+                  title: categoryName || undefined,
+                  rows: [],
+                };
+              } else {
+                // É um item da categoria
+                const parts = choiceStr.split('|');
+
+                // Se não há seção atual, criar uma sem título
+                if (currentSection === null) {
+                  currentSection = {
+                    rows: [],
+                  };
+                }
+
+                currentSection.rows.push({
+                  id: parts[1] || parts[0],
+                  title: parts[0],
+                  description: parts[2] || undefined,
+                });
+              }
+            });
+
+            // Adicionar última seção
+            if (currentSection !== null) {
+              const sec = currentSection as ListSection;
+              if (sec.rows && sec.rows.length > 0) {
+                sections.push(sec);
+              }
+            }
+
+            // Se não há seções, criar uma padrão
+            if (sections.length === 0) {
+              sections.push({
+                rows: cloudResolvedMenuChoices
+                  .slice(0, 10)
+                  .map((choice: any) => {
+                    const parts = String(choice).split('|');
+                    return {
+                      id: parts[1] || parts[0],
+                      title: parts[0],
+                      description: parts[2] || undefined,
+                    };
+                  }),
+              });
+            }
+
+            result = await WhatsAppCloudService.sendInteractiveListMessage(
+              token,
+              String(resolvedPhoneNumber),
+              String(cloudResolvedMenuText),
+              String(cloudResolvedMenuListButton || 'Ver opções'),
+              sections,
+              {
+                footer: cloudResolvedMenuFooter
+                  ? String(cloudResolvedMenuFooter)
+                  : undefined,
+              },
+            );
+          } else if (interactiveMenu.type === 'poll') {
+            // Poll não é suportado na API oficial
+            throw new Error(
+              'Poll type is not supported by WhatsApp Cloud API. Please use button or list instead.',
+            );
+          } else if (interactiveMenu.type === 'carousel') {
+            // Carousel não é suportado na API oficial (ainda)
+            throw new Error(
+              'Carousel type is not yet supported by WhatsApp Cloud API. Please use button or list instead.',
+            );
+          } else {
+            throw new Error(
+              `Unknown interactive menu type: ${interactiveMenu.type}`,
+            );
+          }
+          break;
+
+        case 'template':
+          // Enviar template via WhatsApp Cloud API
+          if (!templateName || !templateLanguage) {
+            throw new Error('Template name and language are required');
+          }
+
+          // Resolver variáveis do template
+          const resolvedTemplateName = replaceVariables(
+            templateName,
+            variableContext,
+          );
+          const resolvedTemplateLanguage = replaceVariables(
+            templateLanguage,
+            variableContext,
+          );
+
+          console.log('📄 Sending template:', {
+            name: resolvedTemplateName,
+            language: resolvedTemplateLanguage,
+            hasVariables: !!rawTemplateVariables,
+            templateVariablesType: typeof rawTemplateVariables,
+            templateVariablesValue: rawTemplateVariables,
+          });
+
+          // IMPORTANTE: hello_world NÃO TEM VARIÁVEIS - ignorar qualquer templateVariables
+          const normalizedName = resolvedTemplateName?.toLowerCase().trim();
+          const isHelloWorld = normalizedName === 'hello_world';
+
+          console.log('🔍 Template check:', {
+            resolvedTemplateName,
+            normalizedName,
+            isHelloWorld,
+          });
+
+          // Processar variáveis do template APENAS se fornecidas E não for hello_world
+          let components:
+            | Array<{
+                type: 'header' | 'body' | 'button';
+                parameters: Array<{
+                  type: 'text';
+                  text: string;
+                }>;
+              }>
+            | undefined = undefined;
+
+          if (isHelloWorld) {
+            console.log(
+              '✅ Template hello_world detectado - FORÇANDO components = undefined',
+            );
+            components = undefined; // FORÇAR undefined para hello_world
+          } else {
+            // Verificar se templateVariables tem conteúdo real
+            let hasRealVariables = false;
+            if (rawTemplateVariables) {
+              if (typeof rawTemplateVariables === 'string') {
+                const trimmed = rawTemplateVariables.trim();
+                hasRealVariables = trimmed !== '' && trimmed !== '{}';
+              } else if (typeof rawTemplateVariables === 'object') {
+                hasRealVariables = Object.keys(rawTemplateVariables).length > 0;
+              }
+            }
+
+            console.log('🔍 Has real variables?', hasRealVariables);
+
+            if (hasRealVariables) {
+              // templateVariables pode ser um objeto ou JSON string
+              let vars: Record<string, string> = {};
+              if (typeof rawTemplateVariables === 'string') {
+                try {
+                  vars = JSON.parse(rawTemplateVariables);
+                } catch (err) {
+                  console.error('Failed to parse template variables:', err);
+                  throw new Error('Invalid template variables format');
+                }
+              } else {
+                vars = rawTemplateVariables;
+              }
+
+              // Resolver variáveis e agrupar por componente
+              const bodyParams: Array<{ type: 'text'; text: string }> = [];
+
+              Object.entries(vars).forEach(([key, value]) => {
+                const resolvedValue = replaceVariables(
+                  String(value),
+                  variableContext,
+                );
+
+                if (key.startsWith('body_')) {
+                  bodyParams.push({
+                    type: 'text',
+                    text: String(resolvedValue),
+                  });
+                }
+              });
+
+              // Adicionar componente BODY se houver parâmetros
+              if (bodyParams.length > 0) {
+                components = [
+                  {
+                    type: 'body',
+                    parameters: bodyParams,
+                  },
+                ];
+
+                console.log('✅ Template com parâmetros:', bodyParams.length);
+              }
+            }
+          }
+
+          console.log('📤 Final components antes do envio:', {
+            components,
+            isUndefined: components === undefined,
+            length: components?.length || 0,
+          });
+
+          result = await WhatsAppCloudService.sendTemplateMessage(
+            token,
+            String(resolvedPhoneNumber),
+            String(resolvedTemplateName),
+            String(resolvedTemplateLanguage),
+            components,
+          );
+          break;
+
+        default:
+          // Se não especificar tipo, assume texto
+          result = await WhatsAppCloudService.sendTextMessage(
+            token,
+            String(resolvedPhoneNumber),
+            String(resolvedText || ''),
+          );
       }
-      throw new Error(
-        `Failed to send message: ${errorData.error || response.statusText}`,
-      );
+
+      console.log('✅ Message sent successfully via WhatsApp Cloud API');
+    } else {
+      // ✅ UAZAPI (Tradicional)
+      console.log('🔗 Using UAZAPI');
+
+      // Determinar endpoint baseado no tipo de mensagem
+      let endpoint = '/send/text';
+      if (messageType === 'interactive_menu') {
+        endpoint = '/send/menu';
+      } else if (messageType === 'media') {
+        endpoint = '/send/media';
+      } else if (messageType === 'contact') {
+        endpoint = '/send/contact';
+      }
+
+      console.log(`🔗 Using endpoint: ${endpoint}`);
+
+      // Chamar API diretamente (sem usar Server Action)
+      const response = await fetch(`${process.env.UAZAPI_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          token: token,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        throw new Error(
+          `Failed to send message: ${errorData.error || response.statusText}`,
+        );
+      }
+
+      result = await response.json();
+      console.log('📋 API Response:', result);
     }
 
-    const result = await response.json();
-    console.log('📋 API Response:', result);
     console.log(
       `✅ Message sent successfully to ${resolvedPhoneNumber} from node ${node.id}`,
     );

@@ -4,12 +4,12 @@ import React, { useState, useCallback, memo, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import {
   ChevronDown,
   ChevronRight,
   Home,
-  Calendar,
   Users,
   Settings,
   Menu,
@@ -280,21 +280,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Header with Logo */}
           <div
             className={cn(
-              'absolute w-full flex items-center justify-start ml-1.5 border-neutral-200 h-20 transition-all duration-200',
+              'absolute w-full flex items-center justify-start border-neutral-200 h-20 transition-all duration-200',
               headerClassName,
             )}
           >
-            <div className="flex items-center overflow-hidden">
+            <div className="flex items-center overflow-hidden mt-6">
               <div
                 className={cn(
-                  'w-10 h-10 min-w-10 min-h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0',
+                  'min-w-10 min-h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                  'transition-all duration-300 ease-in-out',
+                  isHovered || isFakeHovered ? 'w-28 h-28' : 'w-14 h-14',
                   logoClassName,
                 )}
               >
-                <Calendar size={24} className="text-white" />
+                <Image
+                  src="/logo.png"
+                  alt="4itt"
+                  width={500}
+                  height={500}
+                  className="transition-transform duration-300 ease-in-out"
+                />
               </div>
               <div
-                className="overflow-hidden whitespace-nowrap ml-4"
+                className="overflow-hidden whitespace-nowrap"
                 style={{
                   opacity: isHovered || isFakeHovered ? 1 : 0,
                   width: isHovered || isFakeHovered ? 'auto' : '0',
@@ -302,23 +310,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
               >
                 <Typography
-                  variant="h5"
-                  className="text-white font-bold whitespace-nowrap"
+                  variant="h2"
+                  className="text-neutral-600 font-bold whitespace-nowrap"
                 >
-                  Calendar
+                  4itt
                 </Typography>
                 <Typography
                   variant="span"
-                  className="text-zinc-400 text-xs whitespace-nowrap"
+                  className="text-neutral-600 whitespace-break-spaces italic"
                 >
-                  Sistema de Agendamento
+                  Automação de processos
                 </Typography>
               </div>
             </div>
           </div>
           {/* Navigation Menu */}
           <nav
-            style={{ marginTop: '4rem' }}
+            style={{ marginTop: '6rem' }}
             className={cn('flex-1 p-4 overflow-y-auto space-y-1', navClassName)}
           >
             {menuItems.map((item) => (

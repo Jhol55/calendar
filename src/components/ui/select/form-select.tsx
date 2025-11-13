@@ -1,7 +1,7 @@
 'use client';
 
 import { useForm } from '@/hooks/use-form';
-import { forwardRef, useEffect, useState } from 'react';
+import { forwardRef, useEffect, useState, useRef } from 'react';
 import {
   Select,
   SelectContent,
@@ -27,14 +27,40 @@ export const FormSelect = forwardRef<HTMLButtonElement, FormSelectProps>(
     ref,
   ) => {
     const { form, setValue, register } = useForm();
-    const currentValue = (form[fieldName] as string) || '';
+    const formValue = (form[fieldName] as string) || '';
+    const [currentValue, setCurrentValue] = useState<string>(formValue);
     const [isOpen, setIsOpen] = useState(false);
+    const lastFormValueRef = useRef<string>(formValue);
 
     useEffect(() => {
       register(fieldName);
     }, [fieldName, register]);
 
+    // Observar mudanças no valor do form e atualizar o estado local
+    useEffect(() => {
+      // Só atualizar se o valor realmente mudou
+      if (formValue !== lastFormValueRef.current) {
+        lastFormValueRef.current = formValue;
+        setCurrentValue(formValue);
+      }
+    }, [formValue]);
+
+    // Garantir que o valor inicial seja capturado após o mount
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        const currentFormValue = (form[fieldName] as string) || '';
+        if (currentFormValue && currentFormValue !== lastFormValueRef.current) {
+          lastFormValueRef.current = currentFormValue;
+          setCurrentValue(currentFormValue);
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fieldName]);
+
     const handleValueChange = (value: string) => {
+      lastFormValueRef.current = value;
+      setCurrentValue(value);
       setValue(fieldName, value);
       onValueChange?.(value);
     };

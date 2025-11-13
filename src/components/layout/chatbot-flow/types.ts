@@ -17,7 +17,8 @@ export type MessageType =
   | 'media'
   | 'contact'
   | 'location'
-  | 'interactive_menu';
+  | 'interactive_menu'
+  | 'template';
 
 export type InteractiveMenuType = 'button' | 'list' | 'poll' | 'carousel';
 
@@ -70,6 +71,10 @@ export interface MessageConfig {
   forward?: boolean;
   trackSource?: string;
   trackId?: string;
+  // Configuração de template (WhatsApp Cloud API)
+  templateName?: string;
+  templateLanguage?: string;
+  templateVariables?: Record<string, string>;
   // Configuração de memória (opcional)
   memoryConfig?: MemoryConfig;
 }

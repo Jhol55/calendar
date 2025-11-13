@@ -111,9 +111,9 @@ describe('DatabaseService - Concorrência', () => {
           {},
         );
         expect(userRecords).toHaveLength(5);
-        expect(userRecords.every((r) => r.data.startsWith(`User${i}-`))).toBe(
-          true,
-        );
+        expect(
+          userRecords.every((r) => (r.data as string).startsWith(`User${i}-`)),
+        ).toBe(true);
       }
     });
 
@@ -263,9 +263,11 @@ describe('DatabaseService - Concorrência', () => {
       // Verificar que todos foram atualizados
       const finalRecords = await service.getRecords(userId, tableName, {});
       expect(finalRecords).toHaveLength(5);
-      expect(finalRecords.every((r) => r.status.startsWith('completed-'))).toBe(
-        true,
-      );
+      expect(
+        finalRecords.every((r) =>
+          (r.status as string).startsWith('completed-'),
+        ),
+      ).toBe(true);
     });
 
     it('deve lidar com update e delete simultâneos do mesmo registro', async () => {

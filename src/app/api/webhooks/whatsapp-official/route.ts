@@ -133,7 +133,106 @@ export async function POST(request: NextRequest) {
       for (const change of entry.changes) {
         const value = change.value;
 
-        if (!value || !value.metadata) {
+        if (!value) {
+          continue;
+        }
+
+        // Processar evento de atualização de categoria de template
+        if (change.field === 'template_category_update') {
+          const templateId = value.message_template_id;
+          const templateName = value.message_template_name;
+          const templateLanguage = value.message_template_language;
+          const newCategory = value.new_category;
+          const oldCategory = value.old_category;
+
+          console.log('📋 Template category updated:', {
+            templateId,
+            templateName,
+            templateLanguage,
+            oldCategory: oldCategory || 'N/A',
+            newCategory,
+            wabaId: entry.id,
+          });
+
+          // Buscar instância pelo WABA ID
+          const instance = await prisma.instances.findFirst({
+            where: {
+              whatsapp_official_business_account_id: entry.id,
+              whatsapp_official_enabled: true,
+            },
+          });
+
+          if (instance) {
+            console.log('✅ Instância encontrada para template update:', {
+              instanceToken: instance.token,
+              instanceName: instance.name,
+              templateName,
+              categoryChanged: `${oldCategory || 'N/A'} → ${newCategory}`,
+            });
+
+            // Salvar recategorização no banco de dados
+            try {
+              // Verificar se já existe uma recategorização recente para este template
+              const existingUpdate =
+                await prisma.template_category_updates.findFirst({
+                  where: {
+                    template_id: templateId.toString(),
+                    instance_token: instance.token,
+                    template_name: templateName,
+                  },
+                  orderBy: {
+                    updated_at: 'desc',
+                  },
+                });
+
+              // Se não existe ou se a categoria mudou novamente, criar novo registro
+              if (
+                !existingUpdate ||
+                existingUpdate.new_category !== newCategory
+              ) {
+                await prisma.template_category_updates.create({
+                  data: {
+                    template_id: templateId.toString(),
+                    template_name: templateName,
+                    instance_token: instance.token,
+                    old_category: oldCategory || null,
+                    new_category: newCategory,
+                    language: templateLanguage,
+                    waba_id: entry.id,
+                    reviewed: false,
+                    appealed: false,
+                  },
+                });
+
+                console.log('✅ Recategorização salva no banco de dados:', {
+                  templateId,
+                  templateName,
+                  oldCategory: oldCategory || 'N/A',
+                  newCategory,
+                });
+              } else {
+                console.log(
+                  'ℹ️ Recategorização já existe para este template:',
+                  {
+                    templateId,
+                    templateName,
+                  },
+                );
+              }
+            } catch (error) {
+              console.error('❌ Erro ao salvar recategorização:', error);
+              // Não interromper o processamento do webhook se houver erro ao salvar
+            }
+          } else {
+            console.warn('⚠️ Instância não encontrada para WABA ID:', entry.id);
+          }
+
+          // Continuar para o próximo evento
+          continue;
+        }
+
+        // Para outros eventos, verificar se tem metadata
+        if (!value.metadata) {
           continue;
         }
 

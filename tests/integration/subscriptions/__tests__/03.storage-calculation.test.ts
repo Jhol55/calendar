@@ -63,7 +63,7 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
     it('deve calcular 0 MB quando não há dados', async () => {
       console.log('    ✓ Teste: deve calcular 0 MB quando não há dados');
 
-      const storageMB = await getStorageUsage(userId, true);
+      const storageMB = await getStorageUsage(userId);
 
       expect(storageMB).toBe(0);
     });
@@ -86,7 +86,7 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
         },
       });
 
-      const storageMB = await getStorageUsage(userId, true);
+      const storageMB = await getStorageUsage(userId);
 
       // Dados pequenos podem resultar em 0.00 MB, então >= 0 está correto
       expect(storageMB).toBeGreaterThanOrEqual(0);
@@ -111,7 +111,7 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
       // Pequeno delay para garantir commit da transação
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const storageMB = await getStorageUsage(userId, true);
+      const storageMB = await getStorageUsage(userId);
 
       // Dados pequenos podem resultar em 0.00 MB, então >= 0 está correto
       expect(storageMB).toBeGreaterThanOrEqual(0);
@@ -143,7 +143,7 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
       // Pequeno delay para garantir commit da transação
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const storageMB = await getStorageUsage(userId, true);
+      const storageMB = await getStorageUsage(userId);
 
       // Dados pequenos podem resultar em 0.00 MB, então >= 0 está correto
       expect(storageMB).toBeGreaterThanOrEqual(0);
@@ -161,8 +161,8 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
 
       // getStorageUsage agora SEMPRE calcula valor real (sem cache)
       // Este teste agora valida que chamadas múltiplas retornam o mesmo valor
-      const storage1 = await getStorageUsage(userId, true);
-      const storage2 = await getStorageUsage(userId, false);
+      const storage1 = await getStorageUsage(userId);
+      const storage2 = await getStorageUsage(userId);
 
       expect(storage2).toBe(storage1);
       // Cache removido para funções críticas - ambas chamadas calculam valor real
@@ -174,13 +174,13 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
       );
 
       // Primeiro cálculo
-      const storage1 = await getStorageUsage(userId, true);
+      const storage1 = await getStorageUsage(userId);
 
       // Invalidar Redis
       await invalidateStorageCache(userId);
 
-      // Segundo cálculo (deve usar PostgreSQL cache se válido)
-      const storage2 = await getStorageUsage(userId, false);
+      // Segundo cálculo (getStorageUsage sempre calcula valor real)
+      const storage2 = await getStorageUsage(userId);
 
       expect(storage2).toBe(storage1); // PostgreSQL cache ainda válido
     });
@@ -188,13 +188,14 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
     it('deve invalidar cache corretamente', async () => {
       console.log('    ✓ Teste: deve invalidar cache corretamente');
 
-      await getStorageUsage(userId, true);
+      await getStorageUsage(userId);
 
       await invalidateStorageCache(userId);
 
-      // Próximo cálculo deve recalcular (não usar cache Redis)
-      const redisValue = await redis.get(`storage:usage:${userId}`);
-      expect(redisValue).toBeNull();
+      // getStorageUsage sempre calcula valor real (não usa cache Redis)
+      // Redis cache foi removido para funções críticas
+      const storage = await getStorageUsage(userId);
+      expect(typeof storage).toBe('number');
     });
 
     it('deve atualizar cache após cálculo', async () => {
@@ -211,9 +212,9 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
         },
       });
 
-      await getStorageUsage(userId, true);
+      await getStorageUsage(userId);
 
-      // Verificar que cache foi atualizado
+      // Verificar que cache PostgreSQL foi atualizado
       const limits = await prisma.user_plan_limits.findUnique({
         where: { userId },
       });
@@ -308,7 +309,7 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
       }
 
       const start = Date.now();
-      const storageMB = await getStorageUsage(userId, true);
+      const storageMB = await getStorageUsage(userId);
       const duration = Date.now() - start;
 
       // Verificar que calcula corretamente (pode ser 0.00 se dados muito pequenos)
@@ -332,8 +333,8 @@ describe('Subscription Service - Cálculo de Armazenamento', () => {
 
       // getStorageUsage agora SEMPRE calcula valor real (sem cache)
       // Este teste valida que múltiplas chamadas retornam o mesmo valor
-      const storage1 = await getStorageUsage(userId, true);
-      const storage2 = await getStorageUsage(userId, false);
+      const storage1 = await getStorageUsage(userId);
+      const storage2 = await getStorageUsage(userId);
 
       expect(storage2).toBe(storage1);
       // Cache removido para funções críticas - ambas chamadas calculam valor real

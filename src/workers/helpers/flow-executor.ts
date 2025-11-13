@@ -82,6 +82,7 @@ export async function executeFlow(
       startTime: new Date().toISOString(),
       endTime: new Date().toISOString(),
       data: webhookData.body,
+      output: webhookData.body, // Output acessível via {{$nodes.webhookId.output}}
       result: webhookData.body, // ✅ Adicionar result para consistência
     };
 

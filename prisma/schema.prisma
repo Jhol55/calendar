@@ -109,6 +109,7 @@ model instances {
   whatsapp_official_connected_at     DateTime?
 
   chatbot_flows chatbot_flows[]
+  template_category_updates template_category_updates[]
 
   @@index([owner])
   @@index([status])
@@ -277,4 +278,26 @@ model user_plan_limits {
   user user @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model template_category_updates {
+  id            String   @id @default(uuid())
+  template_id   String   @db.VarChar(255) // ID do template do Meta
+  template_name String   @db.VarChar(255) // Nome do template
+  instance_token String  @db.VarChar(255) // Token da instância
+  old_category  String?  @db.VarChar(50) // Categoria anterior (UTILITY, MARKETING, AUTHENTICATION)
+  new_category  String   @db.VarChar(50) // Nova categoria
+  language      String   @db.VarChar(10) // Idioma do template
+  waba_id       String   @db.VarChar(255) // WhatsApp Business Account ID
+  reviewed      Boolean  @default(false) // Se o usuário já revisou
+  appealed      Boolean  @default(false) // Se o usuário fez apelação
+  updated_at    DateTime @default(now()) // Quando foi recategorizado
+  created_at    DateTime @default(now())
+
+  instance instances @relation(fields: [instance_token], references: [token], onDelete: Cascade)
+
+  @@index([template_id])
+  @@index([instance_token])
+  @@index([template_name, instance_token])
+  @@index([updated_at])
 }

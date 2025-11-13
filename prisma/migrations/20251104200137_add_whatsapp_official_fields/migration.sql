@@ -32,3 +32,11 @@ CREATE INDEX IF NOT EXISTS "instances_whatsapp_official_enabled_idx" ON "public"
 
 
 
+
+
+
+
+
+
+
+

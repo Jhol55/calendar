@@ -129,7 +129,7 @@ describe('Subscription Service - Operações Básicas', () => {
         },
       });
 
-      const storageMB = await getStorageUsage(userId, true);
+      const storageMB = await getStorageUsage(userId);
 
       expect(storageMB).toBeGreaterThanOrEqual(0);
       expect(typeof storageMB).toBe('number');
@@ -139,15 +139,12 @@ describe('Subscription Service - Operações Básicas', () => {
       console.log('    ✓ Teste: deve usar cache quando disponível');
 
       // Primeiro cálculo
-      const storage1 = await getStorageUsage(userId, true);
+      const storage1 = await getStorageUsage(userId);
 
-      // Segundo cálculo (deve usar cache)
-      const start = Date.now();
-      const storage2 = await getStorageUsage(userId, false);
-      const duration = Date.now() - start;
+      // Segundo cálculo (getStorageUsage sempre calcula valor real)
+      const storage2 = await getStorageUsage(userId);
 
       expect(storage2).toBe(storage1);
-      expect(duration).toBeLessThan(100); // Cache deve ser muito rápido
     });
 
     it('deve atualizar armazenamento incrementalmente', async () => {

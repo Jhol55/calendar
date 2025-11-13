@@ -35,6 +35,17 @@ export interface InstanceProps {
   created: string;
   updated: string;
   currentTime: string;
+  // WhatsApp Official (Cloud API) fields
+  whatsapp_official_enabled?: boolean;
+  whatsapp_official_phone_number_id?: string;
+  whatsapp_official_business_account_id?: string;
+  whatsapp_official_access_token?: string;
+  whatsapp_official_phone_number?: string;
+  whatsapp_official_status?: string;
+  whatsapp_official_app_id?: string;
+  whatsapp_official_app_secret?: string;
+  whatsapp_official_webhook_verify_token?: string;
+  whatsapp_official_connected_at?: string;
 }
 
 export interface UserContextProps {

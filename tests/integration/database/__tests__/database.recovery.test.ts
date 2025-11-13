@@ -389,7 +389,11 @@ describe('DatabaseService - Recuperação e Consistência', () => {
 
       // Deve retornar apenas registros que satisfazem TODAS as condições
       expect(filtered).toHaveLength(2);
-      expect(filtered.every((r) => r.value > 3 && r.value <= 15)).toBe(true);
+      expect(
+        filtered.every(
+          (r) => (r.value as number) > 3 && (r.value as number) <= 15,
+        ),
+      ).toBe(true);
       expect(filtered.every((r) => r.status !== 'mid')).toBe(true);
       expect(filtered.map((r) => r.value).sort()).toEqual([10, 15]);
     });

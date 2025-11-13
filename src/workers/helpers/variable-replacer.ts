@@ -318,13 +318,10 @@ export function replaceVariables(
   // Se não for string, retornar como está
   if (typeof text !== 'string') return text;
 
-  console.log('🔹 [VARIABLE-REPLACER] Input:', text.substring(0, 200));
-
-  // Verificar se o texto é APENAS uma variável (sem texto ao redor)
-  const isSingleVariable = /^\{\{[^}]+}\}$/.test(text.trim());
-
   // Encontrar todas as variáveis no formato {{path}} ou {{path.expression()}}
   // IMPORTANTE: Substituir variáveis SEM aspas usando JSON.stringify para manter tipos
+  let hasUnresolved = false;
+
   const replaced = text.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
     try {
       // Remover espaços
@@ -405,63 +402,22 @@ export function replaceVariables(
         }
       }
 
-      // Se não encontrou divisão válida, verificar se o path completo é válido
-      // Se não for, pode ser que parte dele seja expressão JS
+      // Se não encontrou divisão válida, tentar resolver o path completo
+      // Se alguma parte do path não existir, retornar undefined
       if (bestSplitPos === -1) {
-        // Tentar resolver o path completo
-        const testParts = cleanPath.split('.');
-        let testValue: unknown = context;
-        let validUntil = -1;
-
-        for (let i = 0; i < testParts.length; i++) {
-          const part = testParts[i];
-          // Verificar se testValue é um objeto válido (não null, não string, não number, etc)
-          const isObjectOrArray =
-            testValue !== null &&
-            testValue !== undefined &&
-            (typeof testValue === 'object' || Array.isArray(testValue));
-
-          if (isObjectOrArray) {
-            const numericIndex = parseInt(part, 10);
-            if (!isNaN(numericIndex) && Array.isArray(testValue)) {
-              // Para arrays, índices negativos ou fora dos limites são inválidos
-              if (numericIndex >= 0 && numericIndex < testValue.length) {
-                testValue = testValue[numericIndex];
-                validUntil = i;
-              } else {
-                // Índice inválido - não é expressão JS, é erro
-                break;
-              }
-            } else if (
-              !Array.isArray(testValue) &&
-              hasProperty(testValue, part)
-            ) {
-              testValue = testValue[part];
-              validUntil = i;
-            } else {
-              // Não encontrou esta parte - a partir daqui pode ser JS
-              if (validUntil >= 0) {
-                variablePath = testParts.slice(0, validUntil + 1).join('.');
-                jsExpression = '.' + testParts.slice(validUntil + 1).join('.');
-              }
-              break;
-            }
-          } else {
-            // Valor não é objeto - não pode continuar
-            if (validUntil >= 0) {
-              variablePath = testParts.slice(0, validUntil + 1).join('.');
-              jsExpression = '.' + testParts.slice(validUntil + 1).join('.');
-            }
-            break;
-          }
-        }
+        // Tentar resolver o path completo diretamente
+        // Se não conseguir, retornar undefined
+        variablePath = cleanPath;
+        jsExpression = '';
       }
 
       // Resolver o path da variável base
       const parts = variablePath.split('.');
 
       let value: unknown = context;
-      for (const part of parts) {
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+
         // Verificar se value é um objeto válido (não null, não string, não number, etc)
         // null é typeof 'object' mas não é um objeto válido para acessar propriedades
         const isObjectOrArray =
@@ -469,46 +425,72 @@ export function replaceVariables(
           value !== undefined &&
           (typeof value === 'object' || Array.isArray(value));
 
-        if (isObjectOrArray) {
-          // Tentar acessar como índice numérico primeiro (para arrays)
-          const numericIndex = parseInt(part, 10);
-          if (!isNaN(numericIndex) && Array.isArray(value)) {
-            // Para arrays, índices negativos ou fora dos limites retornam undefined
-            if (numericIndex >= 0 && numericIndex < value.length) {
-              value = value[numericIndex];
-            } else {
-              // Índice fora dos limites ou negativo - não resolvido
-              return '__UNRESOLVED__' + match;
-            }
-          } else if (!Array.isArray(value) && hasProperty(value, part)) {
-            value = value[part];
-          } else {
-            // Path não existe - marcar como não resolvido
-            return '__UNRESOLVED__' + match;
-          }
-        } else {
+        if (!isObjectOrArray) {
           // Path não existe (value é null, undefined, string, number, etc e não pode ter propriedades)
-          return '__UNRESOLVED__' + match;
+          hasUnresolved = true;
+          return '__UNRESOLVED__';
+        }
+
+        // Tentar acessar como índice numérico primeiro (para arrays)
+        const numericIndex = parseInt(part, 10);
+        if (!isNaN(numericIndex) && Array.isArray(value)) {
+          // Para arrays, índices negativos ou fora dos limites retornam undefined
+          if (numericIndex >= 0 && numericIndex < value.length) {
+            value = value[numericIndex];
+            // Verificar se o valor obtido é undefined
+            if (value === undefined) {
+              hasUnresolved = true;
+              return '__UNRESOLVED__';
+            }
+          } else {
+            // Índice fora dos limites ou negativo - não resolvido
+            hasUnresolved = true;
+            return '__UNRESOLVED__';
+          }
+        } else if (Array.isArray(value)) {
+          // Array mas não é índice numérico válido
+          hasUnresolved = true;
+          return '__UNRESOLVED__';
+        } else {
+          // É um objeto - verificar se a propriedade existe
+          const valueObj = value as Record<string, unknown>;
+
+          // Usar 'in' operator para verificar se a propriedade existe
+          // Isso funciona mesmo se o valor da propriedade for undefined
+          if (!(part in valueObj)) {
+            // Propriedade não existe no objeto
+            hasUnresolved = true;
+            return '__UNRESOLVED__';
+          }
+
+          // Propriedade existe - acessar o valor
+          value = valueObj[part];
+
+          // Se o valor é undefined, ainda consideramos não resolvido
+          if (value === undefined) {
+            hasUnresolved = true;
+            return '__UNRESOLVED__';
+          }
         }
       }
 
-      // Tratar null e undefined após resolver o path completo
+      // Tratar null após resolver o path completo
       // Se chegamos aqui, o path foi completamente resolvido
       if (value === null) {
-        // Para variáveis únicas, null retorna undefined (não resolvido)
-        // Para uso em SQL, null é tratado como 'NULL' mas aqui queremos undefined
-        return '__UNRESOLVED__' + match;
+        // null é tratado como não resolvido (retornar undefined)
+        hasUnresolved = true;
+        return '__UNRESOLVED__';
       }
-      if (value === undefined) {
-        return '__UNRESOLVED__' + match;
-      }
+      // Se value é undefined, já foi tratado no loop acima
+      // Se chegamos aqui, value tem um valor válido
 
       // Se há expressão JavaScript, avaliá-la
       if (jsExpression) {
         value = evaluateJavaScriptExpression(value, jsExpression);
         // Se a expressão JS retornou undefined, tratar como não resolvido
         if (value === undefined) {
-          return '__UNRESOLVED__' + match;
+          hasUnresolved = true;
+          return '__UNRESOLVED__';
         }
       }
 
@@ -531,27 +513,19 @@ export function replaceVariables(
         return String(value);
       }
     } catch {
-      return '__UNRESOLVED__' + match;
+      // Qualquer erro significa que a variável não foi resolvida
+      hasUnresolved = true;
+      return '__UNRESOLVED__';
     }
   });
 
-  // Se era uma variável única e não foi resolvida, retornar undefined
-  if (isSingleVariable && replaced.includes('__UNRESOLVED__')) {
-    console.log(
-      '🔹 [VARIABLE-REPLACER] Variable not resolved, returning undefined',
-    );
+  // Se QUALQUER variável não foi resolvida, retornar undefined
+  if (
+    hasUnresolved ||
+    (typeof replaced === 'string' && replaced.includes('__UNRESOLVED__'))
+  ) {
     return undefined;
   }
 
-  // Remover marcadores __UNRESOLVED__ e manter a variável original
-  const finalResult = replaced.replace(/__UNRESOLVED__/g, '');
-
-  console.log(
-    '🔹 [VARIABLE-REPLACER] After replace:',
-    typeof finalResult === 'string'
-      ? finalResult.substring(0, 200)
-      : finalResult,
-  );
-
-  return finalResult;
+  return replaced;
 }

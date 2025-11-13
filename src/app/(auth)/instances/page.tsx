@@ -31,7 +31,7 @@ export default function Instances() {
           <div>
             <Typography
               variant="h1"
-              className="text-3xl font-bold text-neutral-900 mb-3"
+              className="text-3xl font-bold text-neutral-700 mb-3"
             >
               Minhas Instâncias
             </Typography>
@@ -73,7 +73,7 @@ export default function Instances() {
             <Loading text="" size="md" variant="spinner" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex flex-wrap gap-6">
             {instances.map((instance) => (
               <InstanceCard key={instance.id} instance={instance} />
             ))}

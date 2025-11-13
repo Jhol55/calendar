@@ -579,16 +579,17 @@ export async function processNodeMemory(
               ? item.key
               : String(resolvedKeyResult);
 
-          // Se o valor não foi resolvido (undefined) para uma variável única não resolvida,
-          // usar um placeholder especial que será convertido de volta para undefined ao recuperar
+          // Se o valor não foi resolvido (undefined ou null), usar placeholder especial
           // Isso é necessário porque JSON.stringify remove campos undefined
-          const isSingleVariable = /^\{\{[^}]+}\}$/.test(item.value.trim());
-          const resolvedValue =
-            rawResolvedValue !== undefined
-              ? rawResolvedValue
-              : isSingleVariable
-                ? { __undefined__: true } // Placeholder que será convertido para undefined ao recuperar
-                : item.value;
+          // Quando replaceVariables retorna undefined, significa que a variável não foi resolvida
+          // IMPORTANTE: Se retornar uma string (mesmo com {{), significa que não era uma variável válida
+          // e deve ser mantida como está (ex: texto mal formado)
+          const isUnresolved =
+            rawResolvedValue === undefined || rawResolvedValue === null;
+
+          const resolvedValue = isUnresolved
+            ? { __undefined__: true } // Placeholder que será convertido para undefined ao recuperar
+            : rawResolvedValue;
 
           console.log('✅ Resolved memory item:', {
             resolvedKey,
@@ -927,40 +928,17 @@ export async function processMemoryNode(
             resolvedKeyResult === undefined || resolvedKeyResult === null
               ? item.key
               : String(resolvedKeyResult);
-          const resolvedValue =
-            resolvedValueResult === undefined || resolvedValueResult === null
-              ? item.value
-              : resolvedValueResult;
 
-          console.log('✅ [MEMORY-NODE] Resolved item:', {
-            resolvedKey,
-            resolvedValue,
-          });
+          // CORREÇÃO: Se o valor não foi resolvido (undefined ou null),
+          // usar o placeholder especial que será convertido para undefined
+          // IMPORTANTE: Se retornar uma string (mesmo com {{), significa que não era uma variável válida
+          // e deve ser mantida como está (ex: texto mal formado)
+          const isUnresolved =
+            resolvedValueResult === undefined || resolvedValueResult === null;
 
-          // Verificar se as variáveis foram realmente resolvidas
-          if (
-            typeof resolvedValue === 'string' &&
-            resolvedValue.includes('{{')
-          ) {
-            console.error(
-              '⚠️ [MEMORY-NODE] Value still has unresolved variables:',
-              resolvedValue,
-            );
-            console.error(
-              '   Available $nodes:',
-              (context as any).$nodes
-                ? Object.keys((context as any).$nodes)
-                : 'undefined',
-            );
-
-            // Tentar extrair o node ID da variável não resolvida
-            const nodeMatch = resolvedValue.match(/\{\{\$nodes\.([^.]+)/);
-            if (nodeMatch) {
-              const nodeId = nodeMatch[1];
-              console.error(`   ❌ Node "${nodeId}" not found in context!`);
-              console.error(`   Did this node execute before the memory node?`);
-            }
-          }
+          const resolvedValue = isUnresolved
+            ? { __undefined__: true }
+            : resolvedValueResult;
 
           return {
             key: resolvedKey,
@@ -1018,11 +996,17 @@ export async function processMemoryNode(
           ttl,
         );
 
+        // Converter placeholders {__undefined__: true} de volta para undefined antes de retornar
+        const restoredItems = resolvedItems.map((item) => ({
+          key: item.key,
+          value: restoreUndefinedValues(item.value),
+        }));
+
         return {
           type: 'memory',
           action: 'save',
           name: resolvedMemoryName,
-          items: resolvedItems,
+          items: restoredItems, // Array com undefined restaurado para testes
           saveMode: saveMode || 'overwrite',
           success: saveResult.success,
           expiresAt: saveResult.expiresAt,

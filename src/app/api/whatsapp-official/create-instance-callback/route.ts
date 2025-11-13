@@ -27,8 +27,32 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state'); // tempToken contendo email:timestamp:nome
     const error = searchParams.get('error');
 
-    // Usar o domínio atual da requisição (importante para ngrok)
-    const currentOrigin = request.nextUrl.origin;
+    // Embedded Signup pode enviar waba_id e phone_number_id diretamente
+    const wabaId = searchParams.get('waba_id');
+    const phoneNumberId = searchParams.get('phone_number_id');
+
+    console.log('📥 Parâmetros recebidos:');
+    console.log('  - code:', code ? '✅ presente' : '❌ ausente');
+    console.log('  - state:', state ? '✅ presente' : '❌ ausente');
+    console.log('  - waba_id:', wabaId || '❌ não enviado');
+    console.log('  - phone_number_id:', phoneNumberId || '❌ não enviado');
+
+    // Construir origin correto usando headers (importante para proxies/ngrok)
+    // request.nextUrl.origin retorna localhost quando atrás de proxy
+    // Devemos usar os headers x-forwarded-proto e host para o domínio real
+    const host = request.headers.get('host') || request.nextUrl.hostname;
+    const protocol =
+      request.headers.get('x-forwarded-proto') ||
+      request.nextUrl.protocol.replace(':', '');
+    const currentOrigin = `${protocol}://${host}`;
+
+    console.log('📥 Callback recebido com origem construída:', currentOrigin);
+    console.log(
+      '📥 request.nextUrl.origin (original):',
+      request.nextUrl.origin,
+    );
+    console.log('📥 host:', host);
+    console.log('📥 protocol:', protocol);
 
     if (error) {
       return NextResponse.redirect(
@@ -52,11 +76,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Processar callback OAuth usando a função centralizada
+    // Passar waba_id e phone_number_id caso venham na URL (Embedded Signup)
     const result = await processOAuthCallback(
       code,
       state,
       email,
       currentOrigin,
+      wabaId || undefined,
+      phoneNumberId || undefined,
     );
 
     if (!result.success) {

@@ -131,7 +131,7 @@ describe('DatabaseService - Filtros', () => {
       });
 
       expect(results.length).toBe(2); // Bob (30) e registro vazio (35)
-      expect(results.every((r) => r.age > 25)).toBe(true);
+      expect(results.every((r) => (r.age as number) > 25)).toBe(true);
     });
 
     it('greaterThanOrEqual: 25 >= 25', async () => {
@@ -146,7 +146,7 @@ describe('DatabaseService - Filtros', () => {
       });
 
       expect(results.length).toBe(4); // Todos
-      expect(results.every((r) => r.age >= 25)).toBe(true);
+      expect(results.every((r) => (r.age as number) >= 25)).toBe(true);
     });
 
     it('lessThan: 25 < 30', async () => {
@@ -161,7 +161,7 @@ describe('DatabaseService - Filtros', () => {
       });
 
       expect(results.length).toBe(2); // Alice e Charlie
-      expect(results.every((r) => r.age < 30)).toBe(true);
+      expect(results.every((r) => (r.age as number) < 30)).toBe(true);
     });
 
     it('lessThanOrEqual: 25 <= 25', async () => {
@@ -176,7 +176,7 @@ describe('DatabaseService - Filtros', () => {
       });
 
       expect(results.length).toBe(2); // Alice e Charlie
-      expect(results.every((r) => r.age <= 25)).toBe(true);
+      expect(results.every((r) => (r.age as number) <= 25)).toBe(true);
     });
   });
 
@@ -198,7 +198,9 @@ describe('DatabaseService - Filtros', () => {
       });
 
       expect(results.length).toBe(2); // Alice e Charlie
-      expect(results.every((r) => r.name.includes('li'))).toBe(true);
+      expect(results.every((r) => (r.name as string).includes('li'))).toBe(
+        true,
+      );
     });
 
     it('notContains: deve retornar strings que não contêm', async () => {
@@ -215,7 +217,9 @@ describe('DatabaseService - Filtros', () => {
       });
 
       expect(results.length).toBe(2); // Bob e registro vazio
-      expect(results.every((r) => !r.name.includes('li'))).toBe(true);
+      expect(results.every((r) => !(r.name as string).includes('li'))).toBe(
+        true,
+      );
     });
 
     it('startsWith: "hello" startsWith "he"', async () => {
@@ -245,7 +249,7 @@ describe('DatabaseService - Filtros', () => {
       });
 
       expect(results.length).toBe(2); // Alice e Charlie
-      expect(results.every((r) => r.name.endsWith('e'))).toBe(true);
+      expect(results.every((r) => (r.name as string).endsWith('e'))).toBe(true);
     });
   });
 

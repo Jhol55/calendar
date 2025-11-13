@@ -51,6 +51,7 @@ webhookQueue.process('process-webhook', WEBHOOK_CONCURRENCY, async (job) => {
             startTime: new Date().toISOString(),
             endTime: new Date().toISOString(),
             data: data.body,
+            output: data.body, // Output acessível via {{$nodes.webhookId.output}}
             result: data.body, // Salvar o body como resultado para o próximo node
           },
         } as Prisma.InputJsonValue,

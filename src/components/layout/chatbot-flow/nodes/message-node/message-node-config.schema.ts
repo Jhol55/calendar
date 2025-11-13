@@ -9,6 +9,7 @@ const baseSchema = z.object({
     'contact',
     'location',
     'interactive_menu',
+    'template',
   ]),
   text: z.string().optional(),
   mediaUrl: z.string().url().optional().or(z.literal('')),
@@ -34,6 +35,10 @@ const baseSchema = z.object({
   interactiveMenuImageButton: z.string().optional(),
   interactiveMenuSelectableCount: z.union([z.string(), z.number()]).optional(),
   interactiveMenuChoices: z.string().optional(), // JSON stringified array
+  // Campos de template (WhatsApp Cloud API)
+  templateName: z.string().optional(),
+  templateLanguage: z.string().optional(),
+  templateVariables: z.string().optional(), // JSON stringified object
   // Opções avançadas para mensagens de texto
   linkPreview: z.boolean().optional(),
   linkPreviewTitle: z.string().optional(),
@@ -132,6 +137,17 @@ export const messageConfigSchema = baseSchema.refine(
         return false;
       }
     }
+
+    if (data.messageType === 'template') {
+      const hasName =
+        typeof data.templateName === 'string' &&
+        data.templateName.trim().length > 0;
+      const hasLanguage =
+        typeof data.templateLanguage === 'string' &&
+        data.templateLanguage.trim().length > 0;
+      return hasName && hasLanguage;
+    }
+
     return true;
   },
   (data) => {
@@ -255,6 +271,29 @@ export const messageConfigSchema = baseSchema.refine(
         message: 'Configure o menu interativo corretamente',
         path: ['interactiveMenuType'],
       };
+    }
+    if (data.messageType === 'template') {
+      if (
+        !data.templateName ||
+        (typeof data.templateName === 'string' &&
+          data.templateName.trim().length === 0)
+      ) {
+        return {
+          message: 'Selecione um template',
+          path: ['templateName'],
+        };
+      }
+
+      if (
+        !data.templateLanguage ||
+        (typeof data.templateLanguage === 'string' &&
+          data.templateLanguage.trim().length === 0)
+      ) {
+        return {
+          message: 'Idioma do template é obrigatório',
+          path: ['templateLanguage'],
+        };
+      }
     }
     return { message: 'Erro de validação', path: [] };
   },
