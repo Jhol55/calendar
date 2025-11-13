@@ -93,36 +93,48 @@ export function ExecutionsPanel({
 
   useEffect(() => {
     if (isOpen && flowId) {
-      fetchExecutions();
-
-      // Verificar se há uma execução selecionada no sessionStorage
-      const selectedExecutionStr = sessionStorage.getItem('selectedExecution');
-      if (selectedExecutionStr) {
-        try {
-          const execution = JSON.parse(selectedExecutionStr);
-          setSelectedExecution(execution);
-          if (onExecutionSelect) {
-            onExecutionSelect(execution);
+      // ✅ Buscar execuções primeiro
+      fetchExecutions().then(() => {
+        // ✅ Depois verificar se há uma execução selecionada no sessionStorage
+        const selectedExecutionStr =
+          sessionStorage.getItem('selectedExecution');
+        if (selectedExecutionStr) {
+          try {
+            const execution = JSON.parse(selectedExecutionStr);
+            setSelectedExecution(execution);
+            if (onExecutionSelect) {
+              onExecutionSelect(execution);
+            }
+          } catch {
+            console.warn('⚠️ Could not parse selected execution');
           }
-        } catch {
-          console.warn('⚠️ Could not parse selected execution');
         }
-      }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, flowId]);
 
   // Detectar quando uma execução é selecionada (evento customizado)
   useEffect(() => {
-    const handleExecutionSelected = (event: CustomEvent<Execution>) => {
+    const handleExecutionSelected = async (event: CustomEvent<Execution>) => {
       const execution = event.detail;
       console.log('🎯 Nova execução detectada:', execution.id);
+
+      // ✅ Primeiro atualizar a lista de execuções para garantir que a nova execução esteja na lista
+      await fetchExecutions();
+
+      // ✅ Depois selecionar a execução
       setSelectedExecution(execution);
       if (onExecutionSelect) {
+        console.log('📤 Chamando onExecutionSelect do painel:', {
+          executionId: execution.id,
+          hasNodeExecutions: !!execution.nodeExecutions,
+          nodeExecutionsKeys: execution.nodeExecutions
+            ? Object.keys(execution.nodeExecutions)
+            : [],
+        });
         onExecutionSelect(execution);
       }
-      // Atualizar lista de execuções para incluir a nova
-      fetchExecutions();
     };
 
     window.addEventListener(
@@ -137,7 +149,7 @@ export function ExecutionsPanel({
       );
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchExecutions, onExecutionSelect]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

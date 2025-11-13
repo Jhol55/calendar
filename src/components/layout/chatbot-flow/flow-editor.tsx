@@ -95,6 +95,8 @@ const generateNodeId = () =>
 
 function FlowEditorContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const nodesRef = useRef<Node[]>([]);
+  const edgesRef = useRef<Edge[]>([]);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] =
@@ -203,6 +205,9 @@ function FlowEditorContent() {
 
         // Buscar a execução completa e selecionar automaticamente
         try {
+          // ✅ Aguardar um pouco para garantir que a execução esteja salva no banco
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
           const executionResult = await getExecution(result.executionId);
           if (executionResult.success && executionResult.execution) {
             // Salvar execução completa no sessionStorage
@@ -211,7 +216,7 @@ function FlowEditorContent() {
               JSON.stringify(executionResult.execution),
             );
 
-            // Disparar evento customizado para notificar o painel
+            // Disparar evento customizado para notificar o painel (se estiver aberto)
             window.dispatchEvent(
               new CustomEvent('executionSelected', {
                 detail: executionResult.execution,
@@ -463,6 +468,221 @@ function FlowEditorContent() {
     createWorkflowMutation,
     removeExecutionHandlers,
   ]);
+
+  // Função para destacar nós executados
+  const highlightExecutedNodes = useCallback(
+    (execution: any) => {
+      if (!execution.nodeExecutions) {
+        console.warn('⚠️ Execução sem nodeExecutions:', execution.id);
+        return;
+      }
+
+      const nodeExecutions = execution.nodeExecutions;
+      const executedNodeIds = Object.keys(nodeExecutions);
+
+      console.log('🎨 Destacando nós executados:', {
+        executionId: execution.id,
+        executedNodeIds,
+        nodeExecutionsCount: executedNodeIds.length,
+        nodeExecutions: Object.entries(nodeExecutions).map(
+          ([nodeId, exec]: [string, any]) => ({
+            nodeId,
+            status: exec.status,
+            hasResult: !!exec.result,
+            selectedHandle: exec.result?.selectedHandle,
+          }),
+        ),
+      });
+
+      // ✅ Construir o caminho real seguido na execução
+      // Usar uma função auxiliar para construir o caminho baseado nos nodes e edges atuais
+      const buildExecutionPath = (
+        currentNodes: Node[],
+        currentEdges: Edge[],
+      ) => {
+        // Encontrar nó inicial (sem incoming edges)
+        const startNode = currentNodes.find((node) => {
+          return !currentEdges.some((edge) => edge.target === node.id);
+        });
+
+        if (!startNode) {
+          console.warn('⚠️ Nó inicial não encontrado');
+          return {
+            pathNodeIds: new Set<string>(),
+            pathEdges: new Set<string>(),
+          };
+        }
+
+        // Construir caminho seguido usando BFS, respeitando selectedHandles
+        const pathNodeIds = new Set<string>();
+        const pathEdges = new Set<string>();
+        const queue: string[] = [startNode.id];
+        const visited = new Set<string>();
+
+        while (queue.length > 0) {
+          const currentNodeId = queue.shift()!;
+
+          // Se já visitamos ou o nó não foi executado, pular
+          if (
+            visited.has(currentNodeId) ||
+            !executedNodeIds.includes(currentNodeId)
+          ) {
+            continue;
+          }
+
+          visited.add(currentNodeId);
+          pathNodeIds.add(currentNodeId);
+
+          // Encontrar próximas edges
+          const outgoingEdges = currentEdges.filter(
+            (edge) => edge.source === currentNodeId,
+          );
+
+          const nodeExecution = nodeExecutions[currentNodeId] as
+            | { status: string; result?: any }
+            | undefined;
+
+          // Se o nó tem selectedHandle (condição/loop), filtrar edges
+          if (nodeExecution?.result?.selectedHandle) {
+            const selectedHandle = nodeExecution.result.selectedHandle;
+            const validEdges = outgoingEdges.filter(
+              (edge) => (edge as any).sourceHandle === selectedHandle,
+            );
+
+            // Adicionar apenas edges válidas ao caminho
+            validEdges.forEach((edge) => {
+              pathEdges.add(edge.id);
+              if (
+                executedNodeIds.includes(edge.target) &&
+                !visited.has(edge.target)
+              ) {
+                queue.push(edge.target);
+              }
+            });
+          } else {
+            // Se não tem selectedHandle, adicionar todas as edges para nós executados
+            outgoingEdges.forEach((edge) => {
+              if (
+                executedNodeIds.includes(edge.target) &&
+                !visited.has(edge.target)
+              ) {
+                pathEdges.add(edge.id);
+                queue.push(edge.target);
+              }
+            });
+          }
+        }
+
+        return { pathNodeIds, pathEdges };
+      };
+
+      // Construir caminho e atualizar nodes e edges
+      // Construir caminho usando os valores atuais dos refs (que são atualizados via useEffect)
+      const { pathNodeIds, pathEdges } = buildExecutionPath(
+        nodesRef.current,
+        edgesRef.current,
+      );
+
+      console.log('🛤️ Caminho real construído:', {
+        pathNodeIds: Array.from(pathNodeIds),
+        pathEdges: Array.from(pathEdges),
+      });
+
+      // ✅ Atualizar nodes - destacar apenas os que estão no caminho real
+      setNodes((currentNodes) => {
+        return currentNodes.map((node) => {
+          // Só destacar se o nó está no caminho real
+          if (pathNodeIds.has(node.id)) {
+            const nodeExecution = nodeExecutions[node.id] as
+              | { status: string }
+              | undefined;
+            if (nodeExecution) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  executionStatus: nodeExecution.status,
+                },
+                style: {
+                  ...node.style,
+                  boxShadow:
+                    nodeExecution.status === 'completed'
+                      ? '0 0 0 5px rgba(34, 197, 94, 0.4)'
+                      : nodeExecution.status === 'error'
+                        ? '0 0 0 5px rgba(239, 68, 68, 0.4)'
+                        : '0 0 0 5px rgba(59, 130, 246, 0.4)',
+                  borderRadius: '12px',
+                },
+              };
+            }
+          }
+          // Limpar highlight de nodes não executados ou fora do caminho
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              executionStatus: undefined,
+            },
+            style: {
+              ...node.style,
+              boxShadow: undefined,
+              borderRadius: undefined,
+            },
+          };
+        });
+      });
+
+      // ✅ Atualizar edges - destacar apenas as que estão no caminho real
+      setEdges((currentEdges) => {
+        return currentEdges.map((edge) => {
+          // Só destacar se a edge está no caminho real
+          if (pathEdges.has(edge.id)) {
+            const sourceExecution = nodeExecutions[edge.source] as
+              | { status: string; result?: any }
+              | undefined;
+            const targetExecution = nodeExecutions[edge.target] as
+              | { status: string }
+              | undefined;
+
+            // Determinar a cor baseada no status
+            const hasError =
+              sourceExecution?.status === 'error' ||
+              targetExecution?.status === 'error';
+            const isRunning =
+              sourceExecution?.status === 'running' ||
+              targetExecution?.status === 'running';
+
+            return {
+              ...edge,
+              animated: true,
+              style: {
+                ...edge.style,
+                stroke: hasError
+                  ? '#ef4444'
+                  : isRunning
+                    ? '#3b82f6'
+                    : '#22c55e',
+                strokeWidth: 3,
+              },
+            };
+          }
+          // Limpar highlight de edges não executadas ou fora do caminho
+          return {
+            ...edge,
+            animated: false,
+            style: {
+              ...edge.style,
+              stroke: undefined,
+              strokeWidth: undefined,
+            },
+          };
+        });
+      });
+
+      setHasExecutionHighlight(true);
+    },
+    [setNodes, setEdges],
+  );
 
   const clearExecutionHighlight = useCallback(() => {
     // Limpar highlight dos nodes
@@ -888,6 +1108,47 @@ function FlowEditorContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCopyNode, handlePasteNode]);
 
+  // ✅ Manter refs atualizados
+  React.useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  React.useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
+
+  // ✅ Listener direto para o evento executionSelected (garante que os nós sejam destacados mesmo se o painel não estiver aberto)
+  React.useEffect(() => {
+    const handleExecutionSelected = (event: CustomEvent<any>) => {
+      const execution = event.detail;
+      console.log(
+        '🎯 Evento executionSelected recebido diretamente no flow-editor:',
+        {
+          executionId: execution.id,
+          hasNodeExecutions: !!execution.nodeExecutions,
+        },
+      );
+
+      // Salvar execução selecionada no sessionStorage
+      sessionStorage.setItem('selectedExecution', JSON.stringify(execution));
+
+      // Destacar nós executados
+      highlightExecutedNodes(execution);
+    };
+
+    window.addEventListener(
+      'executionSelected',
+      handleExecutionSelected as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'executionSelected',
+        handleExecutionSelected as EventListener,
+      );
+    };
+  }, [highlightExecutedNodes]);
+
   const nodeColor = useCallback((node: Node) => {
     switch (node.type) {
       case 'start':
@@ -1272,105 +1533,22 @@ function FlowEditorContent() {
         isOpen={isExecutionsPanelOpen}
         onClose={() => setIsExecutionsPanelOpen(false)}
         onExecutionSelect={(execution) => {
+          console.log('🎯 onExecutionSelect chamado:', {
+            executionId: execution.id,
+            hasNodeExecutions: !!execution.nodeExecutions,
+            nodeExecutionsKeys: execution.nodeExecutions
+              ? Object.keys(execution.nodeExecutions)
+              : [],
+          });
+
           // Salvar execução selecionada no sessionStorage
           sessionStorage.setItem(
             'selectedExecution',
             JSON.stringify(execution),
           );
 
-          // Destacar nós executados
-          if (execution.nodeExecutions) {
-            const nodeExecutions = execution.nodeExecutions;
-            const executedNodeIds = Object.keys(nodeExecutions);
-
-            const updatedNodes = nodes.map((node) => {
-              const nodeExecution = nodeExecutions[node.id] as
-                | { status: string }
-                | undefined;
-              if (nodeExecution) {
-                return {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    executionStatus: nodeExecution.status,
-                  },
-                  style: {
-                    ...node.style,
-                    boxShadow:
-                      nodeExecution.status === 'completed'
-                        ? '0 0 0 5px rgba(34, 197, 94, 0.4)'
-                        : nodeExecution.status === 'error'
-                          ? '0 0 0 5px rgba(239, 68, 68, 0.4)'
-                          : '0 0 0 5px rgba(59, 130, 246, 0.4)',
-                    borderRadius: '12px',
-                  },
-                };
-              }
-              // Limpar highlight de nodes não executados
-              return {
-                ...node,
-                data: {
-                  ...node.data,
-                  executionStatus: undefined,
-                },
-                style: {
-                  ...node.style,
-                  boxShadow: undefined,
-                  borderRadius: undefined,
-                },
-              };
-            });
-            setNodes(updatedNodes);
-
-            // Destacar edges entre nós executados
-            const updatedEdges = edges.map((edge) => {
-              const sourceExecuted = executedNodeIds.includes(edge.source);
-              const targetExecuted = executedNodeIds.includes(edge.target);
-
-              if (sourceExecuted && targetExecuted) {
-                const sourceExecution = nodeExecutions[edge.source] as
-                  | { status: string }
-                  | undefined;
-                const targetExecution = nodeExecutions[edge.target] as
-                  | { status: string }
-                  | undefined;
-
-                // Determinar a cor baseada no status
-                const hasError =
-                  sourceExecution?.status === 'error' ||
-                  targetExecution?.status === 'error';
-                const isRunning =
-                  sourceExecution?.status === 'running' ||
-                  targetExecution?.status === 'running';
-
-                return {
-                  ...edge,
-                  animated: true,
-                  style: {
-                    ...edge.style,
-                    stroke: hasError
-                      ? '#ef4444'
-                      : isRunning
-                        ? '#3b82f6'
-                        : '#22c55e',
-                    strokeWidth: 3,
-                  },
-                };
-              }
-              // Limpar highlight de edges não executadas
-              return {
-                ...edge,
-                animated: false,
-                style: {
-                  ...edge.style,
-                  stroke: undefined,
-                  strokeWidth: undefined,
-                },
-              };
-            });
-            setEdges(updatedEdges);
-            setHasExecutionHighlight(true);
-          }
+          // Destacar nós executados usando a função centralizada
+          highlightExecutedNodes(execution);
         }}
       />
     </div>
