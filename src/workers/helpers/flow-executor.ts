@@ -52,8 +52,6 @@ export async function executeFlow(
   flow: any,
   webhookData: WebhookJobData,
 ) {
-  console.log(`🔄 Executing flow ${flow.id} for execution ${executionId}`);
-
   const nodes = flow.nodes as FlowNode[];
   const edges = flow.edges as FlowEdge[];
 
@@ -61,68 +59,85 @@ export async function executeFlow(
     throw new Error('Invalid flow structure');
   }
 
-  console.log(`📊 Flow has ${nodes.length} nodes and ${edges.length} edges`);
-
-  // Encontrar o nó webhook
+  // Encontrar o nó inicial (startNode)
   const webhookNode = nodes.find((node) => node.id === webhookData.nodeId);
   if (!webhookNode) {
-    throw new Error('Webhook node not found in flow');
+    throw new Error(`Start node ${webhookData.nodeId} not found in flow`);
   }
 
-  // IMPORTANTE: Salvar dados do webhook node ANTES de processar os próximos nós
-  // para que os próximos nós possam acessar {{$nodes.webhookNodeId.output.*}}
-  const execution = await prisma.flow_executions.findUnique({
-    where: { id: executionId },
-  });
+  // Verificar se é execução de node isolado (execução parcial isolada)
+  const isIsolatedExecution =
+    webhookData.webhookId === 'manual_partial_execution_isolated' &&
+    webhookData.stopAtNodeId === webhookData.nodeId;
 
-  if (execution) {
-    const nodeExecutions = (execution.nodeExecutions as any) || {};
-    nodeExecutions[webhookData.nodeId] = {
-      status: 'completed',
-      startTime: new Date().toISOString(),
-      endTime: new Date().toISOString(),
-      data: webhookData.body,
-      output: webhookData.body, // Output acessível via {{$nodes.webhookId.output}}
-      result: webhookData.body, // ✅ Adicionar result para consistência
-    };
+  if (isIsolatedExecution) {
+    // Node isolado - processar apenas ele diretamente, sem salvar como webhook
+    await processNodeChain(
+      executionId,
+      webhookData.nodeId,
+      nodes,
+      edges,
+      webhookData,
+    );
+    return; // Parar aqui, não processar mais nada
+  }
 
-    await prisma.flow_executions.update({
+  // ✅ LÓGICA CORRIGIDA: Verificar o tipo do startNode
+  // Se for webhook, salvar os dados sem processar (webhooks não executam lógica)
+  // Se for outro tipo, processar normalmente com processNodeChain
+
+  if (webhookNode.type === 'webhook') {
+    // IMPORTANTE: Salvar dados do webhook node ANTES de processar os próximos nós
+    // para que os próximos nós possam acessar {{$nodes.webhookNodeId.output.*}}
+    const execution = await prisma.flow_executions.findUnique({
       where: { id: executionId },
-      data: {
-        nodeExecutions: nodeExecutions as any,
-      },
     });
 
-    console.log(
-      `✅ Webhook node ${webhookData.nodeId} data saved to nodeExecutions`,
-    );
-    console.log(
-      `🔍 [WEBHOOK-SAVE] Saved data keys:`,
-      Object.keys(webhookData.body || {}),
-    );
-    console.log(
-      `🔍 [WEBHOOK-SAVE] nodeExecutions now has:`,
-      Object.keys(nodeExecutions),
-    );
-  }
+    if (execution) {
+      const nodeExecutions = (execution.nodeExecutions as any) || {};
+      nodeExecutions[webhookData.nodeId] = {
+        status: 'completed',
+        startTime: new Date().toISOString(),
+        endTime: new Date().toISOString(),
+        data: webhookData.body,
+        output: webhookData.body, // Output acessível via {{$nodes.webhookId.output}}
+        result: webhookData.body, // ✅ Adicionar result para consistência
+      };
 
-  // Encontrar próximos nós conectados ao webhook
-  const connectedEdges = edges.filter(
-    (edge) => edge.source === webhookData.nodeId,
-  );
-
-  // Processar cada cadeia de nós conectados
-  for (const edge of connectedEdges) {
-    const nextNode = nodes.find((node) => node.id === edge.target);
-    if (nextNode) {
-      await processNodeChain(
-        executionId,
-        nextNode.id,
-        nodes,
-        edges,
-        webhookData,
-      );
+      await prisma.flow_executions.update({
+        where: { id: executionId },
+        data: {
+          nodeExecutions: nodeExecutions as any,
+        },
+      });
     }
+
+    // Processar próximos nodes conectados ao webhook
+    const connectedEdges = edges.filter(
+      (edge) => edge.source === webhookData.nodeId,
+    );
+
+    for (const edge of connectedEdges) {
+      const nextNode = nodes.find((node) => node.id === edge.target);
+      if (nextNode) {
+        await processNodeChain(
+          executionId,
+          nextNode.id,
+          nodes,
+          edges,
+          webhookData,
+        );
+      }
+    }
+  } else {
+    // ✅ StartNode NÃO é webhook - processar normalmente desde o início
+    await processNodeChain(
+      executionId,
+      webhookData.nodeId,
+      nodes,
+      edges,
+      webhookData,
+    );
   }
 }
 
@@ -146,13 +161,11 @@ async function processNodeChain(
   });
 
   if (execution?.status === 'stopped') {
-    console.log(`🛑 Execution ${executionId} was stopped by user. Aborting.`);
     throw new Error('Execution stopped by user');
   }
 
   const currentNode = nodes.find((node) => node.id === currentNodeId);
   if (!currentNode) {
-    console.log(`⚠️ Node ${currentNodeId} not found`);
     return;
   }
 
@@ -162,10 +175,6 @@ async function processNodeChain(
     result = await processNode(executionId, currentNode, webhookData);
   } catch (error) {
     // 🛑 Se o node falhar, NÃO continuar para os próximos nodes
-    console.error(`🛑 Node ${currentNode.id} failed. Stopping execution.`);
-    console.error(
-      `   Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
 
     // Atualizar status da execução para 'error'
     try {
@@ -198,17 +207,11 @@ async function processNodeChain(
 
   // 🎯 VERIFICAR SE DEVE PARAR NESTE NODE (execução parcial)
   if (webhookData.stopAtNodeId && currentNodeId === webhookData.stopAtNodeId) {
-    console.log(`🎯 Execution stopped at target node: ${currentNodeId}`);
     return; // Parar a execução aqui
   }
 
   // Encontrar próximos nós conectados
   let nextEdges = edges.filter((edge) => edge.source === currentNodeId);
-
-  console.log(
-    `🔍 Next edges from ${currentNodeId}:`,
-    JSON.stringify(nextEdges, null, 2),
-  );
 
   // Se o nó for de condição ou loop e tiver selectedHandle, filtrar edges
   const selectedHandle = (result as any)?.selectedHandle;
@@ -216,29 +219,15 @@ async function processNodeChain(
     (currentNode.type === 'condition' || currentNode.type === 'loop') &&
     selectedHandle
   ) {
-    console.log(
-      `🔀 ${currentNode.type} node selected handle: ${selectedHandle}`,
-    );
     // Filtrar edges baseado no sourceHandle
     nextEdges = nextEdges.filter(
       (edge: any) => edge.sourceHandle === selectedHandle,
     );
-    console.log(
-      `🔀 Filtered to ${nextEdges.length} edge(s) matching handle "${selectedHandle}"`,
-    );
   }
 
   if (nextEdges.length > 0) {
-    console.log(
-      `➡️ Found ${nextEdges.length} next node(s) after ${currentNodeId}`,
-    );
-
     // Processar cada nó seguinte
     for (const edge of nextEdges) {
-      const targetNode = nodes.find((n) => n.id === edge.target);
-      console.log(`  ↪️ Following edge to node: ${edge.target}`);
-      console.log(`     Node type: ${targetNode?.type}, ID: ${targetNode?.id}`);
-
       // 🚨 DETECÇÃO DE LOOP CIRCULAR
       // Permitir loops intencionais quando vêm de um Loop Node com handle 'loop'
       const isIntentionalLoop =

@@ -384,17 +384,26 @@ function MessageFormFields({
     if (!selectedToken) {
       setIsCloudInstance(false);
       setTemplates([]);
+      // Se não há instância selecionada e o tipo é template, limpar
+      if (form.messageType === 'template') {
+        setValue('messageType', 'text');
+        setValue('templateName', '');
+        setValue('templateLanguage', '');
+        setValue('templateVariables', '');
+      }
       return;
     }
 
     const selectedInstance = instances.find(
       (inst) => inst.token === selectedToken,
     );
-    if (
+    const isCloud = !!(
       selectedInstance &&
       selectedInstance.plataform === 'cloud' &&
       selectedInstance.whatsapp_official_enabled
-    ) {
+    );
+
+    if (isCloud) {
       setIsCloudInstance(true);
       // Buscar templates
       setLoadingTemplates(true);
@@ -414,30 +423,69 @@ function MessageFormFields({
     } else {
       setIsCloudInstance(false);
       setTemplates([]);
+      // Se mudou para instância não-Cloud e o tipo é template, limpar
+      if (form.messageType === 'template') {
+        setValue('messageType', 'text');
+        setValue('templateName', '');
+        setValue('templateLanguage', '');
+        setValue('templateVariables', '');
+        setSelectedTemplate(null);
+        setTemplateVariables({});
+      }
     }
-  }, [form.token, instances]);
+  }, [form.token, form.messageType, instances, setValue]);
 
   // Detectar mudanças no template selecionado
   useEffect(() => {
-    if (form.templateName && templates.length > 0) {
+    if (
+      form.templateName &&
+      templates.length > 0 &&
+      form.messageType === 'template'
+    ) {
       const template = templates.find((t) => t.name === form.templateName);
       setSelectedTemplate(template || null);
       if (template) {
         setValue('templateLanguage', template.language);
       }
+    } else if (form.messageType !== 'template') {
+      // Se não for template, limpar selectedTemplate
+      setSelectedTemplate(null);
     }
-  }, [form.templateName, templates, setValue]);
+  }, [form.templateName, form.messageType, templates, setValue]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (config) {
+        // Debug: verificar o que está sendo carregado
+        console.log(
+          '📥 Carregando config no MessageNodeConfig:',
+          JSON.stringify(config, null, 2),
+        );
+
         // Setar token primeiro - delay maior para garantir que FormSelect está completamente montado
         if (config.token) {
           setValue('token', config.token, { shouldValidate: false });
           setSelectedInstanceToken(config.token);
         }
         setValue('phoneNumber', config.phoneNumber || '');
-        setValue('messageType', config.messageType || 'text');
+
+        // IMPORTANTE: Setar messageType com shouldValidate e shouldDirty para garantir que o FormSelect atualize
+        const messageTypeValue = config.messageType || 'text';
+        console.log('📥 Setando messageType:', messageTypeValue);
+        setValue('messageType', messageTypeValue, {
+          shouldValidate: false,
+          shouldDirty: false,
+          shouldTouch: false,
+        });
+
+        // Forçar atualização do FormSelect após um pequeno delay
+        setTimeout(() => {
+          setValue('messageType', messageTypeValue, {
+            shouldValidate: false,
+            shouldDirty: false,
+            shouldTouch: false,
+          });
+        }, 100);
         setValue('text', config.text || '');
         setValue('mediaUrl', config.mediaUrl || '');
         setValue('mediaType', config.mediaType || 'image');
@@ -1210,16 +1258,34 @@ function MessageFormFields({
           fieldName="messageType"
           placeholder="Selecione o tipo"
           options={messageTypes.filter((type) => {
-            if (type.value !== 'template') {
-              return true;
+            // Mostrar template apenas se a instância for Cloud
+            if (type.value === 'template') {
+              return isCloudInstance;
             }
-            // Manter opção template se instância for Cloud ou se já estiver selecionado
-            return (
-              isCloudInstance ||
-              (form.messageType as MessageType | undefined) === 'template'
-            );
+            return true;
           })}
           className="w-full"
+          onValueChange={(value) => {
+            // Garantir que o valor seja salvo
+            setValue('messageType', value);
+            // Se mudou para template e já existe um templateName, atualizar selectedTemplate
+            if (
+              value === 'template' &&
+              form.templateName &&
+              templates.length > 0
+            ) {
+              const template = templates.find(
+                (t) => t.name === form.templateName,
+              );
+              if (template) {
+                setSelectedTemplate(template);
+                setValue('templateLanguage', template.language);
+              }
+            } else if (value !== 'template') {
+              // Se mudou para outro tipo, limpar template
+              setSelectedTemplate(null);
+            }
+          }}
         />
       </div>
 
@@ -2678,6 +2744,21 @@ function MessageFormFields({
                       label: `${template.name} (${template.language})`,
                     }))}
                     className="w-full"
+                    onValueChange={(value) => {
+                      // Garantir que messageType seja 'template' quando um template é selecionado
+                      if (value && value.trim() !== '') {
+                        setValue('messageType', 'template');
+                        const template = templates.find(
+                          (t) => t.name === value,
+                        );
+                        if (template) {
+                          setSelectedTemplate(template);
+                          setValue('templateLanguage', template.language);
+                        }
+                      } else {
+                        setSelectedTemplate(null);
+                      }
+                    }}
                   />
                 );
               })()
@@ -2740,39 +2821,41 @@ function MessageFormFields({
               )}
 
               {/* Preview do template */}
-              {Object.keys(templateVariables).length > 0 && (
-                <div className="mt-3 p-3 bg-white border rounded">
-                  <Typography
-                    variant="span"
-                    className="text-xs text-gray-600 mb-2 block"
-                  >
-                    Preview:
-                  </Typography>
-                  <div className="text-sm whitespace-pre-wrap">
-                    {selectedTemplate.components
-                      .map((comp) => {
-                        if (comp.type === 'BODY' && comp.text) {
-                          let preview = comp.text;
-                          Object.entries(templateVariables).forEach(
-                            ([key, value]) => {
-                              if (key.startsWith('body_')) {
-                                const varNum = key.replace('body_', '');
-                                preview = preview.replace(
-                                  `{{${varNum}}}`,
-                                  value,
-                                );
-                              }
-                            },
-                          );
-                          return preview;
-                        }
-                        return null;
-                      })
-                      .filter(Boolean)
-                      .join('\n')}
-                  </div>
+              <div className="mt-3 p-3 bg-white border rounded">
+                <Typography
+                  variant="span"
+                  className="text-xs text-gray-600 mb-2 block"
+                >
+                  Preview:
+                </Typography>
+                <div className="text-sm text-neutral-600 whitespace-pre-wrap">
+                  {selectedTemplate.components
+                    .map((comp) => {
+                      if (comp.type === 'BODY' && comp.text) {
+                        let preview = comp.text;
+                        // Substituir variáveis se existirem
+                        Object.entries(templateVariables).forEach(
+                          ([key, value]) => {
+                            if (key.startsWith('body_')) {
+                              const varNum = key.replace('body_', '');
+                              preview = preview.replace(
+                                `{{${varNum}}}`,
+                                value || `{{${varNum}}}`,
+                              );
+                            }
+                          },
+                        );
+                        return preview;
+                      }
+                      if (comp.type === 'HEADER' && comp.text) {
+                        return comp.text;
+                      }
+                      return null;
+                    })
+                    .filter(Boolean)
+                    .join('\n\n') || 'Nenhum conteúdo disponível'}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
@@ -3142,6 +3225,41 @@ export function MessageNodeConfig({
   }, [config]);
 
   const handleSubmit = async (data: FieldValues) => {
+    // Debug: verificar o que está sendo recebido
+    console.log('📝 handleSubmit recebeu:', {
+      messageType: data.messageType,
+      templateName: data.templateName,
+      templateLanguage: data.templateLanguage,
+      text: data.text,
+      token: data.token,
+      phoneNumber: data.phoneNumber,
+    });
+
+    // 🔧 CORREÇÃO: Garantir que messageType esteja definido
+    // Se um template foi selecionado, garantir que messageType seja 'template'
+    if (data.templateName && data.templateName.trim() !== '') {
+      data.messageType = 'template';
+    }
+
+    // Se messageType não estiver definido E não houver templateName, usar 'text' como padrão
+    // IMPORTANTE: Não sobrescrever se já for 'template'
+    if (
+      (!data.messageType || data.messageType === '') &&
+      (!data.templateName || data.templateName.trim() === '')
+    ) {
+      data.messageType = 'text';
+    }
+
+    // Garantir que se messageType for 'template', ele seja mantido
+    if (data.messageType === 'template') {
+      // Garantir que templateName e templateLanguage estejam presentes
+      if (!data.templateName || data.templateName.trim() === '') {
+        console.warn(
+          '⚠️ messageType é template mas templateName não está definido',
+        );
+      }
+    }
+
     // 🔧 CORREÇÃO: Sincronizar manualmente os estados locais com o campo do formulário
     // antes de processar o submit, garantindo que os dados estejam atualizados
     if (
@@ -3361,11 +3479,26 @@ export function MessageNodeConfig({
     }
 
     // Modo manual (código original)
+    // Garantir que messageType esteja definido
+    // IMPORTANTE: Se templateName existe, messageType deve ser 'template'
+    let finalMessageType: MessageType = (data.messageType ||
+      'text') as MessageType;
+    if (data.templateName && data.templateName.trim() !== '') {
+      finalMessageType = 'template';
+    }
+
+    // Debug: verificar o que será salvo
+    console.log('💾 Salvando messageConfig:', {
+      messageType: finalMessageType,
+      templateName: data.templateName,
+      templateLanguage: data.templateLanguage,
+    });
+
     const messageConfig: MessageConfig = {
       token: data.token,
       phoneNumber: data.phoneNumber,
-      messageType: data.messageType as MessageType,
-      text: data.messageType === 'text' ? data.text : undefined,
+      messageType: finalMessageType,
+      text: finalMessageType === 'text' ? data.text : undefined,
       mediaUrl: data.mediaUrl,
       mediaType: data.mediaType as
         | 'image'
@@ -3401,7 +3534,7 @@ export function MessageNodeConfig({
       trackId: data.trackId || undefined,
     };
 
-    if (data.messageType === 'template') {
+    if (finalMessageType === 'template') {
       messageConfig.templateName = data.templateName || undefined;
       messageConfig.templateLanguage = data.templateLanguage || undefined;
       if (data.templateVariables && data.templateVariables.trim() !== '') {
@@ -3422,7 +3555,7 @@ export function MessageNodeConfig({
     }
 
     // Se for menu interativo, adicionar configuração
-    if (data.messageType === 'interactive_menu') {
+    if (finalMessageType === 'interactive_menu') {
       let choices: string[] = [];
 
       if (data.interactiveMenuChoices) {
@@ -3484,6 +3617,12 @@ export function MessageNodeConfig({
             : undefined,
       };
     }
+
+    // Debug: verificar o que será passado para onSave
+    console.log(
+      '🚀 Passando para onSave:',
+      JSON.stringify(messageConfig, null, 2),
+    );
 
     onSave(messageConfig);
     onClose();

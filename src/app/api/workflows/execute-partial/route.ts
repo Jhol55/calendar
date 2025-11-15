@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
 import { executeFlow } from '@/workers/helpers/flow-executor';
 import { getSession } from '@/utils/security/session';
+import type { WebhookJobData } from '@/services/queue';
 // Type helper para Prisma JSON fields - necessário usar any devido à tipagem do Prisma
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PrismaJsonValue = any;
@@ -132,22 +133,55 @@ export async function POST(request: NextRequest) {
       edges = dbEdges;
     }
 
-    // Identificar o caminho do início até o targetNode
-
-    const pathToTarget = findPathToNode(targetNodeId, nodes, edges);
-
-    if (pathToTarget.length === 0) {
-      return NextResponse.json(
-        { error: 'Não foi possível encontrar caminho até o node especificado' },
-        { status: 400 },
-      );
-    }
-
-    console.log(`📍 Caminho identificado: ${pathToTarget.join(' → ')}`);
+    // Identificar o caminho do início até o targetNode (será usado depois)
+    // Não precisa validar aqui - pode ser node isolado
 
     // Se for flow inline, criar ou atualizar flow temporário no banco
     let actualFlowId = flowId;
     let isTemporaryFlow = false;
+
+    // ✅ IMPORTANTE: Sempre usar originalFlowId se fornecido (flow salvo)
+    if (inlineFlow?.originalFlowId && inlineFlow.originalFlowId !== 'temp') {
+      actualFlowId = inlineFlow.originalFlowId;
+      console.log(`✅ Usando originalFlowId fornecido: ${actualFlowId}`);
+    }
+
+    // ✅ Se ainda não tem flowId válido, criar flow temporário
+    if (!actualFlowId || actualFlowId === 'temp') {
+      if (currentUserId) {
+        const existingTempFlow = await prisma.chatbot_flows.findFirst({
+          where: {
+            userId: currentUserId,
+            isTemporary: true,
+          },
+        });
+
+        if (existingTempFlow) {
+          actualFlowId = existingTempFlow.id;
+          console.log(`✅ Usando flow temporário existente: ${actualFlowId}`);
+        } else {
+          // Criar novo flow temporário
+          const tempFlow = await prisma.chatbot_flows.create({
+            data: {
+              name: `Preview - User ${currentUserId}`,
+              nodes: nodes as PrismaJsonValue,
+              edges: edges as PrismaJsonValue,
+              userId: currentUserId,
+              isActive: false,
+              isTemporary: true,
+            },
+          });
+          actualFlowId = tempFlow.id;
+          console.log(`✅ Flow temporário criado: ${actualFlowId}`);
+        }
+        isTemporaryFlow = true;
+      } else {
+        return NextResponse.json(
+          { error: 'Usuário não autenticado e flowId não fornecido' },
+          { status: 401 },
+        );
+      }
+    }
 
     if (inlineFlow) {
       // ✅ Usar UM único flow temporário por usuário (evita poluição)
@@ -248,17 +282,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Criar execution record (herdando nodeExecutions mesclados)
+    // ✅ Criar execution record ANTES de executar (para retornar imediatamente)
+    // IMPORTANTE: Usar o flowId ORIGINAL para que a execução apareça na lista correta
+    const flowIdForExecution = inlineFlow?.originalFlowId || actualFlowId;
+
+    console.log(`📝 Criando execução:`);
+    console.log(`   - actualFlowId (flow temporário): ${actualFlowId}`);
+    console.log(
+      `   - originalFlowId (flow real): ${inlineFlow?.originalFlowId}`,
+    );
+    console.log(`   - flowIdForExecution (será usado): ${flowIdForExecution}`);
+
     const startTime = new Date();
     const execution = await prisma.flow_executions.create({
       data: {
-        flowId: actualFlowId,
+        flowId: flowIdForExecution, // ✅ Usar flowId original se existir
         status: 'running',
         triggerType: inlineFlow ? 'manual_partial_preview' : 'manual_partial',
         triggerData: triggerData as PrismaJsonValue,
         startTime,
         data: triggerData as PrismaJsonValue,
-        nodeExecutions: mergedNodeExecutions as PrismaJsonValue, // ✅ Herdar dados de nodes anteriores
+        nodeExecutions: mergedNodeExecutions as PrismaJsonValue,
       },
     });
 
@@ -266,109 +310,167 @@ export async function POST(request: NextRequest) {
       `✅ Execution criada: ${execution.id} (${Object.keys(mergedNodeExecutions).length} nodes herdados)`,
     );
 
-    // Executar o flow parcialmente
-    try {
-      // Encontrar o primeiro node (webhook ou outro tipo)
-      const startNode = nodes.find((node) => {
-        const hasIncoming = edges.some((edge) => edge.target === node.id);
-        return !hasIncoming;
-      });
-
-      if (!startNode) {
-        throw new Error(
-          'Não foi possível encontrar o node inicial. Verifique se o fluxo tem um node inicial sem conexões de entrada.',
+    // ✅ RETORNAR IMEDIATAMENTE após criar a execução
+    // A execução do flow acontece em background
+    // O frontend fará polling para verificar quando terminar
+    const executeInBackground = async () => {
+      try {
+        // Verificar se o targetNode está isolado (sem edges conectando ele)
+        const hasIncomingEdges = edges.some(
+          (edge) => edge.target === targetNodeId,
         );
-      }
+        const hasOutgoingEdges = edges.some(
+          (edge) => edge.source === targetNodeId,
+        );
+        const isIsolated = !hasIncomingEdges && !hasOutgoingEdges;
 
-      console.log(
-        `🚀 Executando flow a partir de: ${startNode.id} (tipo: ${startNode.type})`,
-      );
+        // ✅ LÓGICA CORRETA: Se o node tem incoming edges, SEMPRE executar o caminho completo
+        // Apenas executar o node isolado se ele NÃO tem nenhuma conexão
+        const shouldExecuteOnlyTarget = isIsolated;
 
-      // Criar WebhookJobData simulado para execução
-      const webhookData = {
-        jobId: execution.id,
-        nodeId: startNode.id,
-        flowId: actualFlowId,
-        body: triggerData,
-        stopAtNodeId: targetNodeId, // Adicionar flag para parar no node especificado
-        webhookId: 'manual_partial_execution',
-        method: 'POST',
-        headers: {},
-        queryParams: {},
-        timestamp: new Date().toISOString(),
-        config: {},
-      };
+        let startNode: FlowNode | undefined;
+        let webhookData: WebhookJobData;
 
-      // Executar o flow (usar flow inline ou do banco)
-      const flowToExecute = inlineFlow
-        ? {
-            ...flow,
-            id: actualFlowId, // Usar o flowId temporário criado
+        if (shouldExecuteOnlyTarget) {
+          // Node está isolado ou não há caminho conectado - executar apenas ele
+          const targetNode = nodes.find((node) => node.id === targetNodeId);
+          if (!targetNode) {
+            throw new Error(`Node ${targetNodeId} não encontrado no flow`);
           }
-        : flow;
 
-      await executeFlow(execution.id, flowToExecute, webhookData);
+          startNode = targetNode;
+          webhookData = {
+            nodeId: targetNodeId, // Começar diretamente no node isolado
+            flowId: actualFlowId,
+            body: triggerData,
+            stopAtNodeId: targetNodeId, // Parar imediatamente após executar
+            webhookId: 'manual_partial_execution_isolated',
+            method: 'POST',
+            headers: {},
+            queryParams: {},
+            timestamp: new Date().toISOString(),
+            config: {},
+          };
+        } else {
+          // Há caminho conectado - executar desde o primeiro node até o targetNode
+          // ✅ BUSCAR O PRIMEIRO NODE DO CAMINHO ATÉ O TARGET
+          // Fazer busca reversa a partir do targetNode, seguindo incoming edges
+          const findStartNodeInPath = (
+            nodeId: string,
+            visited: Set<string> = new Set(),
+          ): string => {
+            if (visited.has(nodeId)) return nodeId;
+            visited.add(nodeId);
 
-      // Buscar execution atualizada
-      const updatedExecution = await prisma.flow_executions.findUnique({
-        where: { id: execution.id },
-      });
+            // Buscar edges que chegam neste node
+            const incomingEdges = edges.filter(
+              (edge) => edge.target === nodeId,
+            );
 
-      const endTime = new Date();
-      const duration = endTime.getTime() - startTime.getTime();
+            // Se não tem incoming edges, este é o startNode do caminho
+            if (incomingEdges.length === 0) {
+              return nodeId;
+            }
 
-      // Se ainda não foi finalizada, finalizar agora
-      if (updatedExecution?.status === 'running') {
-        await prisma.flow_executions.update({
+            // Se tem incoming edges, seguir recursivamente
+            // Usar o primeiro source node encontrado
+            const sourceNodeId = incomingEdges[0].source;
+            return findStartNodeInPath(sourceNodeId, visited);
+          };
+
+          const startNodeId = findStartNodeInPath(targetNodeId);
+          startNode = nodes.find((node) => node.id === startNodeId);
+
+          if (!startNode) {
+            throw new Error(
+              `Não foi possível encontrar o node inicial do caminho até ${targetNodeId}`,
+            );
+          }
+
+          webhookData = {
+            nodeId: startNode.id, // Começar do primeiro node
+            flowId: actualFlowId,
+            body: triggerData,
+            stopAtNodeId: targetNodeId, // Parar no node alvo especificado
+            webhookId: 'manual_partial_execution',
+            method: 'POST',
+            headers: {},
+            queryParams: {},
+            timestamp: new Date().toISOString(),
+            config: {},
+          };
+        }
+
+        // Executar o flow (usar flow inline ou do banco)
+        const flowToExecute = inlineFlow
+          ? {
+              ...flow,
+              id: actualFlowId, // Usar o flowId temporário criado
+            }
+          : flow;
+
+        await executeFlow(execution.id, flowToExecute, webhookData);
+
+        // Buscar execution atualizada
+        const updatedExecution = await prisma.flow_executions.findUnique({
           where: { id: execution.id },
-          data: {
-            status: 'success',
-            endTime,
-            duration,
-          },
         });
+
+        const endTime = new Date();
+        const duration = endTime.getTime() - startTime.getTime();
+
+        // Se ainda não foi finalizada, finalizar agora
+        if (updatedExecution?.status === 'running') {
+          await prisma.flow_executions.update({
+            where: { id: execution.id },
+            data: {
+              status: 'success',
+              endTime,
+              duration,
+              // ✅ IMPORTANTE: Não sobrescrever nodeExecutions aqui!
+              // Eles já foram atualizados pelo executeFlow
+            },
+          });
+        }
+      } catch (execError) {
+        console.error('❌ Erro na execução do flow:', execError);
+
+        const endTime = new Date();
+        const duration = endTime.getTime() - startTime.getTime();
+
+        // Atualizar execução com erro
+        try {
+          await prisma.flow_executions.update({
+            where: { id: execution.id },
+            data: {
+              status: 'error',
+              endTime,
+              duration,
+              error:
+                execError instanceof Error
+                  ? execError.message
+                  : 'Erro desconhecido',
+            },
+          });
+        } catch (updateError) {
+          console.error('❌ Erro ao atualizar execução:', updateError);
+        }
       }
+    };
 
-      console.log(
-        `✅ Execução parcial concluída em ${duration}ms ${isTemporaryFlow ? '(flow temporário)' : ''}`,
-      );
+    // Executar em background (não bloquear a resposta)
+    executeInBackground().catch((error) => {
+      console.error('❌ Erro ao executar flow em background:', error);
+    });
 
-      return NextResponse.json({
-        success: true,
-        executionId: execution.id,
-        status: 'success',
-        duration,
-        path: pathToTarget,
-        isTemporaryFlow, // Indicar se o flow é temporário
-      });
-    } catch (execError) {
-      console.error('❌ Erro na execução do flow:', execError);
-
-      const endTime = new Date();
-      const duration = endTime.getTime() - startTime.getTime();
-
-      await prisma.flow_executions.update({
-        where: { id: execution.id },
-        data: {
-          status: 'error',
-          endTime,
-          duration,
-          error:
-            execError instanceof Error
-              ? execError.message
-              : 'Erro desconhecido',
-        },
-      });
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            execError instanceof Error ? execError.message : 'Erro na execução',
-        },
-        { status: 500 },
-      );
-    }
+    // ✅ RETORNAR IMEDIATAMENTE com o executionId E flowId
+    return NextResponse.json({
+      success: true,
+      executionId: execution.id,
+      flowId: flowIdForExecution, // ✅ Retornar flowId para o frontend atualizar
+      status: 'running', // Status inicial
+      isTemporaryFlow,
+    });
   } catch (error) {
     console.error('❌ Erro na API de execução parcial:', error);
     return NextResponse.json(

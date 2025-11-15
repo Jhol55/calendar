@@ -22,6 +22,7 @@ interface PartialExecutionOptions {
 
 interface PartialExecutionResult {
   executionId: string;
+  flowId?: string; // ✅ FlowId usado para salvar a execução (pode ser diferente do flowId original se for temporário)
   status: 'success' | 'error';
   duration: number;
 }
@@ -112,8 +113,27 @@ export function usePartialExecution() {
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Erro ao executar workflow');
+          // Verificar se a resposta é JSON antes de tentar fazer parse
+          const contentType = response.headers.get('content-type');
+          let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+
+          if (contentType?.includes('application/json')) {
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.error || errorMessage;
+            } catch {
+              // Se falhar o parse, usar a mensagem padrão
+            }
+          } else {
+            // Se não for JSON, tentar ler como texto para debug
+            try {
+              await response.text();
+            } catch {
+              // Ignorar erro ao ler texto
+            }
+          }
+
+          throw new Error(errorMessage);
         }
 
         const result = await response.json();
@@ -124,10 +144,22 @@ export function usePartialExecution() {
           duration: result.duration,
         };
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : 'Erro desconhecido';
+        let errorMessage = 'Erro desconhecido';
+
+        if (err instanceof Error) {
+          errorMessage = err.message;
+
+          // Se for um erro de sintaxe JSON, pode ser que a resposta seja HTML
+          if (
+            err.message.includes('Unexpected token') ||
+            err.message.includes('JSON')
+          ) {
+            errorMessage = 'Erro ao processar resposta do servidor.';
+          }
+        }
+
         setError(errorMessage);
-        console.error('❌ Erro na execução parcial:', err);
+
         return null;
       } finally {
         setIsExecuting(false);

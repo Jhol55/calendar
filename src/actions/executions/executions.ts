@@ -4,6 +4,7 @@ import { prisma } from '@/services/prisma';
 
 export interface Execution {
   id: string;
+  flowId?: string; // ✅ Adicionar flowId para identificar o flow da execução
   status: 'running' | 'success' | 'error' | 'stopped';
   triggerType: 'webhook' | 'manual' | 'schedule';
   startTime: string;
@@ -67,6 +68,7 @@ export async function listExecutions(
     // Mapear para o tipo Execution
     const mappedExecutions = executions.map((exec) => ({
       id: exec.id,
+      flowId: exec.flowId, // ✅ Incluir flowId
       status: exec.status as 'running' | 'success' | 'error' | 'stopped',
       triggerType: exec.triggerType as 'webhook' | 'manual' | 'schedule',
       startTime: exec.createdAt.toISOString(),
@@ -114,8 +116,17 @@ export async function getExecution(id: string) {
     }
 
     // Mapear para o tipo Execution
+    const nodeExecs = execution.nodeExecutions as Record<
+      string,
+      unknown
+    > | null;
+    console.log(
+      `📊 [getExecution] Execution ${id}: nodeExecutions tem ${nodeExecs ? Object.keys(nodeExecs).length : 0} nodes`,
+    );
+
     const mappedExecution: Execution = {
       id: execution.id,
+      flowId: execution.flowId, // ✅ Incluir flowId
       status: execution.status as 'running' | 'success' | 'error' | 'stopped',
       triggerType: execution.triggerType as 'webhook' | 'manual' | 'schedule',
       startTime: execution.createdAt.toISOString(),
@@ -124,9 +135,7 @@ export async function getExecution(id: string) {
       error: execution.error || undefined,
       data: execution.data as unknown,
       result: execution.result as unknown,
-      nodeExecutions:
-        (execution.nodeExecutions as Record<string, unknown> | null) ||
-        undefined,
+      nodeExecutions: nodeExecs || undefined,
     };
 
     return { success: true, execution: mappedExecution };

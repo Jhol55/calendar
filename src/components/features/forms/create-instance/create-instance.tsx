@@ -113,22 +113,15 @@ export const CreateInstanceForm = ({
         xfbml: true,
         version: 'v23.0',
       });
-
-      console.log('✅ Facebook SDK inicializado');
     };
 
     // Escutar mensagens do Embedded Signup (WA_EMBEDDED_SIGNUP)
     const handleMessage = (event: MessageEvent) => {
-      console.log('📨 Mensagem recebida!');
-      console.log('📨 Origin:', event.origin);
-      console.log('📨 Data:', event.data);
-
       // Verificar origem
       if (
         event.origin !== 'https://www.facebook.com' &&
         event.origin !== 'https://web.facebook.com'
       ) {
-        console.log('⚠️ Origem não é do Facebook, ignorando');
         return;
       }
 
@@ -136,21 +129,9 @@ export const CreateInstanceForm = ({
         const data =
           typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
 
-        console.log('📊 Data parseado:', data);
-
         if (data.type === 'WA_EMBEDDED_SIGNUP') {
-          console.log('✅ Evento WA_EMBEDDED_SIGNUP detectado!');
-          console.log('📊 Event type:', data.event);
-
           if (data.event === 'FINISH') {
             const { phone_number_id, waba_id } = data.data;
-            console.log(
-              '✅ Embedded Signup completo!',
-              'WABA:',
-              waba_id,
-              'Phone:',
-              phone_number_id,
-            );
 
             // Armazenar IDs para usar no callback (tanto state quanto ref)
             const info = {
@@ -159,25 +140,10 @@ export const CreateInstanceForm = ({
             };
             setWabaInfo(info);
             wabaInfoRef.current = info;
-
-            console.log('✅ wabaInfo definido!', info);
-          } else if (data.event === 'CANCEL') {
-            console.warn('❌ Usuário cancelou Embedded Signup');
-          } else if (data.event === 'ERROR') {
-            console.error(
-              '❌ Erro no Embedded Signup:',
-              data.data.error_message,
-            );
           }
-        } else {
-          console.log(
-            '⚠️ Tipo de mensagem não é WA_EMBEDDED_SIGNUP:',
-            data.type,
-          );
         }
-      } catch (err) {
-        console.log('⚠️ Erro ao parsear mensagem:', err);
-        console.log('Mensagem original:', event.data);
+      } catch {
+        // Ignorar erro ao parsear mensagem
       }
     };
 
@@ -236,8 +202,7 @@ export const CreateInstanceForm = ({
               message: result.message || 'Erro ao criar instância de teste',
             });
           }
-        } catch (error) {
-          console.error('❌ Erro ao criar instância de teste:', error);
+        } catch {
           setError('provider', {
             message: 'Erro ao criar instância de teste',
           });
@@ -246,19 +211,8 @@ export const CreateInstanceForm = ({
         return;
       }
 
-      console.log('🔍 Iniciando fluxo Cloud...');
-      console.log(
-        '🔍 window.FB:',
-        window.FB ? '✅ carregado' : '❌ não carregado',
-      );
-      console.log(
-        '🔍 Config ID:',
-        process.env.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID,
-      );
-
       // Usar Facebook SDK para Embedded Signup
       if (!window.FB) {
-        console.error('❌ Facebook SDK não carregado!');
         setError('provider', {
           message:
             'Facebook SDK não carregado. Aguarde um momento e tente novamente.',
@@ -269,14 +223,11 @@ export const CreateInstanceForm = ({
       const configId =
         process.env.NEXT_PUBLIC_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID;
       if (!configId) {
-        console.error('❌ Config ID não encontrado!');
         setError('provider', {
           message: 'Config ID do Embedded Signup não configurado',
         });
         return;
       }
-
-      console.log('✅ SDK e Config ID OK, prosseguindo...');
 
       // Armazenar nome da instância para usar após callback
       const instanceName = data.name;
@@ -285,29 +236,15 @@ export const CreateInstanceForm = ({
       // Limpar wabaInfo anterior
       setWabaInfo(null);
       wabaInfoRef.current = null;
-      console.log('🧹 wabaInfo limpo para novo fluxo');
-
-      console.log('🚀 Iniciando Embedded Signup via FB.login...');
-      console.log('🚀 Config ID que será usado:', configId);
 
       // Usar FB.login com Embedded Signup
       try {
         window.FB.login(
           (response) => {
-            console.log('📥 Resposta do FB.login:', response);
-            console.log('📥 Status:', response.status);
-            console.log('📥 authResponse:', response.authResponse);
-
             if (response.authResponse) {
               const code = response.authResponse.code;
-              console.log(
-                '✅ Code recebido do FB.login:',
-                code ? '✅ presente' : '❌ AUSENTE',
-              );
-              console.log('📊 authResponse completo:', response.authResponse);
 
               if (!code) {
-                console.error('❌ Code não foi retornado pelo Facebook!');
                 setError('provider', {
                   message: 'Erro: Código não foi retornado pelo Facebook',
                 });
@@ -319,25 +256,11 @@ export const CreateInstanceForm = ({
               let attempts = 0;
               const maxAttempts = 150; // 150 * 200ms = 30 segundos
 
-              console.log('⏳ Aguardando wabaInfo via postMessage...');
-              console.log('⏳ wabaInfoRef.current:', wabaInfoRef.current);
-
               const checkWabaInfo = setInterval(() => {
                 attempts++;
 
-                if (attempts % 10 === 0) {
-                  console.log(
-                    `⏳ Tentativa ${attempts}/${maxAttempts}, wabaInfoRef.current:`,
-                    wabaInfoRef.current,
-                  );
-                }
-
                 if (wabaInfoRef.current) {
                   clearInterval(checkWabaInfo);
-                  console.log(
-                    '✅ WABA Info disponível, criando instância...',
-                    wabaInfoRef.current,
-                  );
 
                   // Preparar dados com code (backend trocará por token)
                   const requestData = {
@@ -347,13 +270,6 @@ export const CreateInstanceForm = ({
                     phoneNumberId: wabaInfoRef.current.phoneNumberId,
                     twoFactorPin: twoFactorPin || undefined, // Enviar PIN se fornecido
                   };
-
-                  console.log('📤 Enviando requisição com dados:', {
-                    name: requestData.name,
-                    code: requestData.code ? '✅ presente' : '❌ AUSENTE',
-                    wabaId: requestData.wabaId,
-                    phoneNumberId: requestData.phoneNumberId,
-                  });
 
                   // Criar instância via API direta (sem trocar código por token)
                   fetch('/api/whatsapp-official/create-instance-sdk', {
@@ -366,7 +282,6 @@ export const CreateInstanceForm = ({
                     .then((res) => res.json())
                     .then((result) => {
                       if (result.success) {
-                        console.log('✅ Instância criada com sucesso!');
                         sessionStorage.removeItem(
                           'pending_cloud_instance_name',
                         );
@@ -374,24 +289,18 @@ export const CreateInstanceForm = ({
                           onSuccess();
                         }
                       } else {
-                        console.error(
-                          '❌ Erro ao criar instância:',
-                          result.message,
-                        );
                         setError('provider', {
                           message: result.message || 'Erro ao criar instância',
                         });
                       }
                     })
-                    .catch((error) => {
-                      console.error('❌ Erro ao chamar API:', error);
+                    .catch(() => {
                       setError('provider', {
                         message: 'Erro ao criar instância Cloud',
                       });
                     });
                 } else if (attempts >= maxAttempts) {
                   clearInterval(checkWabaInfo);
-                  console.error('❌ Timeout aguardando WABA info');
                   setError('provider', {
                     message:
                       'Tempo esgotado aguardando confirmação do WhatsApp',
@@ -399,11 +308,6 @@ export const CreateInstanceForm = ({
                 }
               }, 200);
             } else {
-              console.warn('❌ Usuário cancelou ou erro no login');
-              console.warn(
-                '📊 Response completo:',
-                JSON.stringify(response, null, 2),
-              );
               setError('provider', {
                 message: 'Autenticação cancelada ou falhou',
               });
@@ -421,7 +325,6 @@ export const CreateInstanceForm = ({
           },
         );
       } catch (error) {
-        console.error('❌ Erro ao chamar FB.login:', error);
         setError('provider', {
           message:
             'Erro ao iniciar Embedded Signup: ' +
@@ -449,178 +352,177 @@ export const CreateInstanceForm = ({
   };
 
   return (
-    <div className="w-full max-w-md">
-      <div className="mb-6 mt-6">
-        <Typography
-          variant="h2"
-          className="text-2xl font-bold text-center mb-2"
+    <div className="w-full max-w-md p-4">
+      <div className="my-6" style={{ zoom: 0.9 }}>
+        <div className="mb-6">
+          <Typography
+            variant="h2"
+            className="text-2xl font-bold text-center mb-2"
+          >
+            Criar Nova Instância
+          </Typography>
+          <Typography variant="p" className="text-neutral-600 text-center">
+            Crie uma nova instância para enviar mensagens
+          </Typography>
+        </div>
+        <Form
+          className={cn(
+            'flex flex-col w-full h-full max-h-[75vh] overflow-y-auto rounded-md p-4 -z-50',
+            className,
+          )}
+          zodSchema={createInstanceFormSchema}
+          onSubmit={handleSubmit}
         >
-          Criar Nova Instância
-        </Typography>
-        <Typography variant="p" className="text-neutral-600 text-center">
-          Digite um nome para sua nova instância do WhatsApp
-        </Typography>
-      </div>
-      <Form
-        className={cn(
-          'flex flex-col gap-2 w-full h-full max-h-[75vh] overflow-y-auto md:rounded-r-3xl rounded-r-3xl p-4 -z-50 bg-neutral-50',
-          className,
-        )}
-        zodSchema={createInstanceFormSchema}
-        onSubmit={handleSubmit}
-      >
-        <div className="h-full" /> {/* justify-center when overflow */}
-        {inputs.map((input, index) => (
-          <React.Fragment key={index}>
-            <FormControl variant="label" htmlFor={`${baseId}-${index}`}>
-              {input.label}
-            </FormControl>
-
-            <Input
-              id={`${baseId}-${index}`}
-              type={input.type}
-              placeholder={input.placeholder}
-              fieldName={input.fieldName}
-              autoComplete="off"
-            />
-
-            <ErrorField fieldName={input.fieldName} />
-          </React.Fragment>
-        ))}
-        {/* Campo de seleção de provedor */}
-        <FormControl variant="label" htmlFor={`${baseId}-provider`}>
-          Provedor
-        </FormControl>
-        <FormSelect
-          fieldName="provider"
-          placeholder="Selecione o provedor"
-          options={providerOptions}
-          onValueChange={(value) => {
-            setProvider(value);
-            if (value !== 'cloud') {
-              setCloudAccountType(isDevEnvironment ? null : 'real');
-            }
-          }}
-        />
-        <ErrorField fieldName="provider" />
-        {provider === 'cloud' && isDevEnvironment && (
-          <>
-            <FormControl variant="label">Tipo de Conta</FormControl>
-            <FormSelect
-              fieldName="cloudAccountType"
-              placeholder="Selecione o tipo de conta"
-              options={[
-                { value: 'real', label: 'Conta real (embedded signup)' },
-                { value: 'test', label: 'Conta de teste (token manual)' },
-              ]}
-              onValueChange={(value) => {
-                const accountType = value as 'real' | 'test';
-                setCloudAccountType(accountType);
-                if (accountType === 'test') {
-                  setTwoFactorPin('');
-                }
-              }}
-            />
-            <ErrorField fieldName="cloudAccountType" />
-          </>
-        )}
-        {/* Campo de PIN de 2FA para WhatsApp Cloud (apenas conta real ou produção) */}
-        {provider === 'cloud' &&
-          (!isDevEnvironment || cloudAccountType === 'real') && (
-            <>
-              <FormControl variant="label">
-                PIN de Autenticação de Dois Fatores (2FA)
+          <div className="h-full" /> {/* justify-center when overflow */}
+          {inputs.map((input, index) => (
+            <React.Fragment key={index}>
+              <FormControl variant="label" htmlFor={`${baseId}-${index}`}>
+                {input.label}
               </FormControl>
               <Input
-                type="text"
-                fieldName="twoFactorPin"
-                placeholder="6 dígitos (recomendado para segurança)"
-                value={twoFactorPin}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                  setTwoFactorPin(value);
-                }}
-                maxLength={6}
+                id={`${baseId}-${index}`}
+                type={input.type}
+                placeholder={input.placeholder}
+                fieldName={input.fieldName}
                 autoComplete="off"
               />
-              <div className="text-xs text-gray-600 -mt-1 space-y-1">
-                <p>
-                  <strong className="text-gray-700">
-                    ✓ Se seu número JÁ TEM 2FA:
-                  </strong>{' '}
-                  Insira o PIN existente de 6 dígitos
-                </p>
-                <p>
-                  <strong className="text-gray-700">
-                    ✓ Se seu número NÃO TEM 2FA:
-                  </strong>{' '}
-                  Crie um PIN de 6 dígitos (será configurado automaticamente)
-                </p>
-                <p className="text-amber-600 font-medium">
-                  ⚠️ Deixar em branco deixará seu número sem proteção 2FA (não
-                  recomendado)
-                </p>
-              </div>
-            </>
-          )}
-        {provider === 'cloud' &&
-          isDevEnvironment &&
-          cloudAccountType === 'test' && (
+              <ErrorField fieldName={input.fieldName} />
+            </React.Fragment>
+          ))}
+          {/* Campo de seleção de provedor */}
+          <FormControl variant="label" htmlFor={`${baseId}-provider`}>
+            Provedor
+          </FormControl>
+          <FormSelect
+            fieldName="provider"
+            placeholder="Selecione o provedor"
+            options={providerOptions}
+            onValueChange={(value) => {
+              setProvider(value);
+              if (value !== 'cloud') {
+                setCloudAccountType(isDevEnvironment ? null : 'real');
+              }
+            }}
+          />
+          <ErrorField fieldName="provider" />
+          {provider === 'cloud' && isDevEnvironment && (
             <>
-              <div className="mt-2 rounded-lg border border-dashed border-blue-200 bg-blue-50/60 p-3 space-y-3">
-                <Typography
-                  variant="span"
-                  className="text-xs font-semibold text-blue-700 uppercase tracking-wide"
-                >
-                  Conta de Teste
-                </Typography>
-                <Typography variant="p" className="text-xs text-blue-700">
-                  Informe os dados da conta de teste do WhatsApp Cloud (Public
-                  Test Number). Esses dados são usados apenas em ambiente de
-                  desenvolvimento.
-                </Typography>
-
-                <div className="space-y-2">
-                  <FormControl variant="label">Access Token *</FormControl>
-                  <Input
-                    type="text"
-                    fieldName="testAccessToken"
-                    placeholder="EAAJZ..."
-                    autoComplete="off"
-                  />
-                  <ErrorField fieldName="testAccessToken" />
-                </div>
-
-                <div className="space-y-2">
-                  <FormControl variant="label">Phone Number ID *</FormControl>
-                  <Input
-                    type="text"
-                    fieldName="testPhoneNumberId"
-                    placeholder="123456789012345"
-                    autoComplete="off"
-                  />
-                  <ErrorField fieldName="testPhoneNumberId" />
-                </div>
-
-                <div className="space-y-2">
-                  <FormControl variant="label">WABA ID *</FormControl>
-                  <Input
-                    type="text"
-                    fieldName="testWabaId"
-                    placeholder="987654321098765"
-                    autoComplete="off"
-                  />
-                  <ErrorField fieldName="testWabaId" />
-                </div>
-              </div>
+              <FormControl variant="label">Tipo de Conta</FormControl>
+              <FormSelect
+                fieldName="cloudAccountType"
+                placeholder="Selecione o tipo de conta"
+                options={[
+                  { value: 'real', label: 'Conta real (embedded signup)' },
+                  { value: 'test', label: 'Conta de teste (token manual)' },
+                ]}
+                onValueChange={(value) => {
+                  const accountType = value as 'real' | 'test';
+                  setCloudAccountType(accountType);
+                  if (accountType === 'test') {
+                    setTwoFactorPin('');
+                  }
+                }}
+              />
+              <ErrorField fieldName="cloudAccountType" />
             </>
           )}
-        <SubmitButton variant="gradient">
-          {provider === 'cloud' ? 'Conectar WhatsApp Cloud' : 'Criar Instância'}
-        </SubmitButton>
-        {children}
-        <div className="h-full" /> {/* justify-center when overflow */}
-      </Form>
+          {/* Campo de PIN de 2FA para WhatsApp Cloud (apenas conta real ou produção) */}
+          {provider === 'cloud' &&
+            (!isDevEnvironment || cloudAccountType === 'real') && (
+              <>
+                <FormControl variant="label">
+                  PIN de Autenticação de Dois Fatores (2FA)
+                </FormControl>
+                <Input
+                  type="text"
+                  fieldName="twoFactorPin"
+                  placeholder="6 dígitos (recomendado para segurança)"
+                  value={twoFactorPin}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setTwoFactorPin(value);
+                  }}
+                  maxLength={6}
+                  autoComplete="off"
+                />
+                <div className="text-xs text-gray-600 -mt-1 space-y-1">
+                  <p>
+                    <strong className="text-gray-700">
+                      ✓ Se seu número JÁ TEM 2FA:
+                    </strong>{' '}
+                    Insira o PIN existente de 6 dígitos
+                  </p>
+                  <p>
+                    <strong className="text-gray-700">
+                      ✓ Se seu número NÃO TEM 2FA:
+                    </strong>{' '}
+                    Crie um PIN de 6 dígitos (será configurado automaticamente)
+                  </p>
+                  <p className="text-amber-600 font-medium">
+                    ⚠️ Deixar em branco deixará seu número sem proteção 2FA (não
+                    recomendado)
+                  </p>
+                </div>
+              </>
+            )}
+          {provider === 'cloud' &&
+            isDevEnvironment &&
+            cloudAccountType === 'test' && (
+              <>
+                <div className="mt-2 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/60 p-3 space-y-3">
+                  <Typography
+                    variant="span"
+                    className="text-sm font-semibold text-neutral-700 uppercase tracking-wide"
+                  >
+                    Conta de Teste
+                  </Typography>
+                  <Typography variant="p" className="text-sm text-neutral-700">
+                    Informe os dados da conta de teste do WhatsApp Cloud (Public
+                    Test Number). Esses dados são usados apenas em ambiente de
+                    desenvolvimento.
+                  </Typography>
+                  <div>
+                    <FormControl variant="label">Access Token *</FormControl>
+                    <Input
+                      type="text"
+                      fieldName="testAccessToken"
+                      placeholder="EAAJZ..."
+                      autoComplete="off"
+                    />
+                    <ErrorField fieldName="testAccessToken" />
+                  </div>
+                  <div>
+                    <FormControl variant="label">Phone Number ID *</FormControl>
+                    <Input
+                      type="text"
+                      fieldName="testPhoneNumberId"
+                      placeholder="123456789012345"
+                      autoComplete="off"
+                    />
+                    <ErrorField fieldName="testPhoneNumberId" />
+                  </div>
+                  <div>
+                    <FormControl variant="label">WABA ID *</FormControl>
+                    <Input
+                      type="text"
+                      fieldName="testWabaId"
+                      placeholder="987654321098765"
+                      autoComplete="off"
+                    />
+                    <ErrorField fieldName="testWabaId" />
+                  </div>
+                </div>
+              </>
+            )}
+          <SubmitButton variant="gradient">
+            {provider === 'cloud'
+              ? 'Conectar WhatsApp Cloud'
+              : 'Criar Instância'}
+          </SubmitButton>
+          {children}
+          <div className="h-full" /> {/* justify-center when overflow */}
+        </Form>
+      </div>
     </div>
   );
 };

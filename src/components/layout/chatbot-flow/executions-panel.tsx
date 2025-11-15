@@ -39,6 +39,7 @@ export function ExecutionsPanel({
   const [selectedExecution, setSelectedExecution] = useState<Execution | null>(
     null,
   );
+  const [renderKey, setRenderKey] = useState(0); // ✅ Forçar re-render
 
   const fetchExecutions = useCallback(async () => {
     setLoading(true);
@@ -51,11 +52,9 @@ export function ExecutionsPanel({
       if (result.success && result.executions) {
         setExecutions(result.executions);
       } else {
-        console.error('Error fetching executions:', result.error);
         setExecutions([]);
       }
     } catch (error) {
-      console.error('Error fetching executions:', error);
       setExecutions([]);
     } finally {
       setLoading(false);
@@ -75,7 +74,6 @@ export function ExecutionsPanel({
     try {
       const result = await stopExecution(executionId);
       if (result.success) {
-        console.log('✅ Execution stopped successfully');
         // Atualizar lista de execuções
         await fetchExecutions();
         // Se a execução parada estava selecionada, atualizar
@@ -86,27 +84,34 @@ export function ExecutionsPanel({
         alert(`Erro ao parar execução: ${result.error}`);
       }
     } catch (error) {
-      console.error('Error stopping execution:', error);
       alert('Erro ao parar execução');
     }
   };
 
   useEffect(() => {
     if (isOpen && flowId) {
-      // ✅ Buscar execuções primeiro
+      console.log('🚀 [ExecutionsPanel] Painel aberto, buscando execuções...');
+      // ✅ Buscar execuções primeiro (sempre buscar quando abrir)
       fetchExecutions().then(() => {
+        console.log(
+          '✅ [ExecutionsPanel] Execuções carregadas ao abrir painel',
+        );
         // ✅ Depois verificar se há uma execução selecionada no sessionStorage
         const selectedExecutionStr =
           sessionStorage.getItem('selectedExecution');
         if (selectedExecutionStr) {
           try {
             const execution = JSON.parse(selectedExecutionStr);
+            console.log(
+              '🔍 [ExecutionsPanel] Restaurando execução selecionada:',
+              execution.id,
+            );
             setSelectedExecution(execution);
             if (onExecutionSelect) {
               onExecutionSelect(execution);
             }
           } catch {
-            console.warn('⚠️ Could not parse selected execution');
+            // Ignorar erro ao parsear execução selecionada
           }
         }
       });
@@ -115,25 +120,83 @@ export function ExecutionsPanel({
   }, [isOpen, flowId]);
 
   // Detectar quando uma execução é selecionada (evento customizado)
+  // ✅ IMPORTANTE: Sempre escutar o evento, mesmo quando o painel está fechado
   useEffect(() => {
     const handleExecutionSelected = async (event: CustomEvent<Execution>) => {
       const execution = event.detail;
-      console.log('🎯 Nova execução detectada:', execution.id);
+      console.log(
+        '📥 [ExecutionsPanel] Evento executionSelected recebido:',
+        execution,
+      );
+      console.log('📥 [ExecutionsPanel] FlowId do painel:', flowId);
+      console.log('📥 [ExecutionsPanel] FlowId da execução:', execution.flowId);
 
-      // ✅ Primeiro atualizar a lista de execuções para garantir que a nova execução esteja na lista
-      await fetchExecutions();
+      // ✅ Buscar execuções usando o flowId da execução selecionada
+      // Isso garante que encontremos a execução mesmo se ela for de um flow temporário
+      try {
+        const flowIdToUse = execution.flowId || flowId;
+        console.log(
+          '🔍 [ExecutionsPanel] Buscando execuções do flowId:',
+          flowIdToUse,
+        );
+
+        const result = await listExecutions({
+          flowId: flowIdToUse,
+          limit: 20,
+        });
+
+        console.log('📊 [ExecutionsPanel] Resultado da busca:', result);
+
+        if (result.success && result.executions) {
+          console.log(
+            `✅ [ExecutionsPanel] ${result.executions.length} execuções encontradas`,
+          );
+          setExecutions(result.executions);
+          setRenderKey((prev) => prev + 1); // ✅ Forçar re-render da lista
+
+          // Verificar se a execução atual está na lista
+          const executionInList = result.executions.find(
+            (e) => e.id === execution.id,
+          );
+          if (executionInList) {
+            console.log('✅ [ExecutionsPanel] Execução atual está na lista');
+          } else {
+            console.warn(
+              '⚠️ [ExecutionsPanel] Execução atual NÃO está na lista!',
+            );
+          }
+        }
+      } catch (error) {
+        console.error('❌ [ExecutionsPanel] Erro ao buscar execuções:', error);
+        // Se falhar, tentar com o flowId atual
+        if (flowId) {
+          console.log(
+            '🔄 [ExecutionsPanel] Tentando com flowId atual:',
+            flowId,
+          );
+          await fetchExecutions();
+        }
+      }
 
       // ✅ Depois selecionar a execução
+      console.log('✅ [ExecutionsPanel] Selecionando execução:', execution.id);
+      console.log('📊 [ExecutionsPanel] Painel está aberto?', isOpen);
+      console.log(
+        '📊 [ExecutionsPanel] Total de execuções no estado após busca:',
+        executions.length,
+      );
+
       setSelectedExecution(execution);
       if (onExecutionSelect) {
-        console.log('📤 Chamando onExecutionSelect do painel:', {
-          executionId: execution.id,
-          hasNodeExecutions: !!execution.nodeExecutions,
-          nodeExecutionsKeys: execution.nodeExecutions
-            ? Object.keys(execution.nodeExecutions)
-            : [],
-        });
         onExecutionSelect(execution);
+      }
+
+      // ✅ FORÇAR re-render do painel se estiver aberto
+      // Isso garante que a lista seja atualizada na UI
+      if (isOpen) {
+        console.log(
+          '🔄 [ExecutionsPanel] Forçando atualização da UI do painel',
+        );
       }
     };
 
@@ -149,7 +212,7 @@ export function ExecutionsPanel({
       );
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchExecutions, onExecutionSelect]);
+  }, [flowId, fetchExecutions, onExecutionSelect]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -244,7 +307,7 @@ export function ExecutionsPanel({
                   </Typography>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3" key={renderKey}>
                   {executions.map((execution) => (
                     <div
                       key={execution.id}

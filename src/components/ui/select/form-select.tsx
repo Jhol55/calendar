@@ -46,17 +46,28 @@ export const FormSelect = forwardRef<HTMLButtonElement, FormSelectProps>(
     }, [formValue]);
 
     // Garantir que o valor inicial seja capturado após o mount
+    // useEffect(() => {
+    //   const timer = setTimeout(() => {
+    //     const currentFormValue = (form[fieldName] as string) || '';
+    //     if (currentFormValue !== lastFormValueRef.current) {
+    //       lastFormValueRef.current = currentFormValue;
+    //       setCurrentValue(currentFormValue);
+    //     }
+    //   }, 0);
+    //   return () => clearTimeout(timer);
+    // }, [fieldName, form]);
+
+    // Forçar atualização quando o valor do form mudar (incluindo valores vazios)
     useEffect(() => {
       const timer = setTimeout(() => {
         const currentFormValue = (form[fieldName] as string) || '';
-        if (currentFormValue && currentFormValue !== lastFormValueRef.current) {
+        if (currentFormValue !== lastFormValueRef.current) {
           lastFormValueRef.current = currentFormValue;
           setCurrentValue(currentFormValue);
         }
-      }, 150);
+      }, 200);
       return () => clearTimeout(timer);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fieldName]);
+    }, [formValue, fieldName, form]);
 
     const handleValueChange = (value: string) => {
       lastFormValueRef.current = value;

@@ -12,6 +12,7 @@ import ReactFlow, {
   Connection,
   Edge,
   Node,
+  NodeProps,
   MiniMap,
   Panel,
   ReactFlowInstance,
@@ -69,7 +70,7 @@ import { ExecutionsPanel } from './executions-panel';
 import { DatabaseSpreadsheet } from '@/components/layout/database-spreadsheet/database-spreadsheet';
 import { usePartialExecution } from '@/hooks/use-partial-execution';
 import { withExecuteButton } from './nodes/with-execute-button';
-import { getExecution } from '@/actions/executions';
+import { getExecution, type Execution } from '@/actions/executions';
 
 // Definir nodeTypes base FORA do componente
 const baseNodeTypes = {
@@ -93,10 +94,26 @@ const edgeTypes = {
 const generateNodeId = () =>
   `node_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
+// Tipos para execução de nodes
+interface NodeExecutionResult {
+  status: 'running' | 'completed' | 'error';
+  result?: {
+    selectedHandle?: string;
+    [key: string]: unknown;
+  };
+  error?: string;
+}
+
+interface NodeExecutionsRecord {
+  [nodeId: string]: NodeExecutionResult;
+}
+
 function FlowEditorContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<Node[]>([]);
   const edgesRef = useRef<Edge[]>([]);
+  const currentFlowIdRef = useRef<string | null>(null); // ✅ Ref para evitar stale closure
+  const flowNameRef = useRef<string>(''); // ✅ Ref para evitar stale closure
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] =
@@ -147,6 +164,219 @@ function FlowEditorContent() {
     });
   }, []);
 
+  // Função para destacar nós executados
+  const highlightExecutedNodes = useCallback(
+    (execution: Execution & { targetNodeId?: string }) => {
+      if (!execution.nodeExecutions) {
+        return;
+      }
+
+      const nodeExecutions = execution.nodeExecutions as NodeExecutionsRecord;
+      const executedNodeIds = Object.keys(nodeExecutions);
+      const targetNodeId = execution.targetNodeId;
+
+      const pathNodeIds = new Set<string>();
+      const pathEdgeIds = new Set<string>();
+
+      // ✅ NOVA LÓGICA: Começar do targetNode e voltar para trás seguindo incoming edges
+      // Isso funciona tanto para nodes isolados quanto para nodes conectados
+      const nodeToHighlight = targetNodeId || executedNodeIds[0]; // Se não há target, pegar o primeiro
+
+      if (!nodeToHighlight) {
+        return;
+      }
+
+      // Adicionar o node alvo ao caminho
+      pathNodeIds.add(nodeToHighlight);
+
+      // Se tem targetNode (execução parcial), construir caminho para trás
+      if (targetNodeId) {
+        // DFS reverso: seguir incoming edges recursivamente
+        const buildReversePath = (
+          nodeId: string,
+          visited: Set<string> = new Set(),
+        ) => {
+          if (visited.has(nodeId)) return;
+          visited.add(nodeId);
+
+          // Buscar edges que chegam neste node
+          const incomingEdges = edgesRef.current.filter(
+            (edge) => edge.target === nodeId,
+          );
+
+          incomingEdges.forEach((edge) => {
+            const sourceNode = edge.source;
+
+            // Apenas seguir se o source node foi executado
+            if (executedNodeIds.includes(sourceNode)) {
+              const sourceNodeExecution = nodeExecutions[sourceNode];
+              const sourceNodeData = nodesRef.current.find(
+                (n) => n.id === sourceNode,
+              );
+
+              // ✅ VERIFICAR SE É UM NODE DE CONDIÇÃO/LOOP COM SELECTEDHANDLE
+              const isConditionalNode =
+                sourceNodeData?.type === 'condition' ||
+                sourceNodeData?.type === 'loop';
+
+              if (isConditionalNode && sourceNodeExecution?.result) {
+                // Extrair selectedHandle do result
+                const selectedHandle =
+                  sourceNodeExecution.result &&
+                  typeof sourceNodeExecution.result === 'object' &&
+                  'selectedHandle' in sourceNodeExecution.result
+                    ? (sourceNodeExecution.result.selectedHandle as string)
+                    : undefined;
+
+                // Se tem selectedHandle, só adicionar a edge se ela corresponde ao handle usado
+                if (selectedHandle) {
+                  const edgeWithHandle = edge as {
+                    sourceHandle?: string | null;
+                  };
+                  const edgeSourceHandle = edgeWithHandle.sourceHandle;
+
+                  if (edgeSourceHandle !== selectedHandle) {
+                    return; // Não adicionar esta edge
+                  }
+                }
+              }
+
+              pathNodeIds.add(sourceNode);
+              pathEdgeIds.add(edge.id);
+
+              // Continuar recursivamente para o source node
+              buildReversePath(sourceNode, visited);
+            }
+          });
+        };
+
+        buildReversePath(nodeToHighlight);
+      } else {
+        // Sem targetNode: destacar todos os nodes executados (execução completa)
+        executedNodeIds.forEach((nodeId) => pathNodeIds.add(nodeId));
+
+        // Adicionar edges entre nodes executados, respeitando selectedHandle
+        edgesRef.current.forEach((edge) => {
+          if (
+            executedNodeIds.includes(edge.source) &&
+            executedNodeIds.includes(edge.target)
+          ) {
+            const sourceNodeExecution = nodeExecutions[edge.source];
+            const sourceNodeData = nodesRef.current.find(
+              (n) => n.id === edge.source,
+            );
+
+            // ✅ VERIFICAR SE É UM NODE DE CONDIÇÃO/LOOP COM SELECTEDHANDLE
+            const isConditionalNode =
+              sourceNodeData?.type === 'condition' ||
+              sourceNodeData?.type === 'loop';
+
+            if (isConditionalNode && sourceNodeExecution?.result) {
+              // Extrair selectedHandle do result
+              const selectedHandle =
+                sourceNodeExecution.result &&
+                typeof sourceNodeExecution.result === 'object' &&
+                'selectedHandle' in sourceNodeExecution.result
+                  ? (sourceNodeExecution.result.selectedHandle as string)
+                  : undefined;
+
+              // Se tem selectedHandle, só adicionar a edge se ela corresponde ao handle usado
+              if (selectedHandle) {
+                const edgeWithHandle = edge as { sourceHandle?: string | null };
+                const edgeSourceHandle = edgeWithHandle.sourceHandle;
+
+                if (edgeSourceHandle !== selectedHandle) {
+                  return; // Não adicionar esta edge
+                }
+              }
+            }
+
+            pathEdgeIds.add(edge.id);
+          }
+        });
+      }
+
+      // Atualizar nodes - destacar apenas nodes no caminho real
+      setNodes((currentNodes) => {
+        return currentNodes.map((node) => {
+          // Só destacar se o nó está no caminho real
+          if (pathNodeIds.has(node.id)) {
+            const nodeExecution = nodeExecutions[node.id];
+            if (nodeExecution) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  executionStatus: nodeExecution.status,
+                },
+                style: {
+                  ...node.style,
+                  boxShadow:
+                    nodeExecution.status === 'error'
+                      ? '0 0 0 5px rgba(239, 68, 68, 0.4)' // Vermelho para erro
+                      : '0 0 0 5px rgba(34, 197, 94, 0.4)', // Verde para sucesso/running
+                  borderRadius: '12px',
+                },
+              };
+            }
+          }
+          // Limpar highlight de nodes não executados ou fora do caminho
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              executionStatus: undefined,
+            },
+            style: {
+              ...node.style,
+              boxShadow: undefined,
+              borderRadius: undefined,
+            },
+          };
+        });
+      });
+
+      // Atualizar edges - destacar apenas edges no caminho real
+      setEdges((currentEdges) => {
+        return currentEdges.map((edge) => {
+          // Destacar apenas se a edge está no caminho real
+          if (pathEdgeIds.has(edge.id)) {
+            const sourceExecution = nodeExecutions[edge.source];
+            const targetExecution = nodeExecutions[edge.target];
+
+            // Determinar a cor baseada no status (apenas verde ou vermelho)
+            const hasError =
+              sourceExecution?.status === 'error' ||
+              targetExecution?.status === 'error';
+
+            return {
+              ...edge,
+              animated: true,
+              style: {
+                ...edge.style,
+                stroke: hasError ? '#ef4444' : '#22c55e', // Vermelho para erro, verde para sucesso
+                strokeWidth: 3,
+              },
+            };
+          }
+
+          // Limpar highlight de edges não executadas
+          return {
+            ...edge,
+            animated: false,
+            style: {
+              ...edge.style,
+              stroke: undefined,
+              strokeWidth: undefined,
+            },
+          };
+        });
+      });
+      setHasExecutionHighlight(true);
+    },
+    [setNodes, setEdges],
+  );
+
   // Handler para execução parcial
   const handlePartialExecute = useCallback(
     async (targetNodeId: string) => {
@@ -176,83 +406,108 @@ function FlowEditorContent() {
           triggerData =
             selectedExecution.data || selectedExecution.triggerData || {};
         } catch {
-          console.warn('⚠️ Could not parse selected execution data');
+          // Ignorar erro ao parsear execução selecionada
         }
       }
-
-      console.log(`🎯 Executando até node: ${targetNodeId}`);
 
       // Remover handlers antes de enviar (não podem ser serializados)
       const cleanNodes = removeExecutionHandlers(currentNodes);
 
       // SEMPRE enviar o flow atual para executar sem salvar
+      const flowIdToUse = currentFlowIdRef.current;
+      const flowNameToUse = flowNameRef.current;
+
       const result = await executeUntilNode({
-        flowId: currentFlowId || 'temp', // ID do flow original (se existir)
+        flowId: flowIdToUse || 'temp', // Se null, API vai buscar ou criar temporário
         targetNodeId,
         executionData: triggerData,
         // Sempre passar o flow completo para executar a versão atual (não salva)
         flow: {
           id: 'temp', // ID temporário para o flow inline
-          name: flowName || 'Workflow Temporário',
+          name: flowNameToUse || 'Workflow Temporário',
           nodes: cleanNodes,
           edges: currentEdges,
-          originalFlowId: currentFlowId, // ✅ Passar o flowId original para buscar execuções anteriores
+          originalFlowId: flowIdToUse, // ✅ Passar o flowId original para buscar execuções anteriores
         },
       });
 
-      if (result) {
-        console.log(`✅ Partial execution completed: ${result.executionId}`);
+      if (result?.flowId) {
+        setCurrentFlowId(result.flowId);
+        currentFlowIdRef.current = result.flowId;
+      }
 
-        // Buscar a execução completa e selecionar automaticamente
-        try {
-          // ✅ Aguardar um pouco para garantir que a execução esteja salva no banco
-          await new Promise((resolve) => setTimeout(resolve, 500));
+      if (result?.executionId) {
+        const waitAndSelect = async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
           const executionResult = await getExecution(result.executionId);
+
           if (executionResult.success && executionResult.execution) {
-            // Salvar execução completa no sessionStorage
+            const execution = executionResult.execution;
+
+            const executionWithTarget = {
+              ...execution,
+              targetNodeId,
+            };
+
             sessionStorage.setItem(
               'selectedExecution',
-              JSON.stringify(executionResult.execution),
+              JSON.stringify(executionWithTarget),
             );
 
-            // Disparar evento customizado para notificar o painel (se estiver aberto)
             window.dispatchEvent(
               new CustomEvent('executionSelected', {
-                detail: executionResult.execution,
+                detail: executionWithTarget,
               }),
             );
 
-            console.log(
-              `✅ Execução ${result.executionId} selecionada automaticamente`,
-            );
+            highlightExecutedNodes(executionWithTarget);
           } else {
-            console.warn('⚠️ Não foi possível buscar detalhes da execução');
+            setTimeout(async () => {
+              const retryResult = await getExecution(result.executionId);
+
+              if (retryResult.success && retryResult.execution) {
+                const execution = retryResult.execution;
+
+                const executionWithTarget = {
+                  ...execution,
+                  targetNodeId,
+                };
+
+                sessionStorage.setItem(
+                  'selectedExecution',
+                  JSON.stringify(executionWithTarget),
+                );
+                window.dispatchEvent(
+                  new CustomEvent('executionSelected', {
+                    detail: executionWithTarget,
+                  }),
+                );
+                highlightExecutedNodes(executionWithTarget);
+              }
+            }, 1000);
           }
-        } catch (err) {
-          console.error('❌ Erro ao buscar execução:', err);
-        }
+        };
+
+        waitAndSelect();
       }
     },
     [
-      currentFlowId,
       executeUntilNode,
-      flowName,
       removeExecutionHandlers,
       reactFlowInstance,
+      highlightExecutedNodes,
     ],
   );
 
   // Criar nodeTypes com botão de execução
   const nodeTypes = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return Object.entries(baseNodeTypes).reduce<Record<string, any>>(
-      (acc, [key, NodeComponent]) => {
-        acc[key] = withExecuteButton(NodeComponent);
-        return acc;
-      },
-      {},
-    );
+    return Object.entries(baseNodeTypes).reduce<
+      Record<string, React.ComponentType<NodeProps<NodeData>>>
+    >((acc, [key, NodeComponent]) => {
+      acc[key] = withExecuteButton(NodeComponent);
+      return acc;
+    }, {});
   }, []);
 
   // Verificar se um node específico está executando
@@ -281,10 +536,6 @@ function FlowEditorContent() {
   // Handler para deletar nodes selecionados
   const onNodesDelete = useCallback(
     (nodesToDelete: Node[]) => {
-      console.log(
-        '🗑️ Deleting nodes:',
-        nodesToDelete.map((n) => n.id),
-      );
       setNodes((nds) =>
         nds.filter((node) => !nodesToDelete.some((n) => n.id === node.id)),
       );
@@ -328,10 +579,6 @@ function FlowEditorContent() {
         // Deletar edges selecionadas (se nenhum node estiver selecionado)
         const selectedEdges = edges.filter((edge) => edge.selected);
         if (selectedEdges.length > 0) {
-          console.log(
-            '🗑️ Deleting edges:',
-            selectedEdges.map((e) => e.id),
-          );
           setEdges((eds) =>
             eds.filter((edge) => !selectedEdges.some((e) => e.id === edge.id)),
           );
@@ -418,7 +665,6 @@ function FlowEditorContent() {
     setIsSaving(true);
 
     try {
-      // Remover handlers de execução antes de salvar (não podem ser serializados)
       const cleanNodes = removeExecutionHandlers(nodes);
 
       if (currentFlowId) {
@@ -435,7 +681,6 @@ function FlowEditorContent() {
           id: currentFlowId,
           data: flowData,
         });
-        console.log('✅ Flow atualizado com sucesso!');
       } else {
         // Criar novo flow usando mutation (sem token - será null)
         const flowData = {
@@ -448,12 +693,12 @@ function FlowEditorContent() {
         };
 
         const newFlow = await createWorkflowMutation.mutateAsync(flowData);
-        console.log('✅ Flow criado com sucesso!');
         setCurrentFlowId(newFlow.id);
         setFlowName(newFlow.name);
+        currentFlowIdRef.current = newFlow.id; // ✅ Atualizar ref
+        flowNameRef.current = newFlow.name; // ✅ Atualizar ref
       }
-    } catch (error) {
-      console.error('Error saving flow:', error);
+    } catch {
       alert('Erro ao salvar fluxo');
     } finally {
       setIsSaving(false);
@@ -468,221 +713,6 @@ function FlowEditorContent() {
     createWorkflowMutation,
     removeExecutionHandlers,
   ]);
-
-  // Função para destacar nós executados
-  const highlightExecutedNodes = useCallback(
-    (execution: any) => {
-      if (!execution.nodeExecutions) {
-        console.warn('⚠️ Execução sem nodeExecutions:', execution.id);
-        return;
-      }
-
-      const nodeExecutions = execution.nodeExecutions;
-      const executedNodeIds = Object.keys(nodeExecutions);
-
-      console.log('🎨 Destacando nós executados:', {
-        executionId: execution.id,
-        executedNodeIds,
-        nodeExecutionsCount: executedNodeIds.length,
-        nodeExecutions: Object.entries(nodeExecutions).map(
-          ([nodeId, exec]: [string, any]) => ({
-            nodeId,
-            status: exec.status,
-            hasResult: !!exec.result,
-            selectedHandle: exec.result?.selectedHandle,
-          }),
-        ),
-      });
-
-      // ✅ Construir o caminho real seguido na execução
-      // Usar uma função auxiliar para construir o caminho baseado nos nodes e edges atuais
-      const buildExecutionPath = (
-        currentNodes: Node[],
-        currentEdges: Edge[],
-      ) => {
-        // Encontrar nó inicial (sem incoming edges)
-        const startNode = currentNodes.find((node) => {
-          return !currentEdges.some((edge) => edge.target === node.id);
-        });
-
-        if (!startNode) {
-          console.warn('⚠️ Nó inicial não encontrado');
-          return {
-            pathNodeIds: new Set<string>(),
-            pathEdges: new Set<string>(),
-          };
-        }
-
-        // Construir caminho seguido usando BFS, respeitando selectedHandles
-        const pathNodeIds = new Set<string>();
-        const pathEdges = new Set<string>();
-        const queue: string[] = [startNode.id];
-        const visited = new Set<string>();
-
-        while (queue.length > 0) {
-          const currentNodeId = queue.shift()!;
-
-          // Se já visitamos ou o nó não foi executado, pular
-          if (
-            visited.has(currentNodeId) ||
-            !executedNodeIds.includes(currentNodeId)
-          ) {
-            continue;
-          }
-
-          visited.add(currentNodeId);
-          pathNodeIds.add(currentNodeId);
-
-          // Encontrar próximas edges
-          const outgoingEdges = currentEdges.filter(
-            (edge) => edge.source === currentNodeId,
-          );
-
-          const nodeExecution = nodeExecutions[currentNodeId] as
-            | { status: string; result?: any }
-            | undefined;
-
-          // Se o nó tem selectedHandle (condição/loop), filtrar edges
-          if (nodeExecution?.result?.selectedHandle) {
-            const selectedHandle = nodeExecution.result.selectedHandle;
-            const validEdges = outgoingEdges.filter(
-              (edge) => (edge as any).sourceHandle === selectedHandle,
-            );
-
-            // Adicionar apenas edges válidas ao caminho
-            validEdges.forEach((edge) => {
-              pathEdges.add(edge.id);
-              if (
-                executedNodeIds.includes(edge.target) &&
-                !visited.has(edge.target)
-              ) {
-                queue.push(edge.target);
-              }
-            });
-          } else {
-            // Se não tem selectedHandle, adicionar todas as edges para nós executados
-            outgoingEdges.forEach((edge) => {
-              if (
-                executedNodeIds.includes(edge.target) &&
-                !visited.has(edge.target)
-              ) {
-                pathEdges.add(edge.id);
-                queue.push(edge.target);
-              }
-            });
-          }
-        }
-
-        return { pathNodeIds, pathEdges };
-      };
-
-      // Construir caminho e atualizar nodes e edges
-      // Construir caminho usando os valores atuais dos refs (que são atualizados via useEffect)
-      const { pathNodeIds, pathEdges } = buildExecutionPath(
-        nodesRef.current,
-        edgesRef.current,
-      );
-
-      console.log('🛤️ Caminho real construído:', {
-        pathNodeIds: Array.from(pathNodeIds),
-        pathEdges: Array.from(pathEdges),
-      });
-
-      // ✅ Atualizar nodes - destacar apenas os que estão no caminho real
-      setNodes((currentNodes) => {
-        return currentNodes.map((node) => {
-          // Só destacar se o nó está no caminho real
-          if (pathNodeIds.has(node.id)) {
-            const nodeExecution = nodeExecutions[node.id] as
-              | { status: string }
-              | undefined;
-            if (nodeExecution) {
-              return {
-                ...node,
-                data: {
-                  ...node.data,
-                  executionStatus: nodeExecution.status,
-                },
-                style: {
-                  ...node.style,
-                  boxShadow:
-                    nodeExecution.status === 'completed'
-                      ? '0 0 0 5px rgba(34, 197, 94, 0.4)'
-                      : nodeExecution.status === 'error'
-                        ? '0 0 0 5px rgba(239, 68, 68, 0.4)'
-                        : '0 0 0 5px rgba(59, 130, 246, 0.4)',
-                  borderRadius: '12px',
-                },
-              };
-            }
-          }
-          // Limpar highlight de nodes não executados ou fora do caminho
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              executionStatus: undefined,
-            },
-            style: {
-              ...node.style,
-              boxShadow: undefined,
-              borderRadius: undefined,
-            },
-          };
-        });
-      });
-
-      // ✅ Atualizar edges - destacar apenas as que estão no caminho real
-      setEdges((currentEdges) => {
-        return currentEdges.map((edge) => {
-          // Só destacar se a edge está no caminho real
-          if (pathEdges.has(edge.id)) {
-            const sourceExecution = nodeExecutions[edge.source] as
-              | { status: string; result?: any }
-              | undefined;
-            const targetExecution = nodeExecutions[edge.target] as
-              | { status: string }
-              | undefined;
-
-            // Determinar a cor baseada no status
-            const hasError =
-              sourceExecution?.status === 'error' ||
-              targetExecution?.status === 'error';
-            const isRunning =
-              sourceExecution?.status === 'running' ||
-              targetExecution?.status === 'running';
-
-            return {
-              ...edge,
-              animated: true,
-              style: {
-                ...edge.style,
-                stroke: hasError
-                  ? '#ef4444'
-                  : isRunning
-                    ? '#3b82f6'
-                    : '#22c55e',
-                strokeWidth: 3,
-              },
-            };
-          }
-          // Limpar highlight de edges não executadas ou fora do caminho
-          return {
-            ...edge,
-            animated: false,
-            style: {
-              ...edge.style,
-              stroke: undefined,
-              strokeWidth: undefined,
-            },
-          };
-        });
-      });
-
-      setHasExecutionHighlight(true);
-    },
-    [setNodes, setEdges],
-  );
 
   const clearExecutionHighlight = useCallback(() => {
     // Limpar highlight dos nodes
@@ -840,6 +870,9 @@ function FlowEditorContent() {
         setFlowName(flow.name);
         setCurrentFlowId(flow.id);
 
+        currentFlowIdRef.current = flow.id;
+        flowNameRef.current = flow.name;
+
         // Adicionar edges após os nodes serem renderizados (evitar race condition)
         setTimeout(() => {
           setEdges(processedEdges);
@@ -870,9 +903,10 @@ function FlowEditorContent() {
         setEdges([]);
         setFlowName(flowName);
         setCurrentFlowId(newFlow.id);
+        flowNameRef.current = flowName; // ✅ Atualizar ref
+        currentFlowIdRef.current = newFlow.id; // ✅ Atualizar ref
         setIsCreateDialogOpen(false);
-      } catch (error) {
-        console.error('Error creating flow:', error);
+      } catch {
         alert('Erro ao criar fluxo');
       }
     },
@@ -888,7 +922,6 @@ function FlowEditorContent() {
               ...node,
               data: { ...node.data, ...data },
             };
-            // Atualizar nodeToConfig se for o node que está sendo editado
             if (nodeToConfig?.id === nodeId) {
               setNodeToConfig(updatedNode);
             }
@@ -1039,8 +1072,6 @@ function FlowEditorContent() {
     const selectedNode = nodes.find((node) => node.selected);
     if (selectedNode) {
       setCopiedNode(selectedNode);
-      const nodeLabel = selectedNode.data.label || selectedNode.type;
-      console.log(`📋 Node "${nodeLabel}" copiado (ID: ${selectedNode.id})`);
     }
   }, [nodes]);
 
@@ -1074,8 +1105,6 @@ function FlowEditorContent() {
       }));
       return [...updatedNodes, newNode];
     });
-
-    console.log('📌 Node colado:', newId, 'copiado de:', copiedNode.id);
   }, [copiedNode, setNodes]);
 
   // Listener de teclado para Ctrl+C e Ctrl+V
@@ -1119,15 +1148,8 @@ function FlowEditorContent() {
 
   // ✅ Listener direto para o evento executionSelected (garante que os nós sejam destacados mesmo se o painel não estiver aberto)
   React.useEffect(() => {
-    const handleExecutionSelected = (event: CustomEvent<any>) => {
+    const handleExecutionSelected = (event: CustomEvent<Execution>) => {
       const execution = event.detail;
-      console.log(
-        '🎯 Evento executionSelected recebido diretamente no flow-editor:',
-        {
-          executionId: execution.id,
-          hasNodeExecutions: !!execution.nodeExecutions,
-        },
-      );
 
       // Salvar execução selecionada no sessionStorage
       sessionStorage.setItem('selectedExecution', JSON.stringify(execution));
@@ -1533,14 +1555,6 @@ function FlowEditorContent() {
         isOpen={isExecutionsPanelOpen}
         onClose={() => setIsExecutionsPanelOpen(false)}
         onExecutionSelect={(execution) => {
-          console.log('🎯 onExecutionSelect chamado:', {
-            executionId: execution.id,
-            hasNodeExecutions: !!execution.nodeExecutions,
-            nodeExecutionsKeys: execution.nodeExecutions
-              ? Object.keys(execution.nodeExecutions)
-              : [],
-          });
-
           // Salvar execução selecionada no sessionStorage
           sessionStorage.setItem(
             'selectedExecution',

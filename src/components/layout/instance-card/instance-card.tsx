@@ -13,6 +13,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { InstanceProps } from '@/contexts/user/user-context.type';
 import { useUser } from '@/hooks/use-user';
+import { useInvalidateUser } from '@/lib/react-query/hooks/use-user';
 
 interface InstanceStatusResponse {
   success: boolean;
@@ -41,7 +42,9 @@ export function InstanceCard({ instance }: InstanceCardProps) {
   const [qrCode, setQrCode] = useState<string | ''>('');
   const [pairCode, setPairCode] = useState<string | ''>('');
   const [showQrModal, setShowQrModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { handleUpdate } = useUser();
+  const { invalidateInstances } = useInvalidateUser();
   // Este componente recebe a instância como prop, não precisa buscar todas
   // Removido uso de instances do contexto para evitar buscas desnecessárias
 
@@ -54,9 +57,31 @@ export function InstanceCard({ instance }: InstanceCardProps) {
     }
   }, []);
 
-  const handleDelete = useCallback(async (token: string) => {
-    await deleteInstance(token);
-  }, []);
+  const handleDelete = useCallback(
+    async (token: string) => {
+      try {
+        setIsDeleting(true);
+
+        const response = await deleteInstance(token);
+
+        if (response?.success) {
+          // Invalidar a query do React Query para atualizar a lista
+          await invalidateInstances();
+          // Também atualizar o contexto do usuário
+          handleUpdate();
+        } else {
+          alert(
+            `Erro ao deletar instância: ${response?.message || 'Erro desconhecido'}`,
+          );
+        }
+      } catch (error) {
+        alert('Erro ao deletar instância. Tente novamente.');
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [invalidateInstances, handleUpdate],
+  );
 
   // Effect para gerenciar o polling quando status muda para connecting
   useEffect(() => {
@@ -65,16 +90,12 @@ export function InstanceCard({ instance }: InstanceCardProps) {
     // Removida verificação de instances.find - não é mais necessária
     // A instância já é passada como prop
 
-    console.log('aqui');
-
     let intervalId: NodeJS.Timeout | undefined = undefined;
 
     const fetchInstanceStatus = async () => {
       const response = (await getInstanceStatus(
         instance.token,
       )) as InstanceStatusResponse;
-
-      console.log('response', response);
 
       if (
         response?.success &&
@@ -230,12 +251,10 @@ export function InstanceCard({ instance }: InstanceCardProps) {
           variant="default"
           bgHexColor="#ff4646"
           className="text-xs px-3 py-1"
-          onClick={async () => {
-            await handleDelete(instance.token);
-            handleUpdate();
-          }}
+          onClick={() => handleDelete(instance.token)}
+          disabled={isDeleting}
         >
-          Deletar
+          {isDeleting ? 'Deletando...' : 'Deletar'}
         </Button>
       </div>
 
