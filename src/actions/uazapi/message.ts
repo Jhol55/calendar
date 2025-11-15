@@ -37,20 +37,18 @@ export async function sendMessage({
       };
     }
 
-    const response = await fetch(
-      `http://localhost:3000/api/uazapi/user/message/text`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          token,
-          formData,
-        }),
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/uazapi/user/message/text`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        email,
+        token,
+        formData,
+      }),
+    });
 
     const data = await response.json();
 
@@ -91,20 +89,18 @@ export async function sendMediaMessage({
       };
     }
 
-    const response = await fetch(
-      `http://localhost:3000/api/uazapi/user/message/media`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          token,
-          formData,
-        }),
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/uazapi/user/message/media`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        email,
+        token,
+        formData,
+      }),
+    });
 
     const data = await response.json();
 

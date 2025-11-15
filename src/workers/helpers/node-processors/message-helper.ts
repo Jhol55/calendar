@@ -1041,12 +1041,17 @@ export async function processMessageNode(
       );
     }
 
+    // Extrair message_id (wamid) do resultado da API para associar com erros do webhook
+    const messageId =
+      result?.messages?.[0]?.id || result?.message_id || result?.id || null;
+
     return {
       type: 'message',
       status: 'sent',
       phoneNumber: resolvedPhoneNumber,
       text: resolvedText || text,
       messageType: messageType || 'text',
+      messageId, // Salvar para associar com erros do webhook
       originalConfig: {
         phoneNumber,
         text,

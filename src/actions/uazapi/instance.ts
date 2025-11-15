@@ -125,7 +125,7 @@ export async function connectInstance(token: string): Promise<UazapiResponse> {
     }
 
     const response = await fetch(
-      `http://localhost:3000/api/uazapi/user/instance/connect`,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/uazapi/user/instance/connect`,
       {
         method: 'POST',
         headers: {
@@ -178,7 +178,7 @@ export async function getInstanceStatus(
     }
 
     const response = await fetch(
-      `http://localhost:3000/api/uazapi/user/instance/status`,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/uazapi/user/instance/status`,
       {
         method: 'POST',
         headers: {
@@ -227,7 +227,7 @@ export async function deleteInstance(token: string): Promise<UazapiResponse> {
     }
 
     const response = await fetch(
-      `http://localhost:3000/api/uazapi/user/instance`,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/uazapi/user/instance`,
       {
         method: 'POST',
         headers: {
@@ -278,7 +278,7 @@ export async function createInstance(name: string): Promise<UazapiResponse> {
     }
 
     const response = await fetch(
-      `http://localhost:3000/api/uazapi/admin/instance/init`,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/uazapi/admin/instance/init`,
       {
         method: 'POST',
         headers: {

@@ -52,12 +52,22 @@ interface ApiConfig extends RequestInit {
 const internalBaseURL = 'http://app:3000/api';
 const externalBaseURL = process.env.NEXT_PUBLIC_API_URL || '';
 
-const baseURL =
-  process.env.NODE_ENV === 'production'
-    ? typeof window === 'undefined'
+// Função para obter a URL base correta
+const getBaseURL = () => {
+  // Se estiver no servidor (SSR)
+  if (typeof window === 'undefined') {
+    return process.env.NODE_ENV === 'production'
       ? internalBaseURL
-      : externalBaseURL
-    : 'http://localhost:3000/api';
+      : 'http://localhost:3000/api';
+  }
+
+  // Se estiver no browser (cliente)
+  // Usar o domínio atual da página
+  const currentOrigin = window.location.origin;
+  return `${currentOrigin}/api`;
+};
+
+const baseURL = getBaseURL();
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 

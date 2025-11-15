@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Loading } from '../loading';
 
 interface DialogProps {
   isOpen: boolean;
@@ -32,12 +33,23 @@ export const Dialog: React.FC<DialogProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const [buttonPosition, setButtonPosition] = useState({ top: 0, right: 0 });
   const [isPositionCalculated, setIsPositionCalculated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    return () => {
+      setIsLoading(false);
+    };
+  }, []);
 
   // Calcular posição do botão
   const updateButtonPosition = () => {
     if (dialogRef.current) {
       const rect = dialogRef.current.getBoundingClientRect();
-      const offset = 14; // 16px de distância da borda
+      const offset = 12; // 16px de distância da borda
 
       // Calcular posição baseada no canto superior direito do conteúdo do dialog
       setButtonPosition({
@@ -153,7 +165,13 @@ export const Dialog: React.FC<DialogProps> = ({
             e.stopPropagation();
           }}
         >
-          {children}
+          {!isLoading ? (
+            children
+          ) : (
+            <div className="flex items-center justify-center w-full h-full">
+              <Loading size="md" />
+            </div>
+          )}
         </div>
 
         {/* Botão de fechar posicionado dinamicamente */}

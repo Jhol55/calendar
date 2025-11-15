@@ -166,9 +166,33 @@ function FlowEditorContent() {
 
   // Função para destacar nós executados
   const highlightExecutedNodes = useCallback(
-    (execution: Execution & { targetNodeId?: string }) => {
+    async (execution: Execution & { targetNodeId?: string }) => {
       if (!execution.nodeExecutions) {
         return;
+      }
+
+      // ✅ Sempre buscar dados mais recentes do banco para garantir que o highlight está correto
+      // Isso evita usar dados antigos do sessionStorage quando o webhook atualiza com erro
+      try {
+        const { getExecution } = await import('@/actions/executions');
+        const result = await getExecution(execution.id);
+
+        if (result.success && result.execution) {
+          // Usar execução atualizada do banco
+          execution = {
+            ...result.execution,
+            targetNodeId: execution.targetNodeId,
+          };
+
+          // Atualizar sessionStorage com dados mais recentes
+          sessionStorage.setItem(
+            'selectedExecution',
+            JSON.stringify(execution),
+          );
+        }
+      } catch (error) {
+        console.error('Erro ao buscar execução atualizada:', error);
+        // Continuar com execução original se falhar
       }
 
       const nodeExecutions = execution.nodeExecutions as NodeExecutionsRecord;
@@ -396,6 +420,48 @@ function FlowEditorContent() {
         return;
       }
 
+      // ✅ SALVAR O FLUXO ANTES DE EXECUTAR (para evitar bugs)
+      try {
+        const cleanNodesForSave = removeExecutionHandlers(currentNodes);
+        const flowIdToSave = currentFlowIdRef.current;
+        const flowNameToSave = flowNameRef.current || 'Workflow Sem Nome';
+
+        if (flowIdToSave) {
+          // Atualizar flow existente
+          const flowData = {
+            name: flowNameToSave,
+            description: '',
+            nodes: cleanNodesForSave,
+            edges: currentEdges,
+            isActive: true,
+          };
+
+          await updateWorkflowMutation.mutateAsync({
+            id: flowIdToSave,
+            data: flowData,
+          });
+        } else {
+          // Criar novo flow
+          const flowData = {
+            name: flowNameToSave,
+            description: '',
+            nodes: cleanNodesForSave,
+            edges: currentEdges,
+            userId: user?.id,
+            isActive: true,
+          };
+
+          const newFlow = await createWorkflowMutation.mutateAsync(flowData);
+          setCurrentFlowId(newFlow.id);
+          setFlowName(newFlow.name);
+          currentFlowIdRef.current = newFlow.id;
+          flowNameRef.current = newFlow.name;
+        }
+      } catch (error) {
+        console.error('Erro ao salvar fluxo antes da execução:', error);
+        // Continuar mesmo se houver erro ao salvar (não bloquear execução)
+      }
+
       // Buscar dados da execução selecionada
       const selectedExecutionStr = sessionStorage.getItem('selectedExecution');
       let triggerData = {};
@@ -461,7 +527,7 @@ function FlowEditorContent() {
               }),
             );
 
-            highlightExecutedNodes(executionWithTarget);
+            await highlightExecutedNodes(executionWithTarget);
           } else {
             setTimeout(async () => {
               const retryResult = await getExecution(result.executionId);
@@ -483,7 +549,7 @@ function FlowEditorContent() {
                     detail: executionWithTarget,
                   }),
                 );
-                highlightExecutedNodes(executionWithTarget);
+                await highlightExecutedNodes(executionWithTarget);
               }
             }, 1000);
           }
@@ -497,6 +563,11 @@ function FlowEditorContent() {
       removeExecutionHandlers,
       reactFlowInstance,
       highlightExecutedNodes,
+      updateWorkflowMutation,
+      createWorkflowMutation,
+      user,
+      setCurrentFlowId,
+      setFlowName,
     ],
   );
 
@@ -1148,26 +1219,77 @@ function FlowEditorContent() {
 
   // ✅ Listener direto para o evento executionSelected (garante que os nós sejam destacados mesmo se o painel não estiver aberto)
   React.useEffect(() => {
-    const handleExecutionSelected = (event: CustomEvent<Execution>) => {
-      const execution = event.detail;
+    const handleExecutionSelected = async (event: Event) => {
+      const customEvent = event as CustomEvent<Execution>;
+      const execution = customEvent.detail;
 
       // Salvar execução selecionada no sessionStorage
       sessionStorage.setItem('selectedExecution', JSON.stringify(execution));
 
-      // Destacar nós executados
-      highlightExecutedNodes(execution);
+      // Destacar nós executados (busca dados mais recentes do banco)
+      await highlightExecutedNodes(execution);
     };
 
-    window.addEventListener(
-      'executionSelected',
-      handleExecutionSelected as EventListener,
-    );
+    const listener = handleExecutionSelected as unknown as EventListener;
+    window.addEventListener('executionSelected', listener);
 
     return () => {
-      window.removeEventListener(
-        'executionSelected',
-        handleExecutionSelected as EventListener,
-      );
+      window.removeEventListener('executionSelected', listener);
+    };
+  }, [highlightExecutedNodes]);
+
+  // ✅ Listener para atualizar highlight quando webhook atualizar nodeExecution com erro
+  // O NodeExecutionPanel dispara o evento 'executionUpdated' quando detecta mudanças
+  React.useEffect(() => {
+    const handleExecutionUpdated = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ executionId: string }>;
+      const { executionId } = customEvent.detail;
+
+      // Verificar se a execução atualizada é a que está selecionada
+      const selectedExecutionStr = sessionStorage.getItem('selectedExecution');
+      if (!selectedExecutionStr) {
+        return;
+      }
+
+      try {
+        const selectedExecution = JSON.parse(selectedExecutionStr) as Execution;
+        if (selectedExecution.id !== executionId) {
+          return; // Não é a execução selecionada
+        }
+
+        // Buscar execução atualizada do servidor
+        const { getExecution } = await import('@/actions/executions');
+        const result = await getExecution(executionId);
+
+        if (result.success && result.execution) {
+          const updatedExecution = result.execution;
+
+          // Atualizar sessionStorage
+          sessionStorage.setItem(
+            'selectedExecution',
+            JSON.stringify(updatedExecution),
+          );
+
+          // Preservar targetNodeId se existir
+          const executionWithTarget: Execution & { targetNodeId?: string } = {
+            ...updatedExecution,
+            targetNodeId: (
+              selectedExecution as Execution & { targetNodeId?: string }
+            ).targetNodeId,
+          };
+
+          // Re-aplicar highlight com dados atualizados
+          await highlightExecutedNodes(executionWithTarget);
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar highlight:', error);
+      }
+    };
+
+    window.addEventListener('executionUpdated', handleExecutionUpdated);
+
+    return () => {
+      window.removeEventListener('executionUpdated', handleExecutionUpdated);
     };
   }, [highlightExecutedNodes]);
 
@@ -1561,8 +1683,10 @@ function FlowEditorContent() {
             JSON.stringify(execution),
           );
 
-          // Destacar nós executados usando a função centralizada
-          highlightExecutedNodes(execution);
+          // Destacar nós executados usando a função centralizada (busca dados mais recentes do banco)
+          highlightExecutedNodes(execution).catch((error) => {
+            console.error('Erro ao destacar nós executados:', error);
+          });
         }}
       />
     </div>

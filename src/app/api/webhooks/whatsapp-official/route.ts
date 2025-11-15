@@ -2,6 +2,205 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/services/prisma';
 
 /**
+ * Atualiza o node execution com erro quando uma mensagem falha
+ * Segue a mesma lógica de erro que já existe no flow-executor.ts
+ */
+async function updateNodeExecutionWithError(
+  phoneNumberId: string,
+  messageId: string,
+  errors: Array<{
+    code?: number;
+    title?: string;
+    message?: string;
+    error_data?: unknown;
+    href?: string;
+  }>,
+) {
+  try {
+    console.log('🔍 Buscando node execution com message_id:', messageId);
+
+    // Buscar execuções recentes (últimas 24 horas) que podem ter este message_id
+    // ✅ Incluir todos os status (running, success, error) para encontrar execuções parciais
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const recentExecutions = await prisma.flow_executions.findMany({
+      where: {
+        createdAt: {
+          gte: oneDayAgo,
+        },
+        // ✅ Remover filtro de status para incluir todas as execuções (incluindo parciais)
+        // Isso garante que encontramos execuções parciais mesmo se já terminaram
+      },
+      select: {
+        id: true,
+        nodeExecutions: true,
+        status: true,
+        triggerType: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 200, // ✅ Aumentar limite para 200 execuções recentes
+    });
+
+    console.log(
+      `🔍 Verificando ${recentExecutions.length} execuções recentes (incluindo parciais)...`,
+    );
+    console.log(
+      `🔍 Procurando messageId: ${messageId} em execuções com triggerTypes:`,
+      recentExecutions.map((e) => e.triggerType),
+    );
+
+    // Procurar o node execution que tem este message_id
+    for (const execution of recentExecutions) {
+      console.log(
+        `🔍 Verificando execução ${execution.id} (status: ${execution.status}, trigger: ${execution.triggerType})`,
+      );
+      const nodeExecutions =
+        (execution.nodeExecutions as Record<
+          string,
+          {
+            result?: any; // ✅ Usar any para permitir estrutura flexível
+            status?: string;
+          }
+        >) || {};
+
+      for (const [nodeId, nodeExecution] of Object.entries(nodeExecutions)) {
+        const result = nodeExecution.result;
+
+        // ✅ Buscar messageId de forma mais robusta (seguindo a mesma lógica do message-helper.ts)
+        // No message-helper.ts, o messageId é extraído assim:
+        // result?.messages?.[0]?.id || result?.message_id || result?.id || null
+        // E depois salvo diretamente em result.messageId
+        let foundMessageId: string | null = null;
+
+        if (result && typeof result === 'object') {
+          // 1. Tentar encontrar messageId diretamente (como salvo no message-helper.ts)
+          if ('messageId' in result && result.messageId === messageId) {
+            foundMessageId = result.messageId as string;
+            console.log(
+              `🔍 [${nodeId}] messageId encontrado diretamente: ${foundMessageId}`,
+            );
+          }
+          // 2. Tentar encontrar em apiResponse (estrutura do WhatsApp Cloud)
+          // Seguindo a mesma lógica de extração do message-helper.ts
+          else if (
+            'apiResponse' in result &&
+            result.apiResponse &&
+            typeof result.apiResponse === 'object'
+          ) {
+            const apiResponse = result.apiResponse as any;
+            // Mesma lógica do message-helper.ts linha 1045-1049
+            const extractedMessageId =
+              apiResponse.messages?.[0]?.id ||
+              apiResponse.message_id ||
+              apiResponse.id ||
+              null;
+
+            if (extractedMessageId === messageId) {
+              foundMessageId = extractedMessageId;
+              console.log(
+                `🔍 [${nodeId}] messageId encontrado em apiResponse: ${foundMessageId}`,
+              );
+            } else if (extractedMessageId) {
+              console.log(
+                `🔍 [${nodeId}] messageId diferente encontrado em apiResponse: ${extractedMessageId} (procurando: ${messageId})`,
+              );
+            }
+          } else {
+            console.log(
+              `🔍 [${nodeId}] result não tem messageId nem apiResponse`,
+            );
+          }
+        }
+
+        if (foundMessageId === messageId) {
+          console.log(
+            `✅ Encontrado node execution: ${nodeId} na execução ${execution.id} (status: ${execution.status}, trigger: ${execution.triggerType})`,
+          );
+
+          // Seguir a mesma lógica de erro do flow-executor.ts (linhas 413-423)
+          const errorMessage =
+            errors[0]?.message || errors[0]?.title || 'Message failed';
+
+          // ✅ Preservar o resultado original e adicionar informações de erro
+          // Garantir que messageId está presente (pode estar em result.messageId ou result.apiResponse)
+          const originalMessageId =
+            (result as any)?.messageId ||
+            (result as any)?.apiResponse?.messages?.[0]?.id ||
+            (result as any)?.apiResponse?.message_id ||
+            (result as any)?.apiResponse?.id ||
+            foundMessageId;
+
+          // ✅ Criar resultado de erro seguindo a mesma estrutura do flow-executor.ts
+          // Mas preservando informações úteis do resultado original (apiResponse, messageId, etc)
+          const errorResult = {
+            // Preservar campos úteis do resultado original
+            type: (result as any)?.type || 'message',
+            phoneNumber: (result as any)?.phoneNumber,
+            text: (result as any)?.text,
+            messageType: (result as any)?.messageType,
+            messageId: originalMessageId, // ✅ Garantir que messageId está presente
+            apiResponse: (result as any)?.apiResponse, // Preservar resposta da API original
+
+            // ✅ Campos de erro (sobrescrevem qualquer campo anterior)
+            success: false,
+            error: true,
+            status: 'failed', // ✅ Mudar status de 'sent' para 'failed'
+            message: errorMessage,
+            errors: errors,
+            errorCode: errors[0]?.code,
+            errorTitle: errors[0]?.title,
+          };
+
+          const updatedNodeExecution = {
+            ...nodeExecution,
+            status: 'error',
+            endTime: new Date().toISOString(),
+            error: errorMessage,
+            result: errorResult,
+          };
+
+          nodeExecutions[nodeId] = updatedNodeExecution;
+
+          // Atualizar no banco
+          await prisma.flow_executions.update({
+            where: { id: execution.id },
+            data: {
+              nodeExecutions: nodeExecutions as any,
+            },
+          });
+
+          console.log(
+            `✅ Node execution ${nodeId} atualizado com erro na execução ${execution.id}`,
+          );
+          console.log('📊 Resultado de erro salvo:', {
+            success: errorResult.success,
+            error: errorResult.error,
+            status: errorResult.status,
+            message: errorResult.message,
+            errorCode: errorResult.errorCode,
+            errorTitle: errorResult.errorTitle,
+            messageId: errorResult.messageId,
+          });
+          return; // Encontrou e atualizou, pode parar
+        }
+      }
+    }
+
+    console.log(
+      `⚠️ Node execution não encontrado para message_id: ${messageId}`,
+    );
+    console.log(
+      `💡 Dica: Verifique se o messageId está sendo salvo corretamente no resultado do message-node`,
+    );
+  } catch (error) {
+    console.error('❌ Erro ao atualizar node execution:', error);
+    throw error;
+  }
+}
+
+/**
  * Webhook do WhatsApp Official (Meta/Facebook)
  *
  * URL estática: /api/webhooks/whatsapp-official
@@ -290,7 +489,28 @@ export async function POST(request: NextRequest) {
               timestamp: status.timestamp,
             });
 
-            // TODO: Processar status se necessário
+            // Se a mensagem falhou, atualizar o node execution correspondente
+            if (status.status === 'failed' && status.errors) {
+              console.error('❌ Mensagem falhou:', {
+                messageId: status.id,
+                errors: status.errors,
+                recipientId: status.recipient_id,
+              });
+
+              // Buscar e atualizar o node execution que tem este message_id
+              try {
+                await updateNodeExecutionWithError(
+                  phoneNumberId,
+                  status.id,
+                  status.errors,
+                );
+              } catch (updateError) {
+                console.error(
+                  '❌ Erro ao atualizar node execution com erro:',
+                  updateError,
+                );
+              }
+            }
           }
         }
 

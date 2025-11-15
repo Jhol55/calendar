@@ -74,7 +74,7 @@ export function InstanceCard({ instance }: InstanceCardProps) {
             `Erro ao deletar instância: ${response?.message || 'Erro desconhecido'}`,
           );
         }
-      } catch (error) {
+      } catch {
         alert('Erro ao deletar instância. Tente novamente.');
       } finally {
         setIsDeleting(false);
@@ -167,7 +167,10 @@ export function InstanceCard({ instance }: InstanceCardProps) {
   };
 
   return (
-    <div className="bg-white w-[18rem] rounded-lg shadow-md border border-gray-200 p-4 transition-shadow">
+    <div
+      style={{ zoom: 0.9 }}
+      className="bg-white w-[18rem] rounded-lg shadow-md border border-gray-200 p-4 transition-shadow"
+    >
       <div className="relative flex items-center justify-between gap-2 mb-4">
         <Typography variant="h3" className="text-lg font-semibold truncate">
           {instance.name}
@@ -223,11 +226,25 @@ export function InstanceCard({ instance }: InstanceCardProps) {
                 {instance.profileName}
               </Typography>
             )}
-            {instance.owner && (
-              <Typography variant="p" className="text-sm text-gray-500 mb-1">
-                {instance.owner}
-              </Typography>
-            )}
+            {/* Para contas Cloud (teste ou real), mostrar número do WhatsApp */}
+            {instance.plataform === 'cloud' ||
+            instance.whatsapp_official_enabled
+              ? instance.whatsapp_official_phone_number && (
+                  <Typography
+                    variant="p"
+                    className="text-sm text-gray-500 mb-1"
+                  >
+                    {instance.whatsapp_official_phone_number}
+                  </Typography>
+                )
+              : instance.owner && (
+                  <Typography
+                    variant="p"
+                    className="text-sm text-gray-500 mb-1"
+                  >
+                    {instance.owner}
+                  </Typography>
+                )}
           </div>
         </div>
       </div>

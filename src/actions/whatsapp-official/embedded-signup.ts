@@ -347,13 +347,15 @@ export async function processOAuthCallback(
     }
 
     // Buscar números de telefone do WABA (se ainda não temos)
-    let phoneNumberValue: string | null = null;
+    // Separar verified_name (nome do negócio) de display_phone_number (número real)
+    let phoneNumberValue: string | null = null; // Número real do telefone
+    let profileNameValue: string = instanceName; // Nome do perfil (verified_name ou fallback para instanceName)
 
     if (!phoneNumberId) {
       console.log('🔍 Buscando phone numbers para WABA:', wabaId);
 
       const phoneNumbersResponse = await fetch(
-        `https://graph.facebook.com/v23.0/${wabaId}/phone_numbers?access_token=${accessToken}`,
+        `https://graph.facebook.com/v23.0/${wabaId}/phone_numbers?fields=display_phone_number,verified_name&access_token=${accessToken}`,
       );
 
       if (!phoneNumbersResponse.ok) {
@@ -380,16 +382,16 @@ export async function processOAuthCallback(
       // Selecionar primeiro número (pode ser múltiplos após o fluxo de coexistência)
       const phoneNumber = phoneNumbers[0];
       phoneNumberId = phoneNumber.id;
-      phoneNumberValue =
-        phoneNumber.verified_name ||
-        phoneNumber.display_phone_number ||
-        phoneNumber.id;
+      phoneNumberValue = phoneNumber.display_phone_number || phoneNumber.id;
+
+      profileNameValue = phoneNumber.verified_name || instanceName;
 
       console.log(
         '✅ Phone Number encontrado:',
         phoneNumberId,
         phoneNumberValue,
       );
+      console.log('✅ Nome do perfil:', profileNameValue);
     } else {
       console.log('✅ Phone Number já fornecido:', phoneNumberId);
       // Buscar detalhes do número
@@ -400,11 +402,12 @@ export async function processOAuthCallback(
       if (phoneNumberResponse.ok) {
         const phoneNumberData = await phoneNumberResponse.json();
         phoneNumberValue =
-          phoneNumberData.verified_name ||
-          phoneNumberData.display_phone_number ||
-          phoneNumberId;
+          phoneNumberData.display_phone_number || phoneNumberId;
+
+        profileNameValue = phoneNumberData.verified_name || instanceName;
       } else {
         phoneNumberValue = phoneNumberId;
+        profileNameValue = instanceName;
       }
     }
 
@@ -527,7 +530,7 @@ export async function processOAuthCallback(
         qrcode: '',
         name: instanceName,
         webhook: webhookUrl,
-        profileName: phoneNumberValue,
+        profileName: profileNameValue,
         profilePicUrl: '',
         isBusiness: true,
         plataform: 'cloud',
@@ -657,6 +660,7 @@ export async function exchangeWhatsAppToken(
     const accessToken = tokenData.access_token;
 
     // Buscar informações do número
+    // Separar verified_name (nome do negócio) de display_phone_number (número real)
     const phoneInfoResponse = await fetch(
       `https://graph.facebook.com/v23.0/${data.phoneNumberId}?fields=verified_name,display_phone_number`,
       {
@@ -666,13 +670,14 @@ export async function exchangeWhatsAppToken(
       },
     );
 
-    let phoneNumber = data.phoneNumberId;
+    let phoneNumber = data.phoneNumberId; // Número real do telefone
+    let profileName: string | undefined = undefined; // Nome do perfil (verified_name)
+
     if (phoneInfoResponse.ok) {
       const phoneInfo = await phoneInfoResponse.json();
-      phoneNumber =
-        phoneInfo.verified_name ||
-        phoneInfo.display_phone_number ||
-        phoneNumber;
+      phoneNumber = phoneInfo.display_phone_number || phoneNumber;
+
+      profileName = phoneInfo.verified_name;
     }
 
     // Configurar webhook com campos de coexistência
@@ -710,6 +715,7 @@ export async function exchangeWhatsAppToken(
     await prisma.instances.update({
       where: { token: instanceToken },
       data: {
+        ...(profileName && { profileName: profileName }), // Atualizar profileName se disponível
         whatsapp_official_enabled: true,
         whatsapp_official_access_token: accessToken,
         whatsapp_official_business_account_id: data.wabaId,
@@ -881,31 +887,104 @@ export async function createCloudInstanceWithIds(
     );
     console.log('🧪 Conta de teste:', isTestAccount ? 'Sim' : 'Não');
 
-    // Buscar detalhes do número de telefone (apenas se temos token)
-    let phoneNumberValue = phoneNumberId;
+    // Buscar detalhes do número de telefone (sempre buscar o número real, mesmo para contas de teste)
+    // Separar verified_name (nome do negócio) de display_phone_number (número real)
+    let phoneNumberValue = phoneNumberId; // Número real do telefone
+    let profileNameValue = name; // Nome do perfil (verified_name ou fallback para name)
+
     if (accessToken) {
       try {
+        console.log('🔍 Buscando detalhes do número de telefone...');
         const phoneNumberResponse = await fetch(
           `https://graph.facebook.com/v23.0/${phoneNumberId}?fields=verified_name,display_phone_number&access_token=${accessToken}`,
         );
 
         if (phoneNumberResponse.ok) {
           const phoneNumberData = await phoneNumberResponse.json();
+          console.log(
+            '📊 Dados do número recebidos:',
+            JSON.stringify(phoneNumberData, null, 2),
+          );
+
+          // Separar os valores:
+          // - phoneNumberValue = display_phone_number (número real)
+          // - profileNameValue = verified_name (nome do negócio, ex: "Test Number")
           phoneNumberValue =
-            phoneNumberData.verified_name ||
-            phoneNumberData.display_phone_number ||
-            phoneNumberId;
-          console.log('✅ Nome do número:', phoneNumberValue);
+            phoneNumberData.display_phone_number || phoneNumberId;
+
+          profileNameValue = phoneNumberData.verified_name || name;
+
+          console.log('✅ Número de telefone obtido:', phoneNumberValue);
+          console.log('✅ Nome do perfil obtido:', profileNameValue);
+          console.log(
+            '  - display_phone_number:',
+            phoneNumberData.display_phone_number || 'não disponível',
+          );
+          console.log(
+            '  - verified_name:',
+            phoneNumberData.verified_name || 'não disponível',
+          );
+
+          // Se não conseguiu display_phone_number, tentar buscar na lista de números do WABA
+          if (!phoneNumberData.display_phone_number && wabaId) {
+            console.log('🔍 Tentando buscar número na lista do WABA...');
+            try {
+              const wabaPhonesResponse = await fetch(
+                `https://graph.facebook.com/v23.0/${wabaId}/phone_numbers?fields=display_phone_number,verified_name&access_token=${accessToken}`,
+              );
+
+              if (wabaPhonesResponse.ok) {
+                const wabaPhonesData = await wabaPhonesResponse.json();
+                const phones = wabaPhonesData.data || [];
+                const matchingPhone = phones.find(
+                  (p: { id: string }) => p.id === phoneNumberId,
+                );
+
+                if (matchingPhone?.display_phone_number) {
+                  phoneNumberValue = matchingPhone.display_phone_number;
+                  console.log(
+                    '✅ Número encontrado na lista do WABA:',
+                    phoneNumberValue,
+                  );
+                }
+                if (
+                  matchingPhone?.verified_name &&
+                  !phoneNumberData.verified_name
+                ) {
+                  profileNameValue = matchingPhone.verified_name;
+                  console.log(
+                    '✅ Nome do perfil encontrado na lista do WABA:',
+                    profileNameValue,
+                  );
+                }
+              }
+            } catch (wabaErr) {
+              console.log('⚠️ Erro ao buscar na lista do WABA:', wabaErr);
+            }
+          }
+        } else {
+          const errorText = await phoneNumberResponse.text();
+          console.error('❌ Erro ao buscar detalhes do número:', errorText);
         }
       } catch (err) {
-        console.log('⚠️ Não foi possível buscar detalhes do número, usando ID');
+        console.log(
+          '⚠️ Não foi possível buscar detalhes do número, usando ID:',
+          err,
+        );
       }
     } else {
       console.log('⚠️ Pulando busca de detalhes (sem access token)');
+      // Sem token, usar phoneNumberId como fallback
+      phoneNumberValue = phoneNumberId;
+      profileNameValue = name;
     }
 
-    if (isTestAccount) {
-      phoneNumberValue = 'Test Number';
+    // Garantir que nunca salve "Test Number" como número - sempre usar o número real ou phoneNumberId
+    if (phoneNumberValue === 'Test Number') {
+      console.warn(
+        '⚠️ Valor "Test Number" detectado no número - usando phoneNumberId como fallback',
+      );
+      phoneNumberValue = phoneNumberId;
     }
 
     // Registrar número e configurar webhook apenas se temos token e não for conta de teste
@@ -1074,7 +1153,7 @@ export async function createCloudInstanceWithIds(
         paircode: '',
         qrcode: '',
         webhook: webhookUrl,
-        profileName: phoneNumberValue,
+        profileName: profileNameValue,
         profilePicUrl: '',
         isBusiness: true,
         plataform: 'cloud',

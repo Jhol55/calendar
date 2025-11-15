@@ -348,25 +348,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div
             className={cn(
               'border-t border-neutral-200 h-20 flex items-center transition-all duration-200',
-              isHovered ? 'justify-start px-4' : 'justify-center px-0',
+              isHovered || isFakeHovered ? 'justify-start px-2' : '',
               footerClassName,
             )}
           >
             <div
               className="overflow-hidden"
               style={{
-                opacity: isHovered ? 1 : 0,
-                width: isHovered ? '100%' : '0',
                 transition: 'opacity 0.15s ease-out, width 0.2s ease-out',
               }}
             >
               <UserProfile />
             </div>
-            {!isHovered && (
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <Users size={16} className="text-white" />
-              </div>
-            )}
           </div>
         </div>
       </aside>

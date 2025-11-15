@@ -78,8 +78,19 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     setIsOpen(false);
   };
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (nameOrEmail: string) => {
+    // Se for um email, pegar a primeira letra antes do @
+    if (nameOrEmail.includes('@')) {
+      const beforeAt = nameOrEmail.split('@')[0];
+      // Pegar primeira letra válida (ignorar números e caracteres especiais)
+      const firstLetter = beforeAt.match(/[a-zA-Z]/)?.[0];
+      return firstLetter
+        ? firstLetter.toUpperCase()
+        : beforeAt.charAt(0).toUpperCase();
+    }
+
+    // Se for um nome, pegar as iniciais
+    return nameOrEmail
       .split(' ')
       .map((n) => n[0])
       .join('')
@@ -92,14 +103,15 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       {/* Avatar Button */}
       <Button
         variant="ghost"
+        textClassName="justify-start"
         className={cn(
-          'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 transition-all duration-200',
+          'flex items-center min-w-6 gap-3 px-2.5 py-2 rounded-lg hover:bg-neutral-200 transition-all duration-200',
           'bg-transparent border-none shadow-none',
           avatarClassName,
         )}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
+        <div className="w-8 h-8 min-w-8 min-h-8 rounded-full bg-neutral-500 flex items-center justify-center">
           {user?.avatar ? (
             <Image
               src={user.avatar}
@@ -111,7 +123,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               variant="span"
               className="text-white text-sm font-medium"
             >
-              {getInitials(user?.name || 'U')}
+              {getInitials(user?.name || user?.email || 'U')}
             </Typography>
           )}
         </div>
@@ -119,14 +131,20 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           <Typography variant="span" className="text-white text-sm font-medium">
             {user?.name}
           </Typography>
-          <Typography variant="span" className="text-zinc-400 text-xs block">
-            {user?.email}
-          </Typography>
         </div>
+        {user?.email && (
+          <Typography
+            variant="span"
+            className="text-zinc-400 text-xs truncate max-w-[150px] min-w-0"
+            title={user.email}
+          >
+            {user.email}
+          </Typography>
+        )}
         <ChevronUp
           size={16}
           className={cn(
-            'text-zinc-400 transition-transform duration-200',
+            'text-zinc-400 transition-transform duration-200 flex-shrink-0',
             !isOpen && 'rotate-180',
           )}
         />

@@ -31,7 +31,7 @@ export default function Instances() {
           <div>
             <Typography
               variant="h1"
-              className="text-3xl font-bold text-neutral-700 mb-3"
+              className="text-3xl font-bold text-neutral-600 mb-3"
             >
               Minhas Instâncias
             </Typography>
