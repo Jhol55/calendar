@@ -649,6 +649,34 @@ export async function sendTemplateMessage(
   }
 
   const result = await response.json();
+
+  // Alguns erros da Cloud API vêm com HTTP 200 mas campo "error" no corpo.
+  // Exemplo: code 131049 - "This message was not delivered to maintain healthy ecosystem engagement."
+  const hasLogicalError =
+    result?.error === true ||
+    (Array.isArray(result?.errors) && result.errors.length > 0);
+
+  if (hasLogicalError) {
+    console.error('❌ WhatsApp Cloud template logical error:', result);
+
+    // Tentar extrair mensagem mais amigável
+    const firstError = Array.isArray(result?.errors)
+      ? result.errors[0]
+      : undefined;
+
+    const errorMessage =
+      firstError?.message ||
+      firstError?.title ||
+      result?.error_data?.message ||
+      'Unknown WhatsApp template error';
+
+    throw new Error(
+      `WhatsApp Cloud API error (template): ${errorMessage}${
+        firstError?.code ? ` (code ${firstError.code})` : ''
+      }`,
+    );
+  }
+
   console.log(
     '✅ Template message sent successfully via WhatsApp Cloud API:',
     result,

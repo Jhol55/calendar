@@ -229,7 +229,7 @@ function MessageFormFields({
   setShowTemplateManager: React.Dispatch<React.SetStateAction<boolean>>;
   setSelectedInstanceToken: React.Dispatch<React.SetStateAction<string>>;
 }) {
-  const { form, setValue, register, errors } = useForm();
+  const { form, setValue, register } = useForm();
   const messageType = (form.messageType as MessageType) || 'text';
   const interactiveMenuType =
     (form.interactiveMenuType as InteractiveMenuType) || 'button';
@@ -3130,7 +3130,6 @@ function MessageFormFields({
       <SubmitButton
         variant="gradient"
         className="absolute top-2 right-12 w-fit mt-4"
-        onClick={() => console.log(errors)}
       >
         Salvar Configuração
       </SubmitButton>

@@ -364,10 +364,14 @@ export function NodeExecutionPanel({
   useEffect(() => {
     fetchExecutionData();
 
-    // ✅ Para modo OUTPUT, fazer polling para atualizar quando webhook atualizar o resultado
+    // ✅ Para modo OUTPUT, escutar eventos de atualização ao invés de fazer polling
+    // O webhook atualiza o banco diretamente e dispara o evento 'executionUpdated'
     if (mode === 'output') {
-      const interval = setInterval(async () => {
-        // Buscar execução atualizada
+      const handleExecutionUpdated = async (event: Event) => {
+        const customEvent = event as CustomEvent<{ executionId: string }>;
+        const { executionId } = customEvent.detail;
+
+        // Verificar se é a execução que estamos exibindo
         const selectedExecutionStr =
           sessionStorage.getItem('selectedExecution');
         if (!selectedExecutionStr) {
@@ -376,84 +380,34 @@ export function NodeExecutionPanel({
 
         try {
           const selectedExecution = JSON.parse(selectedExecutionStr);
-          if (!selectedExecution?.id) {
-            return;
+          if (selectedExecution.id !== executionId) {
+            return; // Não é a execução que estamos exibindo
           }
 
           // Buscar execução atualizada do servidor
           const { getExecution } = await import('@/actions/executions');
-          const result = await getExecution(selectedExecution.id);
+          const result = await getExecution(executionId);
 
           if (result.success && result.execution) {
-            const updatedExecution = result.execution;
+            // Atualizar sessionStorage
+            sessionStorage.setItem(
+              'selectedExecution',
+              JSON.stringify(result.execution),
+            );
 
-            // Verificar se algum nodeExecution mudou de status (especialmente para 'error')
-            const hasChanges = Object.keys(
-              updatedExecution.nodeExecutions || {},
-            ).some((nodeId: string) => {
-              const oldNodeExec = (
-                selectedExecution.nodeExecutions as Record<string, any>
-              )?.[nodeId];
-              const newNodeExec = (
-                updatedExecution.nodeExecutions as Record<string, any>
-              )?.[nodeId];
-
-              if (!oldNodeExec || !newNodeExec) {
-                return false;
-              }
-
-              // Verificar se o status mudou (especialmente para 'error')
-              const statusChanged = oldNodeExec.status !== newNodeExec.status;
-
-              // Verificar se o resultado mudou (importante para quando o webhook atualiza com erro)
-              const resultChanged =
-                JSON.stringify(oldNodeExec.result) !==
-                JSON.stringify(newNodeExec.result);
-
-              // Se o status mudou para 'error' ou se já era 'error' mas o resultado foi atualizado
-              if (
-                statusChanged ||
-                (newNodeExec.status === 'error' && resultChanged)
-              ) {
-                console.log(`🔄 Mudança detectada no node ${nodeId}:`, {
-                  oldStatus: oldNodeExec.status,
-                  newStatus: newNodeExec.status,
-                  statusChanged,
-                  resultChanged,
-                });
-                return true;
-              }
-
-              return false;
-            });
-
-            // Se houver mudanças, atualizar dados e disparar evento
-            if (hasChanges) {
-              console.log(
-                '🔄 Mudanças detectadas na execução, atualizando highlight...',
-              );
-              sessionStorage.setItem(
-                'selectedExecution',
-                JSON.stringify(updatedExecution),
-              );
-
-              // Disparar evento para atualizar highlight no flow-editor
-              window.dispatchEvent(
-                new CustomEvent('executionUpdated', {
-                  detail: { executionId: updatedExecution.id },
-                }),
-              );
-
-              // Re-buscar dados
-              fetchExecutionData();
-            }
+            // Re-buscar dados para atualizar a UI
+            fetchExecutionData();
           }
         } catch (error) {
-          console.error('Erro ao verificar atualizações da execução:', error);
+          console.error('Erro ao atualizar execução:', error);
         }
-      }, 2000); // Verificar a cada 2 segundos
+      };
 
-      return () => clearInterval(interval);
+      window.addEventListener('executionUpdated', handleExecutionUpdated);
+
+      return () => {
+        window.removeEventListener('executionUpdated', handleExecutionUpdated);
+      };
     }
   }, [fetchExecutionData, mode]);
 

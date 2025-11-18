@@ -13,22 +13,89 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verificar se é uma instância do WhatsApp Cloud (não usa UazAPI)
+    // Buscar dados completos da instância
     const instance = await prisma.instances.findUnique({
       where: { token },
-      select: { whatsapp_official_enabled: true },
+      select: {
+        whatsapp_official_enabled: true,
+        whatsapp_official_phone_number_id: true,
+        whatsapp_official_access_token: true,
+        whatsapp_official_business_account_id: true,
+        whatsapp_official_phone_number: true,
+      },
     });
+
+    const phoneDisplayName = instance?.whatsapp_official_phone_number || '';
+    const phoneDisplayNameLower = phoneDisplayName.toLowerCase();
+    const isTestAccount =
+      phoneDisplayNameLower === 'test number' ||
+      phoneDisplayNameLower.includes('public test number');
 
     console.log('📋 Instância encontrada:', {
       token,
       isWhatsAppCloud: instance?.whatsapp_official_enabled,
+      phoneNumberId: instance?.whatsapp_official_phone_number_id,
+      phoneDisplayName,
+      isTestAccount,
     });
 
     let apiResponse: Response | null = null;
-    let apiData: any = null;
+    let apiData = null;
 
-    // Se não for instância do WhatsApp Cloud, tentar deletar da API UazAPI
-    if (!instance?.whatsapp_official_enabled) {
+    // Se for instância do WhatsApp Cloud, desregistrar o número antes de deletar
+    // Exceto quando for conta de teste (Meta Test Number / Public Test Number),
+    // para não perder o número de teste global.
+    if (instance?.whatsapp_official_enabled && !isTestAccount) {
+      console.log(
+        'ℹ️ Instância do WhatsApp Cloud - desregistrando número antes de deletar...',
+      );
+
+      if (
+        instance.whatsapp_official_phone_number_id &&
+        instance.whatsapp_official_access_token
+      ) {
+        try {
+          console.log(
+            `📝 Desregistrando número ${instance.whatsapp_official_phone_number_id}...`,
+          );
+
+          const deregisterResponse = await fetch(
+            `https://graph.facebook.com/v21.0/${instance.whatsapp_official_phone_number_id}/deregister`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${instance.whatsapp_official_access_token}`,
+              },
+            },
+          );
+
+          if (deregisterResponse.ok) {
+            console.log('✅ Número desregistrado com sucesso');
+          } else {
+            const errorText = await deregisterResponse.text();
+            console.warn(
+              '⚠️ Não foi possível desregistrar o número:',
+              errorText,
+            );
+            // Continuar mesmo assim - pode já estar desregistrado ou não ser possível
+          }
+        } catch (deregisterError) {
+          console.warn(
+            '⚠️ Erro ao desregistrar número (continuando deleção):',
+            deregisterError,
+          );
+          // Continuar para deletar do banco mesmo se o desregistro falhar
+        }
+      } else {
+        console.log(
+          '⚠️ Instância Cloud sem phone_number_id ou access_token - pulando desregistro',
+        );
+      }
+
+      // Para instâncias do WhatsApp Cloud, considerar sucesso
+      apiResponse = { ok: true } as Response;
+    } else {
+      // Se não for instância do WhatsApp Cloud, tentar deletar da API UazAPI
       console.log('🔄 Tentando deletar da API UazAPI...');
       try {
         apiResponse = await fetch(`${process.env.UAZAPI_URL}/instance`, {
@@ -49,12 +116,6 @@ export async function POST(request: NextRequest) {
         console.error('❌ Erro ao deletar da API UazAPI:', apiError);
         // Continuar para deletar do banco mesmo se a API falhar
       }
-    } else {
-      console.log(
-        'ℹ️ Instância do WhatsApp Cloud - pulando deleção da API UazAPI',
-      );
-      // Para instâncias do WhatsApp Cloud, considerar sucesso
-      apiResponse = { ok: true } as Response;
     }
 
     // Deletar do banco de dados (independente do resultado da API UazAPI)

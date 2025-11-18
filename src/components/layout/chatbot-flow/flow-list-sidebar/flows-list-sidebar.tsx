@@ -95,7 +95,10 @@ export function FlowsListSidebar({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Workflow className="w-5 h-5 text-neutral-600" />
-            <Typography variant="h3" className="font-semibold text-neutral-600">
+            <Typography
+              variant="h3"
+              className="text-lg font-semibold text-neutral-600"
+            >
               Workflows
             </Typography>
           </div>

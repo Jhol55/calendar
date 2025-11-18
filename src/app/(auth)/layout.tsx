@@ -16,7 +16,7 @@ export default function RootLayout({
       {pathname !== '/confirm' && pathname !== '/plans' && (
         <Sidebar noExpandedRoutes={noExpandedRoutes} />
       )}
-      {children}
+      <div className="pt-10 md:pt-0 w-full h-full">{children}</div>
     </>
   );
 }

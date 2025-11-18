@@ -18,7 +18,27 @@ export async function POST(request: NextRequest) {
     // Gerar webhook único
     const webhookId = generateWebhookId();
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
-    const webhookUrl = `${baseUrl}/api/webhooks/${webhookId}`;
+
+    // Obter ID numérico do usuário a partir do email (adminField01)
+    // para montar a URL no formato: /api/webhooks/{userId}/{webhookId}
+    let userIdSegment = '0';
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: adminField01 },
+        select: { id: true },
+      });
+
+      if (user?.id !== undefined && user?.id !== null) {
+        userIdSegment = String(user.id);
+      }
+    } catch (userLookupError) {
+      console.warn(
+        '⚠️ Não foi possível obter ID do usuário para o webhook, usando 0 como fallback:',
+        userLookupError,
+      );
+    }
+
+    const webhookUrl = `${baseUrl}/api/webhooks/${userIdSegment}/${webhookId}`;
 
     const response = await fetch(`${process.env.UAZAPI_URL}/instance/init`, {
       method: 'POST',

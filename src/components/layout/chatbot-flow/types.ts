@@ -10,6 +10,7 @@ export type NodeType =
   | 'agent'
   | 'loop'
   | 'code_execution'
+  | 'playwright-mcp-node'
   | 'end';
 
 export type MessageType =
@@ -254,6 +255,57 @@ export interface ConditionConfig {
   memoryConfig?: MemoryConfig;
 }
 
+export type WebscraperStepMode = 'guided' | 'automatic';
+
+export interface WebscraperStepAction {
+  id?: string; // ID único para identificar a ação no formulário
+  action:
+    | 'goto_url'
+    | 'click'
+    | 'double_click'
+    | 'type'
+    | 'type_and_submit'
+    | 'scroll_down'
+    | 'scroll_up'
+    | 'scroll_to_view'
+    | 'wait'
+    | 'switch_to_iframe'
+    | 'switch_to_default_content'
+    | 'switch_to_tab'
+    | 'close_current_tab'
+    | 'go_back'
+    | 'go_forward'
+    | 'hover'
+    | 'select_option_by_text'
+    | 'select_option_by_value';
+  selectorType?: 'css' | 'xpath' | 'tag_name';
+  selector?: string | null;
+  text?: string | null;
+}
+
+export interface WebscraperStep {
+  id: string;
+  mode: WebscraperStepMode;
+  url?: string | null;
+  description?: string | null;
+  // Para modo automático, a IA usa este prompt para gerar ações.
+  prompt?: string | null;
+  // Para modo guiado, o usuário define as ações explicitamente.
+  actions?: WebscraperStepAction[];
+}
+
+export interface PlaywrightMcpConfig {
+  goal: string;
+  startUrl?: string;
+  mode?: 'autonomous' | 'guided' | 'hybrid';
+  allowedDomains?: string[];
+  maxSteps?: number | string;
+  timeoutMs?: number | string;
+  resultSchema?: string;
+  // Lista de etapas WebScraper (guiadas ou automáticas)
+  steps?: WebscraperStep[];
+}
+
 // Database Node Types
 export type DatabaseOperation =
   | 'addColumns'
@@ -419,6 +471,7 @@ export interface NodeData {
   agentConfig?: AgentConfig;
   loopConfig?: LoopConfig;
   codeExecutionConfig?: CodeExecutionConfig;
+  playwrightMcpConfig?: PlaywrightMcpConfig;
   conditions?: Array<{
     field: string;
     operator: string;

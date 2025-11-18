@@ -405,9 +405,10 @@ function NodeConfigLayoutContent({
 
 export function NodeConfigLayout(props: NodeConfigLayoutProps) {
   const [execution, setExecution] = useState<Execution | null>(null);
+  const hasLoadedRef = useRef(false);
 
   const loadExecution = useCallback(async () => {
-    if (!props.flowId) return;
+    if (!props.flowId || !props.isOpen) return;
 
     try {
       // Primeiro, tentar pegar do sessionStorage (execução selecionada)
@@ -439,16 +440,48 @@ export function NodeConfigLayout(props: NodeConfigLayoutProps) {
       }
 
       setExecution(executionData);
+      hasLoadedRef.current = true;
     } catch (error) {
       console.error('Error loading execution:', error);
     }
-  }, [props.flowId]);
+  }, [props.flowId, props.isOpen]);
 
+  // Carregar execução apenas uma vez quando o dialog abrir
   useEffect(() => {
-    if (props.isOpen && props.flowId) {
+    if (props.isOpen && props.flowId && !hasLoadedRef.current) {
       loadExecution();
     }
+
+    // Resetar flag quando fechar
+    if (!props.isOpen) {
+      hasLoadedRef.current = false;
+    }
   }, [props.isOpen, props.flowId, loadExecution]);
+
+  // Escutar eventos de atualização da execução
+  useEffect(() => {
+    if (!props.isOpen) return;
+
+    const handleExecutionUpdated = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ executionId: string }>;
+      const { executionId } = customEvent.detail;
+
+      // Verificar se é a execução que estamos exibindo
+      if (execution?.id === executionId) {
+        const { getExecution } = await import('@/actions/executions');
+        const result = await getExecution(executionId);
+        if (result.success && result.execution) {
+          setExecution(result.execution);
+        }
+      }
+    };
+
+    window.addEventListener('executionUpdated', handleExecutionUpdated);
+
+    return () => {
+      window.removeEventListener('executionUpdated', handleExecutionUpdated);
+    };
+  }, [props.isOpen, execution]);
 
   return (
     <FlowExecutionProvider>

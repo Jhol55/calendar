@@ -12,6 +12,7 @@ import {
   Code2,
   Search,
   Blocks,
+  Globe2,
 } from 'lucide-react';
 import { NodeType } from './types';
 import { Typography } from '@/components/ui/typography';
@@ -94,6 +95,13 @@ const nodeTemplates: NodeTemplate[] = [
     icon: <Code2 className="w-5 h-5" />,
     description: 'Executar código JS/Python seguro',
     color: 'bg-indigo-600',
+  },
+  {
+    type: 'playwright-mcp-node',
+    label: 'Playwright MCP',
+    icon: <Globe2 className="w-5 h-5" />,
+    description: 'Automatizar navegação web com Playwright + MCP',
+    color: 'bg-emerald-600',
   },
 ];
 

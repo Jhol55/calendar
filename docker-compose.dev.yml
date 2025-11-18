@@ -59,6 +59,19 @@ services:
     networks:
       - api-net
 
+  # ==================== WEBSCRAPER (Python + SeleniumBase) ====================
+
+  web-scraper:
+    container_name: web_scraper
+    build: ./web-scraper
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    environment:
+      - ENV=prod
+    networks:
+      - api-net
+
   redis:
     container_name: redis
     image: redis:7-alpine
@@ -87,98 +100,98 @@ services:
 
   # ==================== JUDGE0 SERVICES ====================
   
-  judge0-server:
-    container_name: judge0-server
-    image: judge0/judge0:1.13.0
-    env_file: judge0.conf
-    volumes:
-      - ./judge0.conf:/judge0.conf:ro
-    ports:
-      - "2358:2358"
-    privileged: true
-    restart: unless-stopped
-    networks:
-      - api-net
-    depends_on:
-      judge0-db:
-        condition: service_healthy
-      judge0-redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2358/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: 100M
+  # judge0-server:
+  #   container_name: judge0-server
+  #   image: judge0/judge0:1.13.0
+  #   env_file: judge0.conf
+  #   volumes:
+  #     - ./judge0.conf:/judge0.conf:ro
+  #   ports:
+  #     - "2358:2358"
+  #   privileged: true
+  #   restart: unless-stopped
+  #   networks:
+  #     - api-net
+  #   depends_on:
+  #     judge0-db:
+  #       condition: service_healthy
+  #     judge0-redis:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:2358/"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: 100M
 
-  judge0-worker:
-    container_name: judge0-worker
-    image: judge0/judge0:1.13.0
-    command: ["./scripts/workers"]
-    env_file: judge0.conf
-    volumes:
-      - ./judge0.conf:/judge0.conf:ro
-    privileged: true
-    restart: unless-stopped
-    networks:
-      - api-net
-    depends_on:
-      judge0-db:
-        condition: service_healthy
-      judge0-redis:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: 100M
+  # judge0-worker:
+  #   container_name: judge0-worker
+  #   image: judge0/judge0:1.13.0
+  #   command: ["./scripts/workers"]
+  #   env_file: judge0.conf
+  #   volumes:
+  #     - ./judge0.conf:/judge0.conf:ro
+  #   privileged: true
+  #   restart: unless-stopped
+  #   networks:
+  #     - api-net
+  #   depends_on:
+  #     judge0-db:
+  #       condition: service_healthy
+  #     judge0-redis:
+  #       condition: service_healthy
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: 100M
 
-  judge0-db:
-    container_name: judge0-db
-    image: postgres:16.2-alpine
-    env_file: judge0.conf
-    # Porta NÃO exposta externamente (só acesso interno via rede Docker)
-    volumes:
-      - judge0_data:/var/lib/postgresql/data/
-    restart: unless-stopped
-    networks:
-      - api-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U judge0"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: json-file
-      options:
-        max-size: 100M
+  # judge0-db:
+  #   container_name: judge0-db
+  #   image: postgres:16.2-alpine
+  #   env_file: judge0.conf
+  #   # Porta NÃO exposta externamente (só acesso interno via rede Docker)
+  #   volumes:
+  #     - judge0_data:/var/lib/postgresql/data/
+  #   restart: unless-stopped
+  #   networks:
+  #     - api-net
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U judge0"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: 100M
 
-  judge0-redis:
-    container_name: judge0-redis
-    image: redis:7.2.4-alpine
-    command:
-      - redis-server
-      - --appendonly
-      - "no"
-      - --requirepass
-      - "YourSecureRedisPasswordHere123!"
-    env_file: judge0.conf
-    # Porta NÃO exposta externamente (só acesso interno via rede Docker)
-    restart: unless-stopped
-    networks:
-      - api-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "YourSecureRedisPasswordHere123!", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: 100M
+  # judge0-redis:
+  #   container_name: judge0-redis
+  #   image: redis:7.2.4-alpine
+  #   command:
+  #     - redis-server
+  #     - --appendonly
+  #     - "no"
+  #     - --requirepass
+  #     - "YourSecureRedisPasswordHere123!"
+  #   env_file: judge0.conf
+  #   # Porta NÃO exposta externamente (só acesso interno via rede Docker)
+  #   restart: unless-stopped
+  #   networks:
+  #     - api-net
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "YourSecureRedisPasswordHere123!", "ping"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 10
+  #     start_period: 10s
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: 100M
 
 volumes:
   redis_data:

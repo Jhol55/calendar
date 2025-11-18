@@ -65,7 +65,7 @@ export const FormSelect = forwardRef<HTMLButtonElement, FormSelectProps>(
           lastFormValueRef.current = currentFormValue;
           setCurrentValue(currentFormValue);
         }
-      }, 200);
+      }, 300);
       return () => clearTimeout(timer);
     }, [formValue, fieldName, form]);
 
@@ -95,7 +95,7 @@ export const FormSelect = forwardRef<HTMLButtonElement, FormSelectProps>(
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent className="bg-neutral-100">
+        <SelectContent className="bg-neutral-100 max-h-[300px] overflow-y-auto">
           {options.map((option) => (
             <SelectItem
               className="hover:cursor-pointer focus-ring-0 hover:bg-neutral-200"

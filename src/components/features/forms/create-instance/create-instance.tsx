@@ -445,7 +445,7 @@ export const CreateInstanceForm = ({
                   maxLength={6}
                   autoComplete="off"
                 />
-                <div className="text-xs text-gray-600 -mt-1 space-y-1">
+                <div className="text-xs text-gray-600 mt-2 mb-6 space-y-1">
                   <p>
                     <strong className="text-gray-700">
                       ✓ Se seu número JÁ TEM 2FA:
@@ -457,10 +457,6 @@ export const CreateInstanceForm = ({
                       ✓ Se seu número NÃO TEM 2FA:
                     </strong>{' '}
                     Crie um PIN de 6 dígitos (será configurado automaticamente)
-                  </p>
-                  <p className="text-amber-600 font-medium">
-                    ⚠️ Deixar em branco deixará seu número sem proteção 2FA (não
-                    recomendado)
                   </p>
                 </div>
               </>

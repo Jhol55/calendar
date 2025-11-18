@@ -120,9 +120,6 @@ export async function getExecution(id: string) {
       string,
       unknown
     > | null;
-    console.log(
-      `📊 [getExecution] Execution ${id}: nodeExecutions tem ${nodeExecs ? Object.keys(nodeExecs).length : 0} nodes`,
-    );
 
     const mappedExecution: Execution = {
       id: execution.id,

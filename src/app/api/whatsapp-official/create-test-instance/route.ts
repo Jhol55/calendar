@@ -62,6 +62,12 @@ export async function POST(request: NextRequest) {
         ? twoFactorPin.trim()
         : undefined;
 
+    // Garantir que sempre enviamos um boolean em isTestAccount
+    const isTest =
+      typeof isTestAccount === 'boolean'
+        ? isTestAccount
+        : accountType === 'test';
+
     const result = await createCloudInstanceWithIds(
       name,
       wabaId,
@@ -69,7 +75,7 @@ export async function POST(request: NextRequest) {
       accessToken,
       email,
       sanitizedPin,
-      isTestAccount ?? accountType === 'test',
+      isTest,
     );
 
     return NextResponse.json(result, {

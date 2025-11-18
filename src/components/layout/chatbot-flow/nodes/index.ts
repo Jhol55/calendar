@@ -6,3 +6,4 @@ export { TransformationNode } from './transformation-node/transformation-node';
 export { DatabaseNode } from './database-node/database-node';
 export { LoopNode } from './loop-node/loop-node';
 export { CodeExecutionNode } from './code-execution-node/code-execution-node';
+export { PlaywrightMcpNode } from './playwright-mcp-node/playwright-mcp-node';

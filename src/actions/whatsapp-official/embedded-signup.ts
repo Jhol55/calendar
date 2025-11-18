@@ -412,7 +412,86 @@ export async function processOAuthCallback(
     }
 
     // Registrar número para Cloud API (OBRIGATÓRIO para enviar mensagens)
+    //
+    // Documentação oficial: https://developers.facebook.com/docs/whatsapp/cloud-api/guides/register-phone-number
+    //
+    // Cenários de registro:
+    // 1. Account Creation: Registrar número durante criação (2FA obrigatório)
+    // 2. Name Change: Registrar novamente após aprovação de mudança de display name
+    // 3. Migration: Migrar de On-Premises para Cloud API
+    //
+    // IMPORTANTE: Antes de registrar, o número deve ter sua propriedade verificada
+    // (ownership verification) no Meta Business Manager
     console.log('📝 Registrando número na Cloud API...');
+
+    // ✅ Verificar status do display name antes de registrar
+    // Se o display name foi aprovado recentemente, precisamos registrar novamente
+    try {
+      const phoneStatusResponse = await fetch(
+        `https://graph.facebook.com/v23.0/${phoneNumberId}?fields=name_status,verified_name&access_token=${accessToken}`,
+      );
+
+      if (phoneStatusResponse.ok) {
+        const phoneStatus = await phoneStatusResponse.json();
+        console.log('📊 Status do display name:', {
+          name_status: phoneStatus.name_status,
+          verified_name: phoneStatus.verified_name,
+        });
+
+        // Se o display name está aprovado, precisamos desregistrar e registrar novamente
+        if (phoneStatus.name_status === 'APPROVED') {
+          console.log(
+            '✅ Display name está aprovado - desregistrando e registrando novamente...',
+          );
+
+          // SEMPRE desregistrar primeiro quando o display name está aprovado
+          // Isso garante que o número seja registrado com o nome aprovado
+          try {
+            const deregisterResponse = await fetch(
+              `https://graph.facebook.com/v21.0/${phoneNumberId}/deregister`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
+              },
+            );
+
+            if (deregisterResponse.ok) {
+              console.log(
+                '✅ Número desregistrado com sucesso (display name aprovado)',
+              );
+              // Aguardar antes de registrar novamente
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            } else {
+              const deregisterErrorText = await deregisterResponse.text();
+              console.warn(
+                '⚠️ Não foi possível desregistrar:',
+                deregisterErrorText,
+              );
+              // Continuar mesmo assim, pode já estar desregistrado
+            }
+          } catch (deregisterError) {
+            console.warn(
+              '⚠️ Erro ao desregistrar (pode já estar desregistrado):',
+              deregisterError,
+            );
+          }
+        } else {
+          console.warn(
+            `⚠️ Display name status: ${phoneStatus.name_status} - pode causar erro 131037`,
+          );
+          console.warn(
+            '💡 Aguarde a aprovação do display name no Meta Business Manager',
+          );
+        }
+      }
+    } catch (error) {
+      console.warn(
+        '⚠️ Não foi possível verificar status do display name:',
+        error,
+      );
+    }
 
     try {
       const registerPayload: { messaging_product: string; pin?: string } = {
@@ -420,6 +499,9 @@ export async function processOAuthCallback(
         // NOTA: PIN de 2FA não está disponível neste fluxo (OAuth callback legado)
         // Para usar PIN (criar ou validar 2FA), use o botão "Conectar WhatsApp Cloud"
         // que usa o SDK do Facebook e permite fornecer o PIN
+        //
+        // ATENÇÃO: A documentação oficial recomenda configurar 2FA durante Account Creation
+        // Este fluxo não suporta PIN, então o número ficará sem proteção 2FA
       };
 
       const registerResponse = await fetch(
@@ -452,13 +534,64 @@ export async function processOAuthCallback(
         const errorCode = errorData.error?.code;
         const errorMessage = errorData.error?.message || errorText;
 
-        // Se o erro for que já está registrado, tudo bem
+        // Se o erro for que já está registrado, tentar desregistrar e registrar novamente
+        // Isso é necessário quando o display name foi aprovado após o registro inicial
         if (
           errorCode === 33 ||
           errorText.includes('already') ||
           errorText.includes('registered')
         ) {
-          console.log('✅ Número já estava registrado (OK)');
+          console.log(
+            '⚠️ Número já estava registrado - tentando desregistrar e registrar novamente...',
+          );
+
+          // Tentar desregistrar primeiro
+          try {
+            const deregisterResponse = await fetch(
+              `https://graph.facebook.com/v21.0/${phoneNumberId}/deregister`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
+              },
+            );
+
+            if (deregisterResponse.ok) {
+              console.log('✅ Número desregistrado com sucesso');
+
+              // Aguardar um pouco antes de registrar novamente
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              // Tentar registrar novamente
+              const retryRegisterResponse = await fetch(
+                `https://graph.facebook.com/v21.0/${phoneNumberId}/register`,
+                {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(registerPayload),
+                },
+              );
+
+              if (retryRegisterResponse.ok) {
+                console.log(
+                  '✅ Número registrado novamente com sucesso após desregistro',
+                );
+              } else {
+                const retryErrorText = await retryRegisterResponse.text();
+                console.warn('⚠️ Erro ao registrar novamente:', retryErrorText);
+              }
+            } else {
+              console.log(
+                '⚠️ Não foi possível desregistrar (pode estar em uso)',
+              );
+            }
+          } catch (deregisterError) {
+            console.warn('⚠️ Erro ao tentar desregistrar:', deregisterError);
+          }
         }
         // Se pedir PIN, avisar que deve usar o fluxo com SDK
         else if (errorCode === 100 && errorText.includes('pin')) {
@@ -540,7 +673,7 @@ export async function processOAuthCallback(
         lastDisconnect: '',
         lastDisconnectReason: '',
         adminField01: userEmail,
-        adminField02: isTestAccount ? 'whatsapp-cloud-test' : '',
+        adminField02: '',
         openai_apikey: '',
         chatbot_enabled: false,
         chatbot_ignoreGroups: false,
@@ -873,9 +1006,11 @@ export async function createCloudInstanceWithIds(
   accessToken: string | null,
   email: string,
   twoFactorPin?: string,
-  isTestAccount = false,
+  isTestAccountParam = false,
 ): Promise<WhatsAppOfficialResponse> {
   try {
+    // Normalizar flag de conta de teste (pode chegar como undefined)
+    const isTestAccount = !!isTestAccountParam;
     console.log('🚀 Criando instância Cloud com IDs diretos');
     console.log('📱 WABA ID:', wabaId);
     console.log('📞 Phone Number ID:', phoneNumberId);
@@ -987,32 +1122,135 @@ export async function createCloudInstanceWithIds(
       phoneNumberValue = phoneNumberId;
     }
 
-    // Registrar número e configurar webhook apenas se temos token e não for conta de teste
-    if (accessToken && !isTestAccount) {
+    // Registrar número e configurar webhook sempre que tivermos token
+    // (inclusive para contas de teste, que também precisam estar registradas)
+    if (accessToken) {
       // Registrar número para Cloud API (OBRIGATÓRIO para enviar mensagens)
+      //
+      // Documentação oficial: https://developers.facebook.com/docs/whatsapp/cloud-api/guides/register-phone-number
+      //
+      // Cenários de registro:
+      // 1. Account Creation: Registrar número durante criação (2FA obrigatório)
+      // 2. Name Change: Registrar novamente após aprovação de mudança de display name
+      // 3. Migration: Migrar de On-Premises para Cloud API
+      //
+      // IMPORTANTE: Antes de registrar, o número deve ter sua propriedade verificada
+      // (ownership verification) no Meta Business Manager
+
+      // ✅ Verificar status do display name antes de registrar
+      // Se o display name foi aprovado recentemente, precisamos registrar novamente
       try {
-        console.log('📝 Registrando número na Cloud API...');
-        console.log(
-          '🔑 PIN de 2FA fornecido:',
-          twoFactorPin ? 'Sim (6 dígitos)' : 'Não',
+        const phoneStatusResponse = await fetch(
+          `https://graph.facebook.com/v23.0/${phoneNumberId}?fields=name_status,verified_name&access_token=${accessToken}`,
         );
 
-        const registerPayload: { messaging_product: string; pin?: string } = {
-          messaging_product: 'whatsapp',
-        };
+        if (phoneStatusResponse.ok) {
+          const phoneStatus = await phoneStatusResponse.json();
+          console.log('📊 Status do display name:', {
+            name_status: phoneStatus.name_status,
+            verified_name: phoneStatus.verified_name,
+          });
 
-        // PIN de 2FA (Importante para segurança):
-        // - Se o número JÁ TEM 2FA: deve enviar o PIN existente de 6 dígitos
-        // - Se o número NÃO TEM 2FA: o PIN enviado CRIARÁ a proteção 2FA automaticamente
-        // - Se não enviar PIN: o número ficará SEM proteção 2FA (vulnerável)
-        if (twoFactorPin && twoFactorPin.length === 6) {
-          registerPayload.pin = twoFactorPin;
+          // Se o display name está aprovado, precisamos desregistrar e registrar novamente
+          // Para conta de teste NÃO desregistrar, para não quebrar o número de teste
+          if (!isTestAccount && phoneStatus.name_status === 'APPROVED') {
+            console.log(
+              '✅ Display name está aprovado - desregistrando e registrando novamente...',
+            );
+
+            // SEMPRE desregistrar primeiro quando o display name está aprovado
+            // Isso garante que o número seja registrado com o nome aprovado
+            try {
+              const deregisterResponse = await fetch(
+                `https://graph.facebook.com/v21.0/${phoneNumberId}/deregister`,
+                {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                  },
+                },
+              );
+
+              if (deregisterResponse.ok) {
+                console.log(
+                  '✅ Número desregistrado com sucesso (display name aprovado)',
+                );
+                // Aguardar antes de registrar novamente
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+              } else {
+                const deregisterErrorText = await deregisterResponse.text();
+                console.warn(
+                  '⚠️ Não foi possível desregistrar:',
+                  deregisterErrorText,
+                );
+                // Continuar mesmo assim, pode já estar desregistrado
+              }
+            } catch (deregisterError) {
+              console.warn(
+                '⚠️ Erro ao desregistrar (pode já estar desregistrado):',
+                deregisterError,
+              );
+            }
+          } else {
+            console.warn(
+              `⚠️ Display name status: ${phoneStatus.name_status} - pode causar erro 131037`,
+            );
+            console.warn(
+              '💡 Aguarde a aprovação do display name no Meta Business Manager',
+            );
+          }
+        }
+      } catch (error) {
+        console.warn(
+          '⚠️ Não foi possível verificar status do display name:',
+          error,
+        );
+      }
+
+      try {
+        console.log('📝 Registrando número na Cloud API...');
+
+        // Para contas de teste, o PIN normalmente não é necessário/possível.
+        // Para contas reais, seguir a recomendação oficial e exigir PIN de 6 dígitos.
+        let registerPayload:
+          | { messaging_product: string }
+          | { messaging_product: string; pin: string };
+
+        if (isTestAccount) {
           console.log(
-            '✅ PIN será enviado na requisição de registro (habilita/valida 2FA)',
+            '🧪 Conta de teste detectada - registrando sem PIN de 2FA (test number)',
           );
+          registerPayload = {
+            messaging_product: 'whatsapp',
+          };
         } else {
           console.log(
-            '⚠️ Nenhum PIN fornecido - número ficará sem proteção 2FA (não recomendado)',
+            '🔑 PIN de 2FA fornecido:',
+            twoFactorPin ? 'Sim (6 dígitos)' : 'Não',
+          );
+
+          // PIN é OBRIGATÓRIO conforme documentação oficial:
+          // https://developers.facebook.com/docs/whatsapp/cloud-api/reference/registration/
+          // "pin: Required. If your verified business phone number already has two-step verification
+          // enabled, set this value to your number's 6-digit two-step verification PIN. If your verified
+          // business phone number does not have two-step verification enabled, set this value to a
+          // 6-digit number. This will be the newly verified business phone number's two-step
+          // verification PIN."
+          if (!twoFactorPin || twoFactorPin.length !== 6) {
+            throw new Error(
+              'PIN de 2FA é obrigatório para registrar o número. ' +
+                'Forneça um PIN de 6 dígitos. Se o número já tem 2FA, use o PIN existente. ' +
+                'Se não tem, o PIN fornecido será configurado como o novo PIN de 2FA.',
+            );
+          }
+
+          registerPayload = {
+            messaging_product: 'whatsapp',
+            pin: twoFactorPin,
+          };
+
+          console.log(
+            '✅ PIN será enviado na requisição de registro (habilita/valida 2FA)',
           );
         }
 
@@ -1046,13 +1284,77 @@ export async function createCloudInstanceWithIds(
           const errorCode = errorData.error?.code;
           const errorMessage = errorData.error?.message || errorText;
 
-          // Se o erro for que já está registrado, tudo bem
+          // Se o erro for que já está registrado
           if (
             errorCode === 33 ||
             errorText.includes('already') ||
             errorText.includes('registered')
           ) {
-            console.log('✅ Número já estava registrado (OK)');
+            if (isTestAccount) {
+              // Para conta de teste, NÃO desregistrar o número.
+              // Apenas manter o registro existente e seguir com a criação da instância.
+              console.log(
+                'ℹ️ Número de teste já estava registrado - mantendo registro atual (sem desregistrar).',
+              );
+            } else {
+              console.log(
+                '⚠️ Número já estava registrado - tentando desregistrar e registrar novamente...',
+              );
+
+              // Tentar desregistrar primeiro
+              try {
+                const deregisterResponse = await fetch(
+                  `https://graph.facebook.com/v21.0/${phoneNumberId}/deregister`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      Authorization: `Bearer ${accessToken}`,
+                    },
+                  },
+                );
+
+                if (deregisterResponse.ok) {
+                  console.log('✅ Número desregistrado com sucesso');
+
+                  // Aguardar um pouco antes de registrar novamente
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+                  // Tentar registrar novamente
+                  const retryRegisterResponse = await fetch(
+                    `https://graph.facebook.com/v21.0/${phoneNumberId}/register`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify(registerPayload),
+                    },
+                  );
+
+                  if (retryRegisterResponse.ok) {
+                    console.log(
+                      '✅ Número registrado novamente com sucesso após desregistro',
+                    );
+                  } else {
+                    const retryErrorText = await retryRegisterResponse.text();
+                    console.warn(
+                      '⚠️ Erro ao registrar novamente:',
+                      retryErrorText,
+                    );
+                  }
+                } else {
+                  console.log(
+                    '⚠️ Não foi possível desregistrar (pode estar em uso)',
+                  );
+                }
+              } catch (deregisterError) {
+                console.warn(
+                  '⚠️ Erro ao tentar desregistrar:',
+                  deregisterError,
+                );
+              }
+            }
           }
           // Se pedir PIN, dar instruções claras
           else if (errorCode === 100 && errorText.includes('pin')) {
@@ -1060,7 +1362,13 @@ export async function createCloudInstanceWithIds(
               '❌ PIN de 2FA é obrigatório mas não foi fornecido ou está incorreto',
             );
 
-            if (twoFactorPin) {
+            if (isTestAccount) {
+              // Conta de teste: não exigir 2FA, apenas avisar que o registro falhou
+              console.warn(
+                '⚠️ Conta de teste com 2FA: registro do número falhou por falta de PIN. ' +
+                  'Continuando criação da instância SEM registrar novamente o número.',
+              );
+            } else if (twoFactorPin) {
               // PIN foi fornecido mas está incorreto
               throw new Error(
                 'PIN de 2FA incorreto. Verifique o PIN de 6 dígitos configurado no WhatsApp Business Manager e tente novamente.',
@@ -1085,8 +1393,7 @@ export async function createCloudInstanceWithIds(
       }
 
       // Configurar webhook
-      const currentOrigin =
-        process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
       const webhookToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
 
       if (!webhookToken) {
@@ -1111,20 +1418,12 @@ export async function createCloudInstanceWithIds(
           const errorText = await subscribeResponse.text();
           console.log('⚠️ Erro ao configurar webhook:', errorText);
         }
-      } catch (err) {
+      } catch {
         console.log('⚠️ Erro ao configurar webhook');
       }
     } else {
-      if (!accessToken) {
-        console.log('⚠️ Pulando registro e webhook (sem access token)');
-        console.log(
-          'ℹ️  Configure o token permanente depois para ativar a API',
-        );
-      } else {
-        console.log(
-          'ℹ️ Conta de teste detectada - pulando registro e exigência de PIN/2FA',
-        );
-      }
+      console.log('⚠️ Pulando registro e webhook (sem access token)');
+      console.log('ℹ️  Configure o token permanente depois para ativar a API');
     }
 
     // Configurar webhook URL

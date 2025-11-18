@@ -32,6 +32,7 @@ import {
   DatabaseNode,
   LoopNode,
   CodeExecutionNode,
+  PlaywrightMcpNode,
 } from './nodes';
 import { HttpRequestNode } from './nodes/http-request-node/http-request-node';
 import AgentNode from './nodes/agent-node/agent-node';
@@ -68,6 +69,7 @@ import { LoopNodeConfig } from './nodes/loop-node/loop-node-config';
 import { CodeExecutionNodeConfig } from './nodes/code-execution-node/code-execution-node-config';
 import { ExecutionsPanel } from './executions-panel';
 import { DatabaseSpreadsheet } from '@/components/layout/database-spreadsheet/database-spreadsheet';
+import { PlaywrightMcpNodeConfig } from './nodes/playwright-mcp-node/playwright-mcp-node-config';
 import { usePartialExecution } from '@/hooks/use-partial-execution';
 import { withExecuteButton } from './nodes/with-execute-button';
 import { getExecution, type Execution } from '@/actions/executions';
@@ -84,6 +86,7 @@ const baseNodeTypes = {
   agent: AgentNode,
   loop: LoopNode,
   code_execution: CodeExecutionNode,
+  'playwright-mcp-node': PlaywrightMcpNode,
 };
 
 const edgeTypes = {
@@ -120,6 +123,8 @@ function FlowEditorContent() {
     useState<ReactFlowInstance | null>(null);
   const [flowName, setFlowName] = useState('');
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [playwrightConfigDialogOpen, setPlaywrightConfigDialogOpen] =
+    useState(false);
   const [webhookConfigDialogOpen, setWebhookConfigDialogOpen] = useState(false);
   const [memoryConfigDialogOpen, setMemoryConfigDialogOpen] = useState(false);
   const [transformationConfigDialogOpen, setTransformationConfigDialogOpen] =
@@ -704,6 +709,7 @@ function FlowEditorContent() {
         agent: 'AI Agent',
         loop: 'Loop',
         code_execution: 'Code Execution',
+        'playwright-mcp-node': 'Playwright MCP',
         end: 'End',
       };
 
@@ -1010,6 +1016,9 @@ function FlowEditorContent() {
       if (node.type === 'message') {
         setNodeToConfig(node);
         setConfigDialogOpen(true);
+      } else if (node.type === 'playwright-mcp-node') {
+        setNodeToConfig(node);
+        setPlaywrightConfigDialogOpen(true);
       } else if (node.type === 'webhook') {
         setNodeToConfig(node);
         setWebhookConfigDialogOpen(true);
@@ -1496,7 +1505,7 @@ function FlowEditorContent() {
         onClose={() => setIsSpreadsheetOpen(false)}
       />
 
-      {configDialogOpen && (
+      {configDialogOpen && nodeToConfig?.type === 'message' && (
         <MessageNodeConfig
           isOpen={configDialogOpen}
           onClose={() => {
@@ -1515,6 +1524,33 @@ function FlowEditorContent() {
           }}
         />
       )}
+
+      {playwrightConfigDialogOpen &&
+        nodeToConfig?.type === 'playwright-mcp-node' && (
+          <PlaywrightMcpNodeConfig
+            isOpen={playwrightConfigDialogOpen}
+            onClose={() => {
+              setPlaywrightConfigDialogOpen(false);
+              setNodeToConfig(null);
+            }}
+            config={nodeToConfig?.data.playwrightMcpConfig}
+            onSave={(cfg) => {
+              if (nodeToConfig) {
+                handleNodeUpdate(nodeToConfig.id, {
+                  playwrightMcpConfig: cfg,
+                });
+              }
+            }}
+            nodeId={nodeToConfig?.id}
+            flowId={currentFlowId || undefined}
+            nodeLabel={nodeToConfig?.data.label}
+            onNodeLabelChange={(label) => {
+              if (nodeToConfig) {
+                handleNodeUpdate(nodeToConfig.id, { label });
+              }
+            }}
+          />
+        )}
 
       {webhookConfigDialogOpen && (
         <WebhookNodeConfig

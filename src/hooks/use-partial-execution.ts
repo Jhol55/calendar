@@ -138,10 +138,13 @@ export function usePartialExecution() {
 
         const result = await response.json();
 
+        // A API de execução parcial agora retorna também flowId e status inicial
+        // Preservar esses campos para o FlowEditor conseguir atualizar o flow selecionado
         return {
           executionId: result.executionId,
-          status: 'success',
-          duration: result.duration,
+          flowId: result.flowId,
+          status: result.status ?? 'running',
+          duration: result.duration ?? undefined,
         };
       } catch (err) {
         let errorMessage = 'Erro desconhecido';

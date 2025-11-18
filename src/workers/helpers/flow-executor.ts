@@ -14,6 +14,11 @@ import { processAgentNode as processAgentNodeHelper } from '../helpers/node-proc
 import { processLoopNode } from '../helpers/node-processors/loop-helper';
 import { processCodeExecutionNode } from '../helpers/node-processors/code-execution-helper';
 import * as transformations from '../helpers/node-processors/transformation-helper';
+import {
+  runWebscraperMcpTask,
+  type WebscraperMcpStep,
+} from '../../services/webscraper-mcp.service';
+import type { PlaywrightMcpConfig } from '@/components/layout/chatbot-flow/types';
 
 // Tipos principais
 interface FlowNode {
@@ -365,6 +370,12 @@ async function processNode(
           webhookData,
         );
         break;
+      case 'playwright-mcp-node':
+        result = await processPlaywrightMcpNode(executionId, node, webhookData);
+        break;
+      case 'playwright-mcp-node':
+        result = await processPlaywrightMcpNode(executionId, node, webhookData);
+        break;
       case 'api':
         result = await processApiNode();
         break;
@@ -551,6 +562,93 @@ async function processAgentNode(
     variableContext,
     replaceVariables,
   });
+}
+
+async function processPlaywrightMcpNode(
+  executionId: string,
+  node: FlowNode,
+  webhookData: WebhookJobData,
+): Promise<unknown> {
+  // Buscar execution para obter flowId e userId
+  const execution = await prisma.flow_executions.findUnique({
+    where: { id: executionId },
+    include: { flow: true },
+  });
+
+  const config = (node.data?.playwrightMcpConfig || {}) as PlaywrightMcpConfig;
+
+  const variableContext = await buildVariableContext(executionId, webhookData);
+
+  // Injetar AI_API_KEY e AI_MODEL no contexto, se existirem em env,
+  // para que serviços externos (como o WebScraper MCP em Python) possam usar
+  // a mesma configuração de forma genérica por fluxo/usuário.
+  const aiApiKey = process.env.AI_API_KEY;
+  const aiModel = process.env.AI_MODEL;
+
+  const enrichedContext = {
+    ...variableContext,
+    ...(aiApiKey ? { AI_API_KEY: aiApiKey } : {}),
+    ...(aiModel ? { AI_MODEL: aiModel } : {}),
+  };
+
+  // 🚀 Usar sempre WebScraper Python (engine moderna e completa)
+  const steps: WebscraperMcpStep[] = [];
+
+  // Se o usuário definiu etapas explicitamente, usamos essas etapas.
+  // Etapas "automatic" serão resolvidas pela IA dentro do serviço Python.
+  if (config.steps && config.steps.length > 0) {
+    for (const step of config.steps) {
+      const baseUrl = step.url || config.startUrl || null;
+      // Para modo automatic, usar o prompt; para guided, usar description
+      const description =
+        step.mode === 'automatic'
+          ? step.prompt || step.description || config.goal
+          : step.description || config.goal;
+
+      steps.push({
+        mode: step.mode || 'guided',
+        url: baseUrl,
+        description,
+        actions: step.actions || [],
+      });
+    }
+  } else if (config.startUrl) {
+    // Compatibilidade: se não houver steps, pelo menos navegar para a URL inicial.
+    steps.push({
+      mode: 'guided',
+      url: config.startUrl,
+      description: config.goal,
+      actions: [
+        {
+          action: 'goto_url',
+          selectorType: 'css',
+          selector: null,
+          text: config.startUrl,
+        },
+      ],
+    });
+  }
+
+  const wsResult = await runWebscraperMcpTask({
+    executionId,
+    nodeId: node.id,
+    flowId: execution?.flowId,
+    userId: execution?.flow?.userId ?? undefined,
+    profile: execution?.flow?.userId
+      ? `user_${execution.flow.userId}`
+      : executionId,
+    goal: config.goal,
+    steps,
+    context: enrichedContext,
+  });
+
+  return {
+    type: 'playwright-mcp-node',
+    success: wsResult.success,
+    message: wsResult.message,
+    data: wsResult.data,
+    logs: wsResult.logs,
+  };
 }
 
 async function processLoopNodeWrapper(

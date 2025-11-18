@@ -267,11 +267,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onMouseLeave={() => setIsHovered(!isHovered)}
         style={{ zoom: 0.9 }}
         className={cn(
-          'fixed left-0 sm:top-0 top-10 flex-1 bg-white backdrop-blur-sm border-r border-neutral-200',
+          'fixed left-0 md:top-0 top-10 flex-1 bg-white backdrop-blur-sm border-r border-neutral-200',
           'z-50 flex flex-col transition-all duration-200 ease-out',
           isOpen ? 'translate-y-0' : '-translate-y-full',
-          'md:relative md:translate-x-0',
-          isHovered || isFakeHovered ? 'sm:w-52' : 'sm:w-12',
+          'md:relative md:translate-x-0 h-screen',
+          isHovered || isFakeHovered ? 'md:w-52' : 'md:w-12',
           'w-full',
           className,
         )}
@@ -284,11 +284,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               headerClassName,
             )}
           >
-            <div className="flex items-center overflow-hidden mt-6">
+            <div
+              className={cn(
+                'flex items-center overflow-hidden transition-all duration-300 ease-out',
+                isHovered || isFakeHovered ? 'mt-6 gap-3' : 'mt-0 gap-0',
+              )}
+            >
               <div
                 className={cn(
-                  'min-w-10 min-h-10 rounded-lg flex items-center justify-center flex-shrink-0',
-                  'transition-all duration-300 ease-in-out',
+                  'min-w-10 min-h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden -translate-x-[2px]',
+                  'transition-all duration-300 ease-out',
                   isHovered || isFakeHovered ? 'w-28 h-28' : 'w-14 h-14',
                   logoClassName,
                 )}
@@ -298,26 +303,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   alt="4itt"
                   width={500}
                   height={500}
-                  className="transition-transform duration-300 ease-in-out"
+                  className={cn(
+                    'transition-all duration-300 ease-out',
+                    isHovered || isFakeHovered ? 'scale-100' : 'scale-90',
+                  )}
+                  style={{
+                    objectFit: 'contain',
+                  }}
                 />
               </div>
               <div
-                className="overflow-hidden whitespace-nowrap"
+                className="overflow-hidden whitespace-nowrap flex flex-col"
                 style={{
                   opacity: isHovered || isFakeHovered ? 1 : 0,
                   width: isHovered || isFakeHovered ? 'auto' : '0',
-                  transition: 'opacity 0.15s ease-out, width 0.2s ease-out',
+                  maxWidth: isHovered || isFakeHovered ? '200px' : '0',
+                  transform:
+                    isHovered || isFakeHovered
+                      ? 'translateY(0) translateX(0)'
+                      : 'translateY(8px) translateX(-10px)',
+                  transition:
+                    isHovered || isFakeHovered
+                      ? 'opacity 0.3s ease-out 0.1s, width 0.3s ease-out 0.1s, max-width 0.3s ease-out 0.1s, transform 0.3s ease-out 0.1s'
+                      : 'opacity 0.15s ease-in, width 0.2s ease-in, max-width 0.2s ease-in, transform 0.2s ease-in',
                 }}
               >
                 <Typography
                   variant="h2"
-                  className="text-neutral-600 font-bold whitespace-nowrap"
+                  className="text-neutral-600 font-bold whitespace-nowrap leading-tight"
+                  style={{
+                    transform:
+                      isHovered || isFakeHovered
+                        ? 'translateY(0)'
+                        : 'translateY(4px)',
+                    opacity: isHovered || isFakeHovered ? 1 : 0,
+                    transition:
+                      isHovered || isFakeHovered
+                        ? 'transform 0.3s ease-out 0.15s, opacity 0.3s ease-out 0.15s'
+                        : 'transform 0.15s ease-in, opacity 0.15s ease-in',
+                  }}
                 >
                   4itt
                 </Typography>
                 <Typography
                   variant="span"
-                  className="text-neutral-600 whitespace-break-spaces italic"
+                  className="text-neutral-500 text-xs whitespace-break-spaces italic leading-tight"
+                  style={{
+                    transform:
+                      isHovered || isFakeHovered
+                        ? 'translateY(0)'
+                        : 'translateY(4px)',
+                    opacity: isHovered || isFakeHovered ? 0.8 : 0,
+                    transition:
+                      isHovered || isFakeHovered
+                        ? 'transform 0.3s ease-out 0.2s, opacity 0.3s ease-out 0.2s'
+                        : 'transform 0.15s ease-in, opacity 0.15s ease-in',
+                  }}
                 >
                   Automação de processos
                 </Typography>
@@ -377,7 +418,7 @@ export const SidebarToggle: React.FC<SidebarToggleProps> = ({
     <Button
       variant="default"
       className={cn(
-        'absolute z-50 sm:hidden p-3 bg-zinc-900/95 backdrop-blur-sm border rounded-none border-zinc-800/50 hover:bg-zinc-800/95',
+        'absolute z-50 md:hidden p-3 bg-zinc-900/95 backdrop-blur-sm border rounded-none border-zinc-800/50 hover:bg-zinc-800/95',
         className,
       )}
       onClick={onToggle}
