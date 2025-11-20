@@ -29,7 +29,7 @@ const nodeTemplates: NodeTemplate[] = [
     type: 'message',
     label: 'Mensagem',
     icon: <MessageSquare className="w-5 h-5 text-blue-500" />,
-    description: 'Enviar mensagem ao usuário',
+    description: 'Gerenciar conversas',
   },
   {
     type: 'condition',
@@ -45,9 +45,9 @@ const nodeTemplates: NodeTemplate[] = [
   },
   {
     type: 'memory',
-    label: 'Memória',
+    label: 'Memória Rápida',
     icon: <Brain className="w-5 h-5 text-fuchsia-500" />,
-    description: 'Salvar/buscar dados do usuário',
+    description: 'Salvar/buscar dados rapidamente',
   },
   {
     type: 'transformation',
@@ -57,7 +57,7 @@ const nodeTemplates: NodeTemplate[] = [
   },
   {
     type: 'database',
-    label: 'Database',
+    label: 'Banco de Dados',
     icon: <Database className="w-5 h-5 text-cyan-500" />,
     description: 'Gerenciar tabelas de dados',
   },
@@ -71,7 +71,7 @@ const nodeTemplates: NodeTemplate[] = [
     type: 'agent',
     label: 'AI Agent',
     icon: <Bot className="w-5 h-5 text-purple-500" />,
-    description: 'Integrar IA (OpenAI GPT)',
+    description: 'Integrar IA',
   },
   {
     type: 'loop',
@@ -81,15 +81,15 @@ const nodeTemplates: NodeTemplate[] = [
   },
   {
     type: 'code_execution',
-    label: 'Code Execution',
+    label: 'Código',
     icon: <Code2 className="w-5 h-5 text-indigo-600" />,
-    description: 'Executar código JS/Python seguro',
+    description: 'Executar código JS/Python',
   },
   {
     type: 'playwright-mcp-node',
     label: 'Playwright MCP',
     icon: <Globe2 className="w-5 h-5 text-emerald-600" />,
-    description: 'Automatizar navegação web com Playwright + MCP',
+    description: 'Automatizar navegação web',
   },
 ];
 

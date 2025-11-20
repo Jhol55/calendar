@@ -20,14 +20,25 @@ export type {
 
 /**
  * Carrega e executa o serviço better-playwright
- * Usa import dinâmico com caminho absoluto para evitar análise estática
+ *
+ * Automaticamente usa Pool + Queue + Timeout para execuções em produção
+ * Usa execução direta (sem fila) para debug visual (headless=false)
  */
 export async function runBetterPlaywrightMcpTaskWrapper(
   input: PlaywrightMcpTaskInput,
 ): Promise<PlaywrightMcpTaskResult> {
-  // Usar import dinâmico com caminho relativo
-  // O webpackIgnore deve evitar que o webpack tente fazer bundle
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const serviceModule = await import('./better-playwright.service');
-  return serviceModule.runBetterPlaywrightMcpTask(input);
+  // Usar import dinâmico para evitar análise estática do Next.js
+  const serviceModule = await import('./index');
+
+  // Se headless=false (debug visual), usar execução direta sem fila
+  // Isso permite ver o browser em ação sem esperar na fila
+  const isHeadless = input.context?.headless !== false;
+
+  if (!isHeadless) {
+    // Debug visual: execução direta
+    return serviceModule.runPlaywrightTaskDirect(input);
+  }
+
+  // Produção: usar pool + queue + timeout (recomendado)
+  return serviceModule.runPlaywrightTask(input);
 }

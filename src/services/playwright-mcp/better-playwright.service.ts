@@ -73,16 +73,26 @@ async function getContextClass(): Promise<any> {
 /**
  * Executa uma tarefa usando better-playwright-mcp
  * Suporta modo guiado (seletores CSS/XPath) e modo automático (IA)
+ *
+ * @param input - Configuração da tarefa
+ * @param options - Opções adicionais (browser do pool, timeout customizado)
  */
 export async function runBetterPlaywrightMcpTask(
   input: PlaywrightMcpTaskInput,
+  options?: {
+    browser?: Browser;
+    browserId?: string;
+    skipBrowserCleanup?: boolean;
+  },
 ): Promise<PlaywrightMcpTaskResult> {
   const logs: string[] = [];
-  let browser: Browser | null = null;
+  let browser: Browser | null = options?.browser || null;
   let page: Page | null = null;
   let finalAnswer: string | null = null;
   let finalUrl = '';
   let autoContext: any = null; // Context compartilhado para todas as etapas automáticas (tipo externo sem definição)
+  const browserId = options?.browserId;
+  const skipBrowserCleanup = options?.skipBrowserCleanup || false;
 
   // 🚀 Histórico de ações (similar ao planner do web-scraper)
   const actionHistory: ActionRecord[] = []; // Histórico global de todas as etapas
@@ -100,14 +110,14 @@ export async function runBetterPlaywrightMcpTask(
 
     // 🚀 ESTRATÉGIA: Criar browser apenas se necessário
     // Se houver etapas automatic, o Context criará seu próprio browser
-    // Se houver etapas guided, criamos um browser manual
+    // Se houver etapas guided, criamos um browser manual (ou usamos do pool)
     // Se houver ambos, tentamos usar o browser do Context para o modo guided também
     const hasAutomaticSteps = input.steps.some((s) => s.mode === 'automatic');
     const hasGuidedSteps = input.steps.some((s) => s.mode !== 'automatic');
 
-    // Criar browser manual apenas se houver etapas guided E não houver etapas automatic
+    // Criar browser manual apenas se houver etapas guided E não houver etapas automatic E não veio do pool
     // Se houver ambos, vamos tentar usar o browser do Context para o modo guided
-    if (hasGuidedSteps && !hasAutomaticSteps) {
+    if (hasGuidedSteps && !hasAutomaticSteps && !browser) {
       browser = await chromium.launch({
         headless: headless,
       });
@@ -121,6 +131,8 @@ export async function runBetterPlaywrightMcpTask(
       logs.push(
         '🔄 [INFO] Etapas automatic e guided detectadas - tentando compartilhar o mesmo navegador',
       );
+    } else if (browser && browserId) {
+      logs.push(`🔄 [POOL] Usando browser do pool (ID: ${browserId})`);
     }
 
     // Array para acumular outputs de múltiplas etapas (quando solicitado)
@@ -734,12 +746,80 @@ CRITICAL INSTRUCTIONS:
         // Ignorar erros ao fechar
       }
     }
-    if (browser) {
+
+    // Fechar browser apenas se NÃO veio do pool
+    if (browser && !skipBrowserCleanup) {
       try {
+        logs.push('🔒 Fechando browser...');
         await browser.close();
+        logs.push('✅ Browser fechado');
       } catch {
         // Ignorar erros ao fechar
       }
+    } else if (browser && skipBrowserCleanup && browserId) {
+      logs.push(`🔄 [POOL] Browser ${browserId} retornará ao pool`);
+      // Browser será retornado ao pool externamente
+    }
+  }
+}
+
+/**
+ * Executa tarefa com timeout automático
+ * Previne execuções infinitas que travam browsers
+ */
+export async function runWithTimeout(
+  input: PlaywrightMcpTaskInput,
+  timeoutMs: number = 5 * 60 * 1000, // 5 minutos por padrão
+  options?: {
+    browser?: Browser;
+    browserId?: string;
+    skipBrowserCleanup?: boolean;
+  },
+): Promise<PlaywrightMcpTaskResult> {
+  return Promise.race([
+    runBetterPlaywrightMcpTask(input, options),
+    new Promise<PlaywrightMcpTaskResult>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(new Error(`Execution timeout: ${timeoutMs / 1000}s exceeded`)),
+        timeoutMs,
+      ),
+    ),
+  ]);
+}
+
+/**
+ * Executa tarefa usando browser do pool
+ * Automaticamente adquire browser do pool, executa e retorna ao pool
+ */
+export async function runWithBrowserPool(
+  input: PlaywrightMcpTaskInput,
+  timeoutMs?: number,
+): Promise<PlaywrightMcpTaskResult> {
+  const { getBrowserPool } = await import('./browser-pool.service');
+  const pool = getBrowserPool();
+
+  let browserId: string | undefined;
+  let browser: Browser | undefined;
+
+  try {
+    // Adquirir browser do pool
+    const acquired = await pool.acquireBrowser();
+    browser = acquired.browser;
+    browserId = acquired.browserId;
+
+    // Executar com timeout
+    const result = await runWithTimeout(input, timeoutMs, {
+      browser,
+      browserId,
+      skipBrowserCleanup: true, // Não fechar browser (vai voltar ao pool)
+    });
+
+    return result;
+  } finally {
+    // Retornar browser ao pool
+    if (browserId) {
+      await pool.releaseBrowser(browserId);
     }
   }
 }

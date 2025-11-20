@@ -233,8 +233,9 @@ function PlaywrightMcpFormFields({
   };
 
   const addStep = () => {
+    const newStepId = crypto.randomUUID();
     const newStep: WebscraperStep = {
-      id: crypto.randomUUID(),
+      id: newStepId,
       mode: 'guided',
       url: '',
       description: '',
@@ -244,7 +245,7 @@ function PlaywrightMcpFormFields({
     setSteps((prev) => [...prev, newStep]);
     setExpandedSteps((prev) => {
       const next = new Set(prev);
-      next.add(newStep.id);
+      next.add(newStepId);
       return next;
     });
   };
@@ -480,7 +481,7 @@ function PlaywrightMcpFormFields({
             type="checkbox"
             id="headless"
             defaultChecked={config?.headless !== false}
-            onChange={(e) => {
+            onChange={() => {
               // Será salvo no handleSubmit
             }}
             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
@@ -527,12 +528,12 @@ function PlaywrightMcpFormFields({
         </div>
         <Typography variant="span" className="text-sm text-neutral-500">
           Cada etapa pode ser <strong>guiada</strong> (com seletores) ou{' '}
-          <strong>automática</strong> (IA converte o prompt em ações).
+          <strong>automática</strong> (IA navega automaticamente).
         </Typography>
 
         <div className="space-y-3">
           {steps.map((step, index) => {
-            const isExpanded = expandedSteps.has(step.id);
+            const isExpanded = expandedSteps.has(step.id || '');
             const isAutomatic = step.mode === 'automatic';
 
             return (
@@ -546,7 +547,7 @@ function PlaywrightMcpFormFields({
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() => toggleStepExpansion(step.id)}
+                      onClick={() => toggleStepExpansion(step.id || '')}
                       className="h-fit w-fit p-1 hover:bg-neutral-100"
                     >
                       {isExpanded ? (
@@ -595,7 +596,7 @@ function PlaywrightMcpFormFields({
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => removeStep(step.id)}
+                        onClick={() => removeStep(step.id || '')}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -630,7 +631,7 @@ function PlaywrightMcpFormFields({
                             },
                           ]}
                           onValueChange={(value) =>
-                            updateStep(step.id, {
+                            updateStep(step.id || '', {
                               mode: value as WebscraperStep['mode'],
                             })
                           }
@@ -651,7 +652,7 @@ function PlaywrightMcpFormFields({
                           fieldName={`step_${step.id}_url`}
                           defaultValue={step.url || ''}
                           onChange={(e) =>
-                            updateStep(step.id, { url: e.target.value })
+                            updateStep(step.id || '', { url: e.target.value })
                           }
                           placeholder="https://exemplo.com/pagina"
                         />
@@ -673,7 +674,7 @@ function PlaywrightMcpFormFields({
                         fieldName={`step_${step.id}_description`}
                         defaultValue={step.description || ''}
                         onChange={(e) =>
-                          updateStep(step.id, {
+                          updateStep(step.id || '', {
                             description: e.target.value,
                           })
                         }
@@ -697,7 +698,9 @@ function PlaywrightMcpFormFields({
                           fieldName={`step_${step.id}_prompt`}
                           defaultValue={step.prompt || ''}
                           onChange={(e) =>
-                            updateStep(step.id, { prompt: e.target.value })
+                            updateStep(step.id || '', {
+                              prompt: e.target.value,
+                            })
                           }
                           rows={3}
                           placeholder='Ex: "entre no site X e me dê a primeira notícia que você encontrar"'
@@ -718,7 +721,7 @@ function PlaywrightMcpFormFields({
                           <Button
                             type="button"
                             variant="gradient"
-                            onClick={() => addActionToStep(step.id)}
+                            onClick={() => addActionToStep(step.id || '')}
                             className="gap-1 text-sm w-fit p-2 absolute -top-6 right-0"
                           >
                             <Plus className="w-3 h-3" />
@@ -758,7 +761,7 @@ function PlaywrightMcpFormFields({
                                     type="button"
                                     variant="ghost"
                                     onClick={() =>
-                                      moveAction(step.id, actionId, 'up')
+                                      moveAction(step.id || '', actionId, 'up')
                                     }
                                     disabled={actionIndex === 0}
                                     className="hover:bg-neutral-200 h-fit w-fit p-1"
@@ -769,7 +772,11 @@ function PlaywrightMcpFormFields({
                                     type="button"
                                     variant="ghost"
                                     onClick={() =>
-                                      moveAction(step.id, actionId, 'down')
+                                      moveAction(
+                                        step.id || '',
+                                        actionId,
+                                        'down',
+                                      )
                                     }
                                     disabled={
                                       actionIndex ===
@@ -784,7 +791,10 @@ function PlaywrightMcpFormFields({
                                       type="button"
                                       variant="ghost"
                                       onClick={() =>
-                                        removeActionFromStep(step.id, actionId)
+                                        removeActionFromStep(
+                                          step.id || '',
+                                          actionId,
+                                        )
                                       }
                                       className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
                                     >
@@ -866,10 +876,14 @@ function PlaywrightMcpFormFields({
                                       },
                                     ]}
                                     onValueChange={(value) =>
-                                      updateActionInStep(step.id, actionId, {
-                                        action:
-                                          value as WebscraperStepAction['action'],
-                                      })
+                                      updateActionInStep(
+                                        step.id || '',
+                                        actionId,
+                                        {
+                                          action:
+                                            value as WebscraperStepAction['action'],
+                                        },
+                                      )
                                     }
                                   />
                                 </div>
@@ -898,10 +912,14 @@ function PlaywrightMcpFormFields({
                                         },
                                       ]}
                                       onValueChange={(value) =>
-                                        updateActionInStep(step.id, actionId, {
-                                          selectorType:
-                                            value as WebscraperStepAction['selectorType'],
-                                        })
+                                        updateActionInStep(
+                                          step.id || '',
+                                          actionId,
+                                          {
+                                            selectorType:
+                                              value as WebscraperStepAction['selectorType'],
+                                          },
+                                        )
                                       }
                                     />
                                   </div>
@@ -926,9 +944,13 @@ function PlaywrightMcpFormFields({
                                     fieldName={`step_${step.id}_action_${actionId}_selector`}
                                     defaultValue={action.selector || ''}
                                     onChange={(e) => {
-                                      updateActionInStep(step.id, actionId, {
-                                        selector: e.target.value,
-                                      });
+                                      updateActionInStep(
+                                        step.id || '',
+                                        actionId,
+                                        {
+                                          selector: e.target.value,
+                                        },
+                                      );
                                     }}
                                     placeholder="Ex: #meu-input ou //input[@name='email']"
                                   />
@@ -1043,7 +1065,7 @@ function PlaywrightMcpFormFields({
                                           // Para ações que precisam apenas de seletor, salvar em selector
                                           if (needsSelectorOnly) {
                                             updateActionInStep(
-                                              step.id,
+                                              step.id || '',
                                               actionId,
                                               {
                                                 selector: value,
@@ -1054,7 +1076,7 @@ function PlaywrightMcpFormFields({
                                           // Para ações que precisam apenas de texto, salvar em text
                                           else if (needsTextOnly) {
                                             updateActionInStep(
-                                              step.id,
+                                              step.id || '',
                                               actionId,
                                               {
                                                 text: value,
@@ -1065,7 +1087,7 @@ function PlaywrightMcpFormFields({
                                           // Para type e type_and_submit, salvar em text (o seletor deve ser definido separadamente se necessário)
                                           else if (needsBoth) {
                                             updateActionInStep(
-                                              step.id,
+                                              step.id || '',
                                               actionId,
                                               {
                                                 text: value,
@@ -1148,7 +1170,7 @@ export function PlaywrightMcpNodeConfig({
   );
 
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(
-    () => new Set(steps.map((s) => s.id)),
+    () => new Set(steps.map((s) => s.id || '').filter(Boolean)),
   );
 
   const handleSubmit = (values: FieldValues) => {
