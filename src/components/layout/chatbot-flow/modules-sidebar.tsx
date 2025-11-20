@@ -126,10 +126,11 @@ export const Sidebar = memo(function Sidebar({ onDragStart }: SidebarProps) {
 
   return (
     <div
-      className="w-64 bg-white border-l border-gray-200 overflow-y-auto"
+      className="w-64 bg-white border-l border-gray-200 flex flex-col h-full"
       style={{ zoom: 0.9 }}
     >
-      <div className="flex items-center justify-center gap-2 p-4 w-full border-b border-gray-200 mb-2">
+      {/* Título fixo no topo */}
+      <div className="flex items-center justify-center gap-2 p-4 w-full border-b border-gray-200 flex-shrink-0">
         <Blocks className="w-5 h-5 text-neutral-600" />
         <Typography
           variant="h2"
@@ -139,8 +140,8 @@ export const Sidebar = memo(function Sidebar({ onDragStart }: SidebarProps) {
         </Typography>
       </div>
 
-      {/* Campo de Pesquisa */}
-      <div className="px-2 pb-3" style={{ zoom: 0.9 }}>
+      {/* Campo de Pesquisa fixo */}
+      <div className="px-2 mt-2 pb-3 flex-shrink-0" style={{ zoom: 0.9 }}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40" />
           <input
@@ -153,45 +154,51 @@ export const Sidebar = memo(function Sidebar({ onDragStart }: SidebarProps) {
         </div>
       </div>
 
-      <div className="space-y-2 px-2 mb-2">
-        {filteredTemplates.length > 0 ? (
-          filteredTemplates.map((template) => (
-            <div
-              key={template.type}
-              draggable
-              onDragStart={(e) => onDragStart(e, template.type)}
-              className="p-3 border border-gray-200 rounded-lg cursor-move hover:shadow-md transition-shadow bg-white"
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className={`${template.color} p-2 rounded text-white flex-shrink-0`}
-                >
-                  {template.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <Typography variant="h3" className="font-semibold text-sm">
-                    {template.label}
-                  </Typography>
-                  <Typography
-                    variant="p"
-                    className="text-xs text-gray-600 mt-1"
+      {/* Área de módulos com scroll */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="space-y-2 px-2 mb-2">
+          {filteredTemplates.length > 0 ? (
+            filteredTemplates.map((template) => (
+              <div
+                key={template.type}
+                draggable
+                onDragStart={(e) => onDragStart(e, template.type)}
+                className="p-3 border border-gray-200 rounded-lg cursor-move hover:shadow-md transition-shadow bg-white"
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`${template.color} p-2 rounded text-white flex-shrink-0`}
                   >
-                    {template.description}
-                  </Typography>
+                    {template.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Typography variant="h3" className="font-semibold text-sm">
+                      {template.label}
+                    </Typography>
+                    <Typography
+                      variant="p"
+                      className="text-xs text-gray-600 mt-1"
+                    >
+                      {template.description}
+                    </Typography>
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="py-8 text-center" style={{ zoom: 0.9 }}>
+              <Typography
+                variant="p"
+                className="text-sm font-semibold text-neutral-500"
+              >
+                Nenhum módulo encontrado
+              </Typography>
+              <Typography variant="p" className="text-xs text-neutral-400 mt-1">
+                Tente outro termo de pesquisa
+              </Typography>
             </div>
-          ))
-        ) : (
-          <div className="py-8 text-center">
-            <Typography variant="p" className="text-sm text-gray-500">
-              Nenhum módulo encontrado
-            </Typography>
-            <Typography variant="p" className="text-xs text-gray-400 mt-1">
-              Tente outro termo de pesquisa
-            </Typography>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

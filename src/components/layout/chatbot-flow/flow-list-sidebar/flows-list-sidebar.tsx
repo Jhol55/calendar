@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChatbotFlow } from '@/actions/chatbot-flows/flows';
 import { useWorkflows, useDeleteWorkflow } from '@/lib/react-query/hooks';
 import {
@@ -11,6 +11,7 @@ import {
   Loader2,
   Plus,
   Workflow,
+  Search,
 } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ export function FlowsListSidebar({
 }: FlowsListSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [renamingFlow, setRenamingFlow] = useState<{
     id: string;
     name: string;
@@ -38,6 +40,18 @@ export function FlowsListSidebar({
 
   // Usar React Query para buscar workflows (userId obtido automaticamente no backend)
   const { data: workflows = [], isLoading: loading } = useWorkflows();
+
+  // Filtrar workflows baseado no termo de pesquisa
+  const filteredWorkflows = useMemo(() => {
+    if (!searchTerm.trim()) return workflows;
+
+    const term = searchTerm.toLowerCase();
+    return workflows.filter(
+      (flow) =>
+        flow.name.toLowerCase().includes(term) ||
+        (flow.description && flow.description.toLowerCase().includes(term)),
+    );
+  }, [workflows, searchTerm]);
 
   // Hook para deletar workflow
   const { mutate: deleteWorkflow } = useDeleteWorkflow({
@@ -113,11 +127,38 @@ export function FlowsListSidebar({
         </div>
       </div>
 
+      {/* Campo de Pesquisa fixo */}
+      <div className="px-2 mt-2 pb-1 flex-shrink-0" style={{ zoom: 0.8 }}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40" />
+          <input
+            type="text"
+            placeholder="Pesquisar"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 rounded-md border placeholder:italic border-gray-300 bg-neutral-100 p-1 text-black/80 outline-none placeholder:text-black/40 focus:ring-2 focus:ring-[#5c5e5d] text-sm"
+          />
+        </div>
+      </div>
+
       {/* Flows List */}
       <div className="flex-1 overflow-y-auto" style={{ zoom: 0.9 }}>
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <Loader2 className="w-6 h-6 text-neutral-500 animate-spin" />
+          </div>
+        ) : filteredWorkflows.length === 0 && searchTerm.trim() ? (
+          <div className="p-8 text-center" style={{ zoom: 0.9 }}>
+            <FileText className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
+            <Typography
+              variant="p"
+              className="text-neutral-500 text-sm font-semibold"
+            >
+              Nenhum workflow encontrado
+            </Typography>
+            <Typography variant="p" className="text-xs text-gray-400 mt-1">
+              Tente outro termo de pesquisa
+            </Typography>
           </div>
         ) : workflows.length === 0 ? (
           <div className="p-8 text-center" style={{ zoom: 0.9 }}>
@@ -139,7 +180,7 @@ export function FlowsListSidebar({
           </div>
         ) : (
           <div className="p-2 space-y-2">
-            {workflows.map((flow) => (
+            {filteredWorkflows.map((flow) => (
               <button
                 key={flow.id}
                 onClick={() => onSelectFlow(flow)}
