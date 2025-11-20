@@ -1377,121 +1377,129 @@ function FlowEditorContent() {
           <Controls />
           <MiniMap nodeColor={nodeColor} />
 
-          <Panel position="top-left">
-            <div className="flex gap-4">
-              {flowName ? (
-                <div className="bg-white rounded-lg shadow-lg p-4 min-w-24 w-fit">
-                  <Typography variant="span" className="text-xs w-24">
+          <Panel
+            position="top-left"
+            className="flex gap-2"
+            style={{ zoom: 0.9 }}
+          >
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-4">
+                {flowName ? (
+                  <div className="bg-white rounded-lg shadow-lg p-4 min-w-24 w-fit">
+                    <Typography variant="span" className="text-xs w-24">
+                      Workflow
+                    </Typography>
+                    <Typography variant="h3" className="text-lg font-semibold">
+                      {flowName}
+                    </Typography>
+                  </div>
+                ) : (
+                  <div className="bg-transparent p-4 min-w-24 w-fit"></div>
+                )}
+                <CreateWorkflowDialog
+                  isOpen={isCreateDialogOpen}
+                  onClose={() => setIsCreateDialogOpen(false)}
+                  onSubmit={handleCreateNewFlow}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 w-full">
+              <div className="flex gap-2 w-full" style={{ zoom: 0.9 }}>
+                <Button
+                  variant="gradient"
+                  className="w-fit h-fit flex items-center justify-center gap-2"
+                  // bgHexColor="#77a5f5"
+                  onClick={handleExport}
+                >
+                  <Download className="w-4 h-4" />
+                  {/* <Typography variant="span" className="text-xs text-white">
+                      Exportar
+                    </Typography> */}
+                </Button>
+                <Button
+                  variant="gradient"
+                  className="w-fit h-fit flex items-center justify-center gap-2"
+                  // bgHexColor="#f047ee"
+                  onClick={handleImport}
+                >
+                  <Upload className="w-4 h-4" />
+                  {/* <Typography variant="span" className="text-xs text-white">
+                      Importar
+                    </Typography> */}
+                </Button>
+                <Button
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  variant="gradient"
+                  className="w-fit h-fit flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  {/* <Typography variant="span" className="text-xs text-white">
                     Workflow
-                  </Typography>
-                  <Typography variant="h3" className="text-lg font-semibold">
-                    {flowName}
-                  </Typography>
-                </div>
-              ) : (
-                <div className="bg-transparent p-4 min-w-24 w-fit"></div>
-              )}
-
-              <CreateWorkflowDialog
-                isOpen={isCreateDialogOpen}
-                onClose={() => setIsCreateDialogOpen(false)}
-                onSubmit={handleCreateNewFlow}
-              />
+                  </Typography> */}
+                </Button>
+                <Button
+                  variant="gradient"
+                  className="w-fit h-fit flex items-center justify-center gap-2"
+                  // bgHexColor="#66e477"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  <Save className="w-4 h-4" />
+                  {/* <Typography variant="span" className="text-xs text-white">
+                    {isSaving ? 'Salvando...' : 'Salvar'}
+                  </Typography> */}
+                </Button>
+                {currentFlowId && (
+                  <Button
+                    variant="gradient"
+                    className="w-fit h-fit flex items-center justify-center gap-2"
+                    // bgHexColor="#f59e0b"
+                    onClick={() => setIsExecutionsPanelOpen(true)}
+                  >
+                    <Play className="w-4 h-4" />
+                    {/* <Typography variant="span" className="text-xs text-white">
+                    Execuções
+                  </Typography> */}
+                  </Button>
+                )}
+                {hasExecutionHighlight && (
+                  <Button
+                    variant="gradient"
+                    className="w-full flex items-center justify-center gap-2"
+                    bgHexColor="#ef4444"
+                    onClick={clearExecutionHighlight}
+                  >
+                    <X className="w-4 h-4" />
+                    {/* <Typography
+                    variant="span"
+                    className="text-xs text-white whitespace-nowrap"
+                  >
+                    Limpar Visualização
+                  </Typography> */}
+                  </Button>
+                )}
+              </div>
             </div>
           </Panel>
-
           <Panel
             position="top-right"
             className="flex gap-2 p-4 !bg-transparent -translate-y-4 translate-x-4 rounded-bl-lg"
             style={panelTopRightStyle}
           >
-            <div className="flex gap-4 h-fit">
-              <Button
-                onClick={() => setIsCreateDialogOpen(true)}
-                variant="gradient"
-                className="w-full flex items-center justify-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                <Typography variant="span" className="text-xs text-white">
-                  Workflow
-                </Typography>
-              </Button>
+            <div className="flex gap-4 h-fit" style={{ zoom: 0.9 }}>
               <Button
                 variant="gradient"
-                className="w-full flex items-center justify-center gap-2"
-                bgHexColor="#66e477"
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                <Save className="w-4 h-4" />
-                <Typography variant="span" className="text-xs text-white">
-                  {isSaving ? 'Salvando...' : 'Salvar'}
-                </Typography>
-              </Button>
-              <Button
-                variant="gradient"
-                className="w-full flex items-center justify-center gap-2"
-                bgHexColor="#77a5f5"
-                onClick={handleExport}
-              >
-                <Download className="w-4 h-4" />
-                <Typography variant="span" className="text-xs text-white">
-                  Exportar
-                </Typography>
-              </Button>
-              {currentFlowId && (
-                <Button
-                  variant="gradient"
-                  className="w-full flex items-center justify-center gap-2"
-                  bgHexColor="#f59e0b"
-                  onClick={() => setIsExecutionsPanelOpen(true)}
-                >
-                  <Play className="w-4 h-4" />
-                  <Typography variant="span" className="text-xs text-white">
-                    Execuções
-                  </Typography>
-                </Button>
-              )}
-              <Button
-                variant="gradient"
-                className="w-full flex items-center justify-center gap-2"
-                bgHexColor="#10b981"
+                className="w-fit h-fit flex items-center justify-center gap-2"
+                // bgHexColor="#10b981"
                 onClick={() => setIsSpreadsheetOpen(true)}
               >
                 <Database className="w-4 h-4" />
-                <Typography
+                {/* <Typography
                   variant="span"
                   className="text-xs text-white whitespace-nowrap"
                 >
                   Banco de dados
-                </Typography>
-              </Button>
-              {hasExecutionHighlight && (
-                <Button
-                  variant="gradient"
-                  className="w-full flex items-center justify-center gap-2"
-                  bgHexColor="#ef4444"
-                  onClick={clearExecutionHighlight}
-                >
-                  <X className="w-4 h-4" />
-                  <Typography
-                    variant="span"
-                    className="text-xs text-white whitespace-nowrap"
-                  >
-                    Limpar Visualização
-                  </Typography>
-                </Button>
-              )}
-              <Button
-                variant="gradient"
-                className="w-full flex items-center justify-center gap-2"
-                bgHexColor="#f047ee"
-                onClick={handleImport}
-              >
-                <Upload className="w-4 h-4" />
-                <Typography variant="span" className="text-xs text-white">
-                  Importar
-                </Typography>
+                </Typography> */}
               </Button>
             </div>
           </Panel>
