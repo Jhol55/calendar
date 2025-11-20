@@ -17,7 +17,68 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
+    // Excluir Playwright do bundle do cliente (server-only)
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        child_process: false,
+      };
+      
+      // Excluir playwright e suas dependências do bundle do cliente
+      config.externals = config.externals || [];
+      config.externals.push({
+        playwright: 'commonjs playwright',
+        'playwright-core': 'commonjs playwright-core',
+        'chromium-bidi': 'commonjs chromium-bidi',
+        'better-playwright-mcp3': 'commonjs better-playwright-mcp3',
+      });
+      
+      // Ignorar módulos problemáticos durante análise estática
+      config.module = config.module || {};
+      config.module.unknownContextCritical = false;
+      config.module.unknownContextRegExp = /^\.\/.*$/;
+    }
+    
+    // SEMPRE excluir playwright do bundle (mesmo no servidor durante análise estática)
+    // Isso previne que o Next.js tente fazer bundle desses pacotes
+    const externalPackages = {
+      playwright: 'commonjs playwright',
+      'playwright-core': 'commonjs playwright-core',
+      'chromium-bidi': 'commonjs chromium-bidi',
+      'better-playwright-mcp3': 'commonjs better-playwright-mcp3',
+    };
+    
+    // Configurar externals
+    if (!config.externals) {
+      config.externals = [];
+    }
+    if (Array.isArray(config.externals)) {
+      config.externals.push(externalPackages);
+    } else if (typeof config.externals === 'object') {
+      Object.assign(config.externals, externalPackages);
+    }
+    
+    // Ignorar avisos de dependências dinâmicas
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      { module: /playwright/ },
+      { module: /better-playwright-mcp3/ },
+    ];
+    
+    // Configurar para não tentar resolver módulos playwright durante análise estática
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+    };
+    
+    // Adicionar regra para ignorar playwright durante análise
+    config.module = config.module || {};
+    config.module.unknownContextCritical = false;
+
     if (process.env.NODE_ENV === 'production') {
       config.module.rules.push({
         test: /\.(ts|tsx)$/,

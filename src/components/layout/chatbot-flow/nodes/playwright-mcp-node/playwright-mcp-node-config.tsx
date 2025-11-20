@@ -34,6 +34,7 @@ export interface PlaywrightMcpConfig {
   maxSteps?: number | string;
   timeoutMs?: number | string;
   resultSchema?: string;
+  headless?: boolean; // false = mostra o navegador, true = executa em background
   steps?: WebscraperStep[];
 }
 
@@ -461,6 +462,32 @@ function PlaywrightMcpFormFields({
             defaultValue={config?.timeoutMs?.toString() || ''}
             placeholder="ex: 60000"
           />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <FormControl variant="label">
+          <Typography variant="h3" className="text-sm font-semibold">
+            Modo de visualização
+          </Typography>
+        </FormControl>
+        <Typography variant="span" className="text-sm text-neutral-500">
+          Se desativado, o navegador será aberto para você visualizar a execução
+          em tempo real.
+        </Typography>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="headless"
+            defaultChecked={config?.headless !== false}
+            onChange={(e) => {
+              // Será salvo no handleSubmit
+            }}
+            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label htmlFor="headless" className="text-sm text-neutral-700">
+            Executar em background (headless)
+          </label>
         </div>
       </div>
 
@@ -1155,6 +1182,14 @@ export function PlaywrightMcpNodeConfig({
         values.resultSchema.trim().length > 0
           ? values.resultSchema
           : undefined,
+      headless: (() => {
+        const headlessInput = document.getElementById(
+          'headless',
+        ) as HTMLInputElement;
+        return headlessInput
+          ? headlessInput.checked
+          : config?.headless !== false;
+      })(),
       steps,
     };
 

@@ -15,9 +15,11 @@ import { processLoopNode } from '../helpers/node-processors/loop-helper';
 import { processCodeExecutionNode } from '../helpers/node-processors/code-execution-helper';
 import * as transformations from '../helpers/node-processors/transformation-helper';
 import {
-  runWebscraperMcpTask,
-  type WebscraperMcpStep,
-} from '../../services/webscraper-mcp.service';
+  runBetterPlaywrightMcpTaskWrapper,
+  type PlaywrightMcpStep,
+} from '../../services/playwright-mcp/better-playwright-wrapper';
+// Alias para compatibilidade
+type WebscraperMcpStep = PlaywrightMcpStep;
 import type { PlaywrightMcpConfig } from '@/components/layout/chatbot-flow/types';
 
 // Tipos principais
@@ -589,6 +591,10 @@ async function processPlaywrightMcpNode(
     ...variableContext,
     ...(aiApiKey ? { AI_API_KEY: aiApiKey } : {}),
     ...(aiModel ? { AI_MODEL: aiModel } : {}),
+    // Passar allowedDomains para o serviço
+    ...(config.allowedDomains ? { allowedDomains: config.allowedDomains } : {}),
+    // Passar headless para o serviço
+    headless: config.headless !== false, // default true se não especificado
   };
 
   // 🚀 Usar sempre WebScraper Python (engine moderna e completa)
@@ -629,7 +635,7 @@ async function processPlaywrightMcpNode(
     });
   }
 
-  const wsResult = await runWebscraperMcpTask({
+  const wsResult = await runBetterPlaywrightMcpTaskWrapper({
     executionId,
     nodeId: node.id,
     flowId: execution?.flowId,
