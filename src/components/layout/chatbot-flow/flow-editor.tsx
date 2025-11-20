@@ -1394,7 +1394,7 @@ function FlowEditorContent() {
                     </Typography>
                   </div>
                 ) : (
-                  <div className="bg-transparent p-4 min-w-24 w-fit"></div>
+                  <div className="bg-transparent hidden p-4 min-w-24 w-fit"></div>
                 )}
                 <CreateWorkflowDialog
                   isOpen={isCreateDialogOpen}

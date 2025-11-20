@@ -22,86 +22,74 @@ interface NodeTemplate {
   label: string;
   icon: React.ReactNode;
   description: string;
-  color: string;
 }
 
 const nodeTemplates: NodeTemplate[] = [
   {
     type: 'message',
     label: 'Mensagem',
-    icon: <MessageSquare className="w-5 h-5" />,
+    icon: <MessageSquare className="w-5 h-5 text-blue-500" />,
     description: 'Enviar mensagem ao usuário',
-    color: 'bg-blue-500',
   },
   {
     type: 'condition',
     label: 'Condição',
-    icon: <GitBranch className="w-5 h-5" />,
+    icon: <GitBranch className="w-5 h-5 text-violet-500" />,
     description: 'IF/SWITCH - Decisões e ramificações',
-    color: 'bg-violet-500',
   },
   {
     type: 'webhook',
     label: 'Webhook',
-    icon: <Webhook className="w-5 h-5" />,
+    icon: <Webhook className="w-5 h-5 text-emerald-500" />,
     description: 'Receber requisições HTTP',
-    color: 'bg-emerald-500',
   },
   {
     type: 'memory',
     label: 'Memória',
-    icon: <Brain className="w-5 h-5" />,
+    icon: <Brain className="w-5 h-5 text-fuchsia-500" />,
     description: 'Salvar/buscar dados do usuário',
-    color: 'bg-fuchsia-500',
   },
   {
     type: 'transformation',
     label: 'Transformação',
-    icon: <Settings className="w-5 h-5" />,
+    icon: <Settings className="w-5 h-5 text-orange-500" />,
     description: 'Transformar e processar dados',
-    color: 'bg-orange-500',
   },
   {
     type: 'database',
     label: 'Database',
-    icon: <Database className="w-5 h-5" />,
+    icon: <Database className="w-5 h-5 text-cyan-500" />,
     description: 'Gerenciar tabelas de dados',
-    color: 'bg-cyan-500',
   },
   {
     type: 'http_request',
     label: 'HTTP Request',
-    icon: <Globe className="w-5 h-5" />,
+    icon: <Globe className="w-5 h-5 text-teal-500" />,
     description: 'Fazer requisições HTTP',
-    color: 'bg-teal-500',
   },
   {
     type: 'agent',
     label: 'AI Agent',
-    icon: <Bot className="w-5 h-5" />,
+    icon: <Bot className="w-5 h-5 text-purple-500" />,
     description: 'Integrar IA (OpenAI GPT)',
-    color: 'bg-gradient-to-r from-purple-500 to-pink-500',
   },
   {
     type: 'loop',
     label: 'Loop',
-    icon: <Repeat className="w-5 h-5" />,
+    icon: <Repeat className="w-5 h-5 text-rose-500" />,
     description: 'Iterar sobre arrays e listas',
-    color: 'bg-rose-500',
   },
   {
     type: 'code_execution',
     label: 'Code Execution',
-    icon: <Code2 className="w-5 h-5" />,
+    icon: <Code2 className="w-5 h-5 text-indigo-600" />,
     description: 'Executar código JS/Python seguro',
-    color: 'bg-indigo-600',
   },
   {
     type: 'playwright-mcp-node',
     label: 'Playwright MCP',
-    icon: <Globe2 className="w-5 h-5" />,
+    icon: <Globe2 className="w-5 h-5 text-emerald-600" />,
     description: 'Automatizar navegação web com Playwright + MCP',
-    color: 'bg-emerald-600',
   },
 ];
 
@@ -166,9 +154,7 @@ export const Sidebar = memo(function Sidebar({ onDragStart }: SidebarProps) {
                 className="p-3 border border-gray-200 rounded-lg cursor-move hover:shadow-md transition-shadow bg-white"
               >
                 <div className="flex items-start gap-3">
-                  <div
-                    className={`${template.color} p-2 rounded text-white flex-shrink-0`}
-                  >
+                  <div className="bg-white border border-neutral-200 p-2 rounded flex-shrink-0">
                     {template.icon}
                   </div>
                   <div className="flex-1 min-w-0">
