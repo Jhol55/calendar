@@ -13,7 +13,7 @@ import { useForm } from '@/hooks/use-form';
 import { FormSelect } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { NodeConfigLayout } from '../node-config-layout';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, MoveUp, MoveDown } from 'lucide-react';
 
 interface MemoryNodeConfigProps {
   isOpen: boolean;
@@ -117,6 +117,25 @@ function MemoryFormFields({
     setValue('items', newItems);
   };
 
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === items.length - 1)
+    ) {
+      return;
+    }
+
+    const newItems = [...items];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [newItems[index], newItems[targetIndex]] = [
+      newItems[targetIndex],
+      newItems[index],
+    ];
+
+    setItems(newItems);
+    setValue('items', newItems);
+  };
+
   return (
     <>
       {/* Ação */}
@@ -203,16 +222,36 @@ function MemoryFormFields({
                     onChange={(e) => updateItem(index, 'value', e.target.value)}
                   />
                 </div>
-                {items.length > 1 && (
+                <div className="flex items-center gap-1">
                   <Button
                     type="button"
-                    onClick={() => removeItem(index)}
+                    onClick={() => moveItem(index, 'up')}
+                    disabled={index === 0}
                     variant="ghost"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                    className="hover:bg-neutral-200 h-fit w-fit p-1"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <MoveUp className="w-4 h-4 text-neutral-600" />
                   </Button>
-                )}
+                  <Button
+                    type="button"
+                    onClick={() => moveItem(index, 'down')}
+                    disabled={index === items.length - 1}
+                    variant="ghost"
+                    className="hover:bg-neutral-200 h-fit w-fit p-1"
+                  >
+                    <MoveDown className="w-4 h-4 text-neutral-600" />
+                  </Button>
+                  {items.length > 1 && (
+                    <Button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      variant="ghost"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

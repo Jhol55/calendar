@@ -31,7 +31,7 @@ export default function Instances() {
           <div>
             <Typography
               variant="h1"
-              className="text-3xl font-bold text-neutral-600 mb-3"
+              className="text-2xl font-bold text-neutral-600 mb-3"
             >
               Minhas Instâncias
             </Typography>
@@ -39,7 +39,7 @@ export default function Instances() {
               Gerencie suas instâncias do WhatsApp
             </Typography>
           </div>
-          <div>
+          <div style={{ zoom: 0.9 }}>
             <Button
               variant="gradient"
               className="w-fit h-fit"

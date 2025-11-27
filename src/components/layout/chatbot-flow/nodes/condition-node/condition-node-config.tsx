@@ -371,6 +371,35 @@ function ConditionFormFields({
     );
   };
 
+  const moveRuleInCase = (
+    caseId: string,
+    ruleIndex: number,
+    direction: 'up' | 'down',
+  ) => {
+    setCases(
+      cases.map((c) => {
+        if (c.id !== caseId) return c;
+
+        const rules = c.rules;
+        if (
+          (direction === 'up' && ruleIndex === 0) ||
+          (direction === 'down' && ruleIndex === rules.length - 1)
+        ) {
+          return c;
+        }
+
+        const newRules = [...rules];
+        const targetIndex = direction === 'up' ? ruleIndex - 1 : ruleIndex + 1;
+        [newRules[ruleIndex], newRules[targetIndex]] = [
+          newRules[targetIndex],
+          newRules[ruleIndex],
+        ];
+
+        return { ...c, rules: newRules };
+      }),
+    );
+  };
+
   const updateCaseRule = (
     caseId: string,
     ruleId: string,
@@ -544,11 +573,11 @@ function ConditionFormFields({
                   </div>
                 )}
 
-                {/* Variável */}
+                {/* Valor */}
                 <div>
                   <FormControl variant="label">
                     <Typography variant="span" className="text-sm">
-                      Variável *
+                      Valor *
                     </Typography>
                   </FormControl>
                   <Input
@@ -744,7 +773,7 @@ function ConditionFormFields({
                               type="button"
                               variant="gradient"
                               onClick={() => addRuleToCase(caseItem.id)}
-                              className="gap-1 text-sm w-fit p-2"
+                              className="gap-1 text-sm w-30fit p-2"
                             >
                               <Plus className="w-3 h-3" />
                               Adicionar Regra
@@ -763,18 +792,52 @@ function ConditionFormFields({
                                 >
                                   Regra {ruleIndex + 1}
                                 </Typography>
-                                {caseItem.rules.length > 1 && (
+                                <div className="flex items-center gap-1">
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     onClick={() =>
-                                      removeRuleFromCase(caseItem.id, rule.id)
+                                      moveRuleInCase(
+                                        caseItem.id,
+                                        ruleIndex,
+                                        'up',
+                                      )
                                     }
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                                    disabled={ruleIndex === 0}
+                                    className="hover:bg-neutral-200 h-fit w-fit p-1"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <MoveUp className="w-4 h-4 text-neutral-600" />
                                   </Button>
-                                )}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      moveRuleInCase(
+                                        caseItem.id,
+                                        ruleIndex,
+                                        'down',
+                                      )
+                                    }
+                                    disabled={
+                                      ruleIndex === caseItem.rules.length - 1
+                                    }
+                                    className="hover:bg-neutral-200 h-fit w-fit p-1"
+                                  >
+                                    <MoveDown className="w-4 h-4 text-neutral-600" />
+                                  </Button>
+                                  {caseItem.rules.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        removeRuleFromCase(caseItem.id, rule.id)
+                                      }
+                                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-fit w-fit"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Variável */}

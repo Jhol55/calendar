@@ -1,99 +1,63 @@
-import { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { memo, useMemo } from 'react';
+import { NodeProps } from 'reactflow';
 import { NodeData } from '../../types';
 import { Code2, Clock } from 'lucide-react';
-import { Typography } from '@/components/ui/typography';
+import { BaseNode, NodeInfoLine } from '../base-node';
+import { useVariableContext, resolveVariable } from '../use-variable-context';
 
-export const CodeExecutionNode = memo(({ data }: NodeProps<NodeData>) => {
-  const codeConfig = data.codeExecutionConfig;
-  const language = codeConfig?.language || 'javascript';
-  const timeout = codeConfig?.timeout || 5;
+export const CodeExecutionNode = memo(
+  ({ data, selected }: NodeProps<NodeData>) => {
+    const codeConfig = data.codeExecutionConfig;
+    const language = codeConfig?.language || 'javascript';
+    const timeout = codeConfig?.timeout || 5;
+    const context = useVariableContext();
 
-  // Emoji baseado na linguagem
-  const getLanguageEmoji = () => {
-    switch (language) {
-      case 'javascript':
-        return '🟨';
-      case 'python':
-        return '🐍';
-      default:
-        return '💻';
-    }
-  };
+    // Nome formatado da linguagem
+    const getLanguageName = () => {
+      switch (language) {
+        case 'javascript':
+          return '🟨 JavaScript';
+        case 'python':
+          return '🐍 Python';
+        default:
+          return `💻 ${language}`;
+      }
+    };
 
-  // Nome formatado da linguagem
-  const getLanguageName = () => {
-    switch (language) {
-      case 'javascript':
-        return 'JavaScript';
-      case 'python':
-        return 'Python';
-      default:
-        return language;
-    }
-  };
+    const resolvedOutputVariable = useMemo(
+      () => resolveVariable(codeConfig?.outputVariable, context),
+      [codeConfig?.outputVariable, context],
+    );
 
-  return (
-    <div className="px-4 py-3 shadow-lg rounded-lg border-2 border-indigo-600 bg-white min-w-[200px] max-w-[300px]">
-      <Handle type="target" position={Position.Left} />
-
-      <div className="flex items-center gap-2 mb-2">
-        <div className="bg-indigo-500 p-2 rounded-lg text-white">
-          <Code2 className="w-4 h-4" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <Typography
-            variant="h3"
-            className="font-semibold text-sm text-gray-800"
-          >
-            {getLanguageEmoji()} Code Execution
-          </Typography>
-          <Typography variant="span" className="text-xs text-gray-500 block">
-            {getLanguageName()}
-          </Typography>
-        </div>
-      </div>
-
-      {/* Informações do código */}
-      {codeConfig && (
-        <div className="mt-2 space-y-1">
-          {/* Número de linhas de código (aproximado) */}
-          {codeConfig.code && (
-            <Typography
-              variant="span"
-              className="text-xs text-gray-600 truncate block"
-            >
-              📝 {codeConfig.code.split('\n').length} linhas
-            </Typography>
-          )}
-
-          {/* Variável de saída */}
-          {codeConfig.outputVariable && (
-            <Typography
-              variant="span"
-              className="text-xs text-gray-600 truncate block"
-            >
-              📦 Output: {codeConfig.outputVariable}
-            </Typography>
-          )}
-
-          {/* Timeout */}
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-gray-500" />
-            <Typography variant="span" className="text-xs text-gray-600">
-              {timeout}s timeout
-            </Typography>
-          </div>
-        </div>
-      )}
-
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ background: '#4f46e5' }}
+    return (
+      <BaseNode
+        icon={<Code2 className="w-4 h-4" />}
+        title="Code Execution"
+        subtitle={getLanguageName()}
+        selected={selected}
+        themeColor="orange"
+        footer={
+          codeConfig && (
+            <div className="space-y-1">
+              {codeConfig.code && (
+                <NodeInfoLine>
+                  📝 {codeConfig.code.split('\n').length} linhas
+                </NodeInfoLine>
+              )}
+              {resolvedOutputVariable && (
+                <NodeInfoLine className="truncate">
+                  📦 Output: {resolvedOutputVariable}
+                </NodeInfoLine>
+              )}
+              <NodeInfoLine icon={<Clock className="w-3 h-3" />}>
+                {timeout}s timeout
+              </NodeInfoLine>
+            </div>
+          )
+        }
       />
-    </div>
-  );
-});
+    );
+  },
+);
 
 CodeExecutionNode.displayName = 'CodeExecutionNode';

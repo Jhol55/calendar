@@ -214,25 +214,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     }
 
     // Para inputs text com variáveis, renderizar com overlay
+    const handleEnterEditMode = () => {
+      setIsEditing(true);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    };
+
     return (
       <div className="relative w-full">
-        <input
-          ref={mergeRefs(ref, registerRef, inputRef)}
-          type={type}
-          autoComplete={autoComplete}
-          onChange={handleOnChange}
+        {/* Container clicável que parece um input */}
+        <div
           className={cn(
             styles.default,
-            'text-transparent caret-black',
+            'flex items-center overflow-hidden whitespace-nowrap cursor-text min-h-[42px]',
             className,
           )}
-          {...props}
-          {...registerProps}
-        />
-        {/* Overlay para mostrar variáveis estilizadas */}
-        <div
-          className="absolute inset-0 z-50 pointer-events-none flex items-center px-2.5 text-sm overflow-hidden whitespace-nowrap"
-          style={{ backgroundColor: 'transparent' }}
+          onClick={handleEnterEditMode}
         >
           <div className="flex flex-wrap items-center gap-0.5">
             {renderValueWithVariables?.map((part, index) => {
@@ -294,12 +290,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                   delay={200}
                 >
                   <span
-                    className="pointer-events-auto inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-800 border border-zinc-300 cursor-pointer hover:bg-zinc-200 transition-colors"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-800 border border-zinc-300 cursor-pointer hover:bg-zinc-200 transition-colors"
                     style={{
                       fontFamily: 'inherit',
                       boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
                     }}
-                    onClick={() => setIsEditing(true)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEnterEditMode();
+                    }}
                   >
                     {part.text}
                   </span>
@@ -308,6 +307,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             })}
           </div>
         </div>
+        {/* Input escondido para manter o valor do formulário */}
+        <input
+          ref={mergeRefs(ref, registerRef, inputRef)}
+          type="hidden"
+          onChange={handleOnChange}
+          {...props}
+          {...registerProps}
+        />
       </div>
     );
   },

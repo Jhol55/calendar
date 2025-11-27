@@ -13,6 +13,7 @@ import ReactFlow, {
   Edge,
   Node,
   NodeProps,
+  NodeChange,
   MiniMap,
   Panel,
   ReactFlowInstance,
@@ -33,6 +34,7 @@ import {
   LoopNode,
   CodeExecutionNode,
   PlaywrightMcpNode,
+  notifyExecutionContextChanged,
 } from './nodes';
 import { HttpRequestNode } from './nodes/http-request-node/http-request-node';
 import AgentNode from './nodes/agent-node/agent-node';
@@ -117,8 +119,36 @@ function FlowEditorContent() {
   const edgesRef = useRef<Edge[]>([]);
   const currentFlowIdRef = useRef<string | null>(null); // ✅ Ref para evitar stale closure
   const flowNameRef = useRef<string>(''); // ✅ Ref para evitar stale closure
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Wrapper para onNodesChange com logs apenas para remoções importantes
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      // Verificar se há remoções não intencionais (não por Delete/Backspace)
+      const removals = changes.filter((c) => c.type === 'remove');
+      if (removals.length > 0) {
+        removals.forEach((removal) => {
+          if ('id' in removal) {
+            const node = nodes.find((n) => n.id === removal.id);
+            // Log apenas se for um node de mensagem sendo removido (pode ser problema)
+            if (node?.type === 'message') {
+              console.warn(
+                '⚠️ [FLOW-EDITOR] Node de mensagem sendo removido:',
+                {
+                  id: removal.id,
+                  type: node.type,
+                },
+              );
+            }
+          }
+        });
+      }
+
+      onNodesChangeBase(changes);
+    },
+    [onNodesChangeBase, nodes],
+  );
   const [reactFlowInstance, setReactFlowInstance] =
     useState<ReactFlowInstance | null>(null);
   const [flowName, setFlowName] = useState('');
@@ -992,8 +1022,31 @@ function FlowEditorContent() {
 
   const handleNodeUpdate = useCallback(
     (nodeId: string, data: Partial<NodeData>) => {
-      setNodes((nds) =>
-        nds.map((node) => {
+      setNodes((nds) => {
+        const nodeBefore = nds.find((n) => n.id === nodeId);
+
+        // Se o node não existe no array mas está no nodeToConfig, restaurá-lo
+        if (!nodeBefore) {
+          if (nodeToConfig && nodeToConfig.id === nodeId) {
+            console.warn(
+              '⚠️ [FLOW-EDITOR] Node não encontrado no array, restaurando do nodeToConfig:',
+              nodeId,
+            );
+            const restoredNode = {
+              ...nodeToConfig,
+              data: { ...nodeToConfig.data, ...data },
+            };
+            return [...nds, restoredNode];
+          }
+          console.error(
+            '🔴 [FLOW-EDITOR] Node não encontrado e não pode ser restaurado:',
+            nodeId,
+          );
+          return nds;
+        }
+
+        // Atualizar node existente
+        const updated = nds.map((node) => {
           if (node.id === nodeId) {
             const updatedNode = {
               ...node,
@@ -1005,8 +1058,10 @@ function FlowEditorContent() {
             return updatedNode;
           }
           return node;
-        }),
-      );
+        });
+
+        return updated;
+      });
     },
     [setNodes, nodeToConfig],
   );
@@ -1061,6 +1116,10 @@ function FlowEditorContent() {
     (config: MessageConfig) => {
       if (nodeToConfig) {
         handleNodeUpdate(nodeToConfig.id, { messageConfig: config });
+      } else {
+        console.error(
+          '🔴 [FLOW-EDITOR] nodeToConfig é null/undefined ao salvar!',
+        );
       }
     },
     [nodeToConfig, handleNodeUpdate],
@@ -1234,6 +1293,9 @@ function FlowEditorContent() {
 
       // Salvar execução selecionada no sessionStorage
       sessionStorage.setItem('selectedExecution', JSON.stringify(execution));
+
+      // Notificar nodes que o contexto de execução mudou
+      notifyExecutionContextChanged();
 
       // Destacar nós executados (busca dados mais recentes do banco)
       await highlightExecutedNodes(execution);

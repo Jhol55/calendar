@@ -1,56 +1,168 @@
 import { CodeExecutionConfig } from '@/components/layout/chatbot-flow/types';
+import {
+  replaceVariables,
+  evaluateJavaScriptExpression,
+} from '../variable-replacer';
 
 /**
  * Substitui variáveis em um JSON template garantindo formato válido
- * Adiciona aspas automaticamente em strings quando necessário
+ * Usa a função replaceVariables do variable-replacer.ts que já suporta
+ * arrays, expressões JavaScript, etc.
+ *
+ * IMPORTANTE: Quando replaceVariables substitui strings, elas vêm sem aspas.
+ * No contexto JSON, precisamos adicionar aspas automaticamente para strings.
  */
 function replaceVariablesInJSON(
   jsonTemplate: string,
   context: Record<string, unknown>,
 ): Record<string, unknown> {
-  // Substituir variáveis usando uma regex que detecta o contexto
-  const replaced = jsonTemplate.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
-    try {
-      const cleanPath = path.trim();
-      const parts = cleanPath.split('.');
+  // Usar replaceVariables que já tem toda a lógica implementada (incluindo expressões JS)
+  // Mas precisamos fazer substituição manual para garantir que strings tenham aspas no JSON
+  const variableMatches: Array<{
+    match: string;
+    path: string;
+    start: number;
+    end: number;
+  }> = [];
 
+  // Encontrar todas as variáveis no template
+  let match;
+  const regex = /\{\{([^}]+)\}\}/g;
+  while ((match = regex.exec(jsonTemplate)) !== null) {
+    variableMatches.push({
+      match: match[0],
+      path: match[1].trim(),
+      start: match.index,
+      end: match.index + match[0].length,
+    });
+  }
+
+  // Resolver cada variável e substituir com formatação correta para JSON
+  let replaced = jsonTemplate;
+  // Processar de trás para frente para não afetar os índices
+  for (let i = variableMatches.length - 1; i >= 0; i--) {
+    const { match: matchStr, path } = variableMatches[i];
+
+    try {
+      // Resolver o path da variável
+      const parts = path.split('.');
       let value: unknown = context;
-      for (const part of parts) {
-        // Type guard para verificar se value é um objeto indexável
-        if (
-          value &&
-          typeof value === 'object' &&
-          !Array.isArray(value) &&
-          part in value
-        ) {
-          // Type assertion: sabemos que value é um objeto indexável
-          value = (value as Record<string, unknown>)[part];
+
+      // Detectar se há expressão JavaScript (ex: .replace("x", "y"))
+      let variablePath = path;
+      let jsExpression = '';
+      const jsPattern =
+        /\.(replace|toUpperCase|toLowerCase|trim|substring|substr|slice|split|join|concat|indexOf|lastIndexOf|includes|startsWith|endsWith|repeat|padStart|padEnd|toFixed|toString|parseInt|parseFloat|map|filter|find|some|every|reduce|length)\s*\(?/i;
+
+      for (let j = 0; j < path.length; j++) {
+        const remaining = path.substring(j);
+        const jsMatch = remaining.match(jsPattern);
+        if (jsMatch && jsMatch.index === 0) {
+          variablePath = path.substring(0, j);
+          jsExpression = path.substring(j);
+          break;
+        }
+      }
+
+      // Resolver o path base
+      const pathParts = variablePath.split('.');
+      for (let j = 0; j < pathParts.length; j++) {
+        const part = pathParts[j];
+        const isObjectOrArray =
+          value !== null &&
+          value !== undefined &&
+          (typeof value === 'object' || Array.isArray(value));
+
+        if (!isObjectOrArray) {
+          throw new Error(`Path inválido: ${variablePath}`);
+        }
+
+        const numericIndex = parseInt(part, 10);
+        if (!isNaN(numericIndex) && Array.isArray(value)) {
+          if (numericIndex >= 0 && numericIndex < value.length) {
+            value = value[numericIndex];
+          } else {
+            throw new Error(`Índice inválido: ${part}`);
+          }
+        } else if (Array.isArray(value)) {
+          throw new Error(`Tentando acessar propriedade em array: ${part}`);
         } else {
-          return match; // Variável não encontrada
+          const valueObj = value as Record<string, unknown>;
+          if (!(part in valueObj)) {
+            throw new Error(`Propriedade não encontrada: ${part}`);
+          }
+          value = valueObj[part];
+        }
+
+        if (value === undefined) {
+          throw new Error(`Valor undefined em: ${part}`);
         }
       }
 
       if (value === null || value === undefined) {
-        return match;
+        throw new Error('Valor é null ou undefined');
       }
 
-      // SEMPRE usar JSON.stringify para garantir formato válido
-      // Isso adiciona aspas em strings, formata objetos/arrays corretamente
-      return JSON.stringify(value);
-    } catch {
-      return match;
-    }
-  });
+      // Aplicar expressão JavaScript se houver
+      if (jsExpression) {
+        value = evaluateJavaScriptExpression(value, jsExpression);
+      }
 
-  // Agora parsear o JSON resultante
-  const parsed = JSON.parse(replaced);
+      // Formatar o valor para JSON
+      let replacement: string;
+      if (typeof value === 'string') {
+        // Strings devem ter aspas e ser escapadas
+        replacement = JSON.stringify(value);
+      } else if (typeof value === 'number' || typeof value === 'boolean') {
+        // Números e booleanos sem aspas
+        replacement = String(value);
+      } else if (value === null) {
+        replacement = 'null';
+      } else {
+        // Objetos e arrays: usar JSON.stringify
+        replacement = JSON.stringify(value);
+      }
+
+      replaced =
+        replaced.substring(0, variableMatches[i].start) +
+        replacement +
+        replaced.substring(variableMatches[i].end);
+    } catch (error) {
+      console.error('🔴 [CODE-EXECUTION] Erro ao resolver variável:', {
+        path,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new Error(
+        `Erro ao resolver variável {{${path}}}: ${
+          error instanceof Error ? error.message : 'Erro desconhecido'
+        }`,
+      );
+    }
+  }
+
+  // Parsear o JSON resultante
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(replaced);
+  } catch (error) {
+    console.error('🔴 [CODE-EXECUTION] JSON inválido após substituição:', {
+      original: jsonTemplate,
+      replaced: replaced.substring(0, 500), // Limitar tamanho do log
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(
+      `JSON inválido após substituição de variáveis: ${
+        error instanceof Error ? error.message : 'Erro desconhecido'
+      }`,
+    );
+  }
 
   // Garantir que o resultado é um objeto
   if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
     return parsed as Record<string, unknown>;
   }
 
-  // Se não for um objeto, retornar objeto vazio ou lançar erro
+  // Se não for um objeto, lançar erro
   throw new Error('JSON template deve resultar em um objeto');
 }
 

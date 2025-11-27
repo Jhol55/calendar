@@ -1,13 +1,17 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Typography } from '@/components/ui/typography';
 import type { NodeData } from '../../types';
-import { GitBranch, Settings, Split } from 'lucide-react';
+import { GitBranch, Split } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { nodeThemes } from '../node-theme';
+import { useVariableContext, resolveVariable } from '../use-variable-context';
 
 interface ConditionNodeProps {
   data: NodeData;
+  selected?: boolean;
 }
 
 // Função helper para traduzir operadores
@@ -30,114 +34,170 @@ const getOperatorSymbol = (operator: string): string => {
   return operators[operator] || operator;
 };
 
-function ConditionNodeComponent({ data }: ConditionNodeProps) {
+function ConditionNodeComponent({ data, selected }: ConditionNodeProps) {
   const config = data.conditionConfig;
   const isIfType = config?.conditionType === 'if';
   const isSwitchType = config?.conditionType === 'switch';
+  const theme = nodeThemes['violet'];
+  const context = useVariableContext();
 
-  // Para IF: 1 entrada, 2 saídas (true/false)
-  // Para SWITCH: 1 entrada, N saídas (casos + default)
   const switchCases = config?.cases || [];
   const hasDefaultCase = config?.useDefaultCase ?? true;
 
-  // Calcular altura dinâmica para Switch e IF
+  // Resolver variáveis nas regras do IF
+  const resolvedRules = useMemo(() => {
+    if (!config?.rules) return [];
+    return config.rules.map((rule) => {
+      // Resolver cada campo separadamente
+      const varResolved = rule.variable
+        ? resolveVariable(rule.variable, context)
+        : undefined;
+      const valResolved = rule.value
+        ? resolveVariable(rule.value, context)
+        : undefined;
+
+      return {
+        ...rule,
+        resolvedVariable: varResolved ?? rule.variable ?? '',
+        resolvedValue: valResolved ?? rule.value ?? '',
+      };
+    });
+  }, [config?.rules, context]);
+
+  // Resolver variável do Switch
+  const resolvedSwitchVariable = useMemo(() => {
+    if (!config?.variable) return '';
+    return resolveVariable(config.variable, context) ?? config.variable;
+  }, [config?.variable, context]);
+
+  // Calcular altura dinâmica para Switch
   const totalOutputs = isSwitchType
     ? switchCases.length + (hasDefaultCase ? 1 : 0)
     : 0;
 
-  // Altura base + espaço para cada saída (mínimo 40px por handle)
   let minHeight: number | undefined;
   if (isSwitchType && totalOutputs > 0) {
     minHeight = Math.max(160, 100 + totalOutputs * 40);
   } else if (isIfType) {
-    minHeight = 100;
+    minHeight = 140;
   }
 
   return (
     <div className="relative">
-      {/* Handle de Entrada (esquerda) */}
+      {/* Handle de Entrada */}
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3 h-3 !bg-violet-400 border-2 border-white"
+        className="!w-3 !h-3 !border-2 !border-white"
+        style={{ background: theme.handleColor }}
       />
 
       {/* Card do Node */}
       <div
-        className={`min-w-[240px] max-w-[280px] bg-gradient-to-br from-violet-50 to-white border-2 border-violet-400 rounded-xl shadow-lg overflow-hidden ${isSwitchType && totalOutputs > 3 ? 'flex flex-col' : ''}`}
+        className={cn(
+          'bg-white rounded-lg border-2 shadow-lg transition-all duration-200 min-w-[240px] max-w-[280px]',
+          selected ? theme.borderSelected : theme.border,
+          isSwitchType && totalOutputs > 3 ? 'flex flex-col' : '',
+        )}
         style={minHeight ? { minHeight: `${minHeight}px` } : undefined}
       >
-        {/* Header Compacto */}
-        <div className="bg-neutral-50 px-3 py-2">
-          <div className="flex items-center gap-2 justify-between">
-            <div className="flex gap-2 items-center">
-              {isIfType && <GitBranch className="w-4 h-4 text-violet-500" />}
-              {isSwitchType && <Split className="w-4 h-4 text-violet-500" />}
-              {!config && <GitBranch className="w-4 h-4 text-violet-500" />}
+        {/* Header */}
+        <div className="p-4 pb-2">
+          <div className="flex items-center gap-3 mb-3">
+            <div className={cn('p-2 rounded-lg', theme.iconBg, theme.iconText)}>
+              {isIfType && <GitBranch className="w-4 h-4" />}
+              {isSwitchType && <Split className="w-4 h-4" />}
+              {!config && <GitBranch className="w-4 h-4" />}
+            </div>
+            <div className="flex-1 min-w-0">
               <Typography
-                variant="span"
-                className="text-neutral-600 font-semibold text-sm"
+                variant="h3"
+                className="font-semibold text-sm text-gray-800"
               >
                 {isIfType && 'If (Condicional)'}
-                {isSwitchType && 'Switch (Múltiplas condições)'}
+                {isSwitchType && 'Switch'}
                 {!config && 'Condição'}
               </Typography>
-            </div>
-            <Settings className="w-4 h-4 text-gray-400" />
-          </div>
-        </div>
-
-        {/* Body Minimalista */}
-        <div
-          className={`px-3 py-2 w-full ${isSwitchType && totalOutputs > 3 ? 'flex-1' : ''}`}
-        >
-          {/* IF Config Display - Melhorado */}
-          {isIfType && config?.rules && (
-            <div className="space-y-1">
-              {config.rules.slice(0, 2).map((rule, index) => (
-                <div
-                  key={rule.id}
-                  className="flex items-center gap-1 text-xs bg-neutral-50 rounded px-2 py-1"
+              {isSwitchType && (
+                <Typography
+                  variant="span"
+                  className="text-xs text-gray-500 block"
                 >
-                  {index > 0 && rule.logicOperator && (
-                    <span className="font-bold text-violet-600 text-[10px] bg-violet-200 px-1 rounded">
-                      {rule.logicOperator}
-                    </span>
-                  )}
-                  <span className="font-mono text-gray-700 truncate max-w-[70px]">
-                    {rule.variable.length > 10
-                      ? `${rule.variable.substring(0, 10)}...`
-                      : rule.variable}
-                  </span>
-                  <span className="text-violet-600 font-bold">
-                    {getOperatorSymbol(rule.operator)}
-                  </span>
-                  {rule.value && (
-                    <span className="font-mono text-gray-700 truncate max-w-[50px]">
-                      {rule.value.length > 8
-                        ? `"${rule.value.substring(0, 8)}..."`
-                        : `"${rule.value}"`}
-                    </span>
-                  )}
-                </div>
-              ))}
-              {config.rules.length > 2 && (
+                  Múltiplas condições
+                </Typography>
+              )}
+            </div>
+          </div>
+
+          {/* IF Config Display */}
+          {isIfType && resolvedRules.length > 0 && (
+            <div className="space-y-2 pr-16">
+              {resolvedRules.slice(0, 2).map((rule, index) => {
+                // Mostrar 'undefined' apenas se for realmente undefined, não para string vazia
+                const displayVar =
+                  rule.resolvedVariable === undefined
+                    ? 'undefined'
+                    : rule.resolvedVariable;
+                const displayVal =
+                  rule.resolvedValue === undefined
+                    ? 'undefined'
+                    : rule.resolvedValue;
+
+                return (
+                  <div key={rule.id}>
+                    {index > 0 && rule.logicOperator && (
+                      <div className="flex justify-center mb-1">
+                        <span
+                          className={cn(
+                            'font-bold text-[10px] px-2 py-0.5 rounded',
+                            theme.badgeBg,
+                            theme.badgeText,
+                          )}
+                        >
+                          {rule.logicOperator}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-0.5 text-xs bg-gray-50 rounded px-2 py-1.5">
+                      {/* Valor 1 - Variável */}
+                      <span className="font-mono text-gray-700 truncate">
+                        {displayVar.length > 25
+                          ? `${displayVar.substring(0, 25)}...`
+                          : displayVar}
+                      </span>
+                      {/* Operador */}
+                      <span
+                        className={cn('font-bold text-center', theme.badgeText)}
+                      >
+                        {getOperatorSymbol(rule.operator)}
+                      </span>
+                      {/* Valor 2 */}
+                      <span className="font-mono text-gray-700 truncate">
+                        {displayVal.length > 25
+                          ? `${displayVal.substring(0, 25)}...`
+                          : displayVal}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {resolvedRules.length > 2 && (
                 <div className="text-center">
                   <Typography
                     variant="span"
                     className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full"
                   >
-                    +{config.rules.length - 2} regras
+                    +{resolvedRules.length - 2} regras
                   </Typography>
                 </div>
               )}
             </div>
           )}
 
-          {/* SWITCH Config Display - Melhorado */}
+          {/* SWITCH Config Display */}
           {isSwitchType && config?.variable && (
             <div className="space-y-1 pr-4">
-              <div className="bg-violet-50 rounded px-2 py-1">
+              <div className={cn('rounded px-2 py-1', theme.badgeBg)}>
                 <Typography
                   variant="span"
                   className="text-[10px] text-gray-500 uppercase"
@@ -145,9 +205,9 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
                   Variável
                 </Typography>
                 <div className="font-mono text-xs text-gray-800 font-semibold truncate">
-                  {config.variable.length > 22
-                    ? `${config.variable.substring(0, 22)}...`
-                    : config.variable}
+                  {resolvedSwitchVariable && resolvedSwitchVariable.length > 22
+                    ? `${resolvedSwitchVariable.substring(0, 22)}...`
+                    : resolvedSwitchVariable}
                 </div>
               </div>
               <div className="flex items-center justify-center gap-2 pt-1">
@@ -176,111 +236,94 @@ function ConditionNodeComponent({ data }: ConditionNodeProps) {
                 variant="span"
                 className="text-xs text-gray-400 italic"
               >
-                Clique 2x para configurar
+                Duplo clique para configurar
               </Typography>
             </div>
           )}
         </div>
 
-        {/* Handles de Saída - Design melhorado */}
-
-        {/* IF Type - Handles mais destacados */}
-        {/* Sempre renderizar handles true/false quando NÃO for switch */}
+        {/* Handles IF Type */}
         {!isSwitchType && (
-          <>
-            {/* Handle True */}
-            <div className="absolute right-[-4px] top-[30%] flex items-center gap-1">
-              {isIfType && (
-                <div className="text-white px-2 py-0.5 rounded-l-md mr-1">
-                  <Typography
-                    variant="span"
-                    className="absolute -right-5 -top-5 text-[10px] font-semibold text-neutral-600"
-                  >
-                    true
-                  </Typography>
-                </div>
-              )}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id="true"
-                className="w-3 h-3 !bg-green-500 border-2 border-white shadow-lg hover:scale-125 transition-transform"
-              />
+          <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-end h-5">
+                <span className="text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded leading-none">
+                  true
+                </span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id="true"
+                  className="!w-3 !h-3 !border-2 !border-white !static !transform-none !ml-1"
+                  style={{ background: '#22c55e' }}
+                />
+              </div>
+              <div className="flex items-center justify-end h-5">
+                <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded leading-none">
+                  false
+                </span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id="false"
+                  className="!w-3 !h-3 !border-2 !border-white !static !transform-none !ml-1"
+                  style={{ background: '#ef4444' }}
+                />
+              </div>
             </div>
-
-            {/* Handle False */}
-            <div className="absolute right-[-4px] bottom-[30%] flex items-center gap-1">
-              {isIfType && (
-                <div className="text-white px-2 py-0.5 rounded-l-md mr-1">
-                  <Typography
-                    variant="span"
-                    className="absolute -right-6 -top-5 text-[10px] font-semibold text-neutral-600"
-                  >
-                    false
-                  </Typography>
-                </div>
-              )}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id="false"
-                className="w-3 h-3 !bg-red-500 border-2 border-white shadow-lg hover:scale-125 transition-transform"
-              />
-            </div>
-          </>
+          </div>
         )}
 
-        {/* SWITCH Type - Lista na lateral direita */}
+        {/* Handles SWITCH Type */}
         {isSwitchType && (
-          <div className="absolute right-[-4px] top-0 bottom-0 flex flex-col justify-center py-4">
-            <div className="flex flex-col justify-around h-full">
-              {/* Handles para cada caso - TODOS os casos */}
+          <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center">
+            <div className="flex flex-col gap-4">
               {switchCases.length > 0 ? (
                 switchCases.map((caseItem) => (
                   <div
                     key={caseItem.id}
-                    className="flex items-center gap-1 relative"
+                    className="flex items-center justify-end h-5"
                   >
-                    <Typography
-                      variant="span"
-                      className="absolute left-[calc(100%-7px)] ml-2 -top-3 -translate-y-1/2 text-[10px] font-semibold text-neutral-600 whitespace-nowrap"
-                    >
-                      {caseItem.label.length > 12
-                        ? `${caseItem.label.substring(0, 12)}...`
+                    <span className="text-[10px] font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap leading-none">
+                      {caseItem.label.length > 40
+                        ? `${caseItem.label.substring(0, 40)}...`
                         : caseItem.label}
-                    </Typography>
+                    </span>
                     <Handle
                       type="source"
                       position={Position.Right}
                       id={`case_${caseItem.id}`}
-                      className="w-3 h-3 border-2 border-white shadow-lg hover:scale-125 transition-transform"
+                      className="!w-3 !h-3 !border-2 !border-white !static !transform-none !ml-1"
+                      style={{ background: theme.handleColor }}
                     />
                   </div>
                 ))
               ) : (
-                // Handle padrão se não houver casos ainda
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id="default"
-                  className="w-3 h-3 !bg-gray-500 border-2 border-white shadow-lg hover:scale-125 transition-transform"
-                />
-              )}
-
-              {/* Handle Default - sempre renderizar se configurado */}
-              {hasDefaultCase && switchCases.length > 0 && (
-                <div className="flex items-center gap-1 relative">
-                  <Typography
-                    variant="span"
-                    className="absolute left-[calc(100%-7px)] ml-2 -top-3 -translate-y-1/2 text-[10px] font-semibold text-neutral-600 whitespace-nowrap"
-                  >
+                <div className="flex items-center justify-end h-5">
+                  <span className="text-[10px] font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded leading-none">
                     Default
-                  </Typography>
+                  </span>
                   <Handle
                     type="source"
                     position={Position.Right}
                     id="default"
-                    className="w-3 h-3 !bg-gray-500 border-2 border-white shadow-lg hover:scale-125 transition-transform"
+                    className="!w-3 !h-3 !border-2 !border-white !static !transform-none !ml-1"
+                    style={{ background: '#6b7280' }}
+                  />
+                </div>
+              )}
+
+              {hasDefaultCase && switchCases.length > 0 && (
+                <div className="flex items-center justify-end h-5">
+                  <span className="text-[10px] font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded leading-none">
+                    Default
+                  </span>
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id="default"
+                    className="!w-3 !h-3 !border-2 !border-white !static !transform-none !ml-1"
+                    style={{ background: '#6b7280' }}
                   />
                 </div>
               )}

@@ -66,6 +66,31 @@ const menuItems: MenuItem[] = [
   },
 ];
 
+// Componente para indicador com delay
+const DelayedIndicator = memo(() => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !h-10 !w-10 inset-0 rounded-full shadow-md bg-neutral-100 -z-50 border border-neutral-400"
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transition: 'opacity 0.3s ease-out',
+      }}
+    />
+  );
+});
+
+DelayedIndicator.displayName = 'DelayedIndicator';
+
 const MenuItemComponent = memo(
   ({
     item,
@@ -97,10 +122,12 @@ const MenuItemComponent = memo(
           className={cn(
             'relative w-full gap-3 h-12 text-left transition-all duration-200',
             isHovered ? 'justify-start px-4' : 'justify-center px-0',
-            isActive && isHovered && '!bg-neutral-100 shadow-md rounded-full',
+            isActive &&
+              isHovered &&
+              '!bg-neutral-100 shadow-md border border-neutral-400 rounded-full',
             'hover:bg-neutral-100 hover:shadow-md rounded-full',
             level > 0 && isHovered && 'ml-4 text-sm h-10 w-[calc(100%-1rem)]',
-            'bg-transparent border-none',
+            'bg-transparent',
             menuItemClassName,
           )}
           onClick={() => {
@@ -111,9 +138,7 @@ const MenuItemComponent = memo(
             }
           }}
         >
-          {isActive && !isHovered && (
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 !h-10 !w-10 inset-0 rounded-full shadow-md bg-neutral-100 -z-50 border" />
-          )}
+          {isActive && !isHovered && <DelayedIndicator />}
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3 min-w-0">
               <div
@@ -263,8 +288,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* Sidebar */}
       <aside
-        onMouseEnter={() => setIsHovered(!isHovered)}
-        onMouseLeave={() => setIsHovered(!isHovered)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         style={{ zoom: 0.9 }}
         className={cn(
           'fixed left-0 md:top-0 top-10 flex-1 bg-white backdrop-blur-sm border-r border-neutral-200',

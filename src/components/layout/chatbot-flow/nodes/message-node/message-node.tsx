@@ -1,11 +1,13 @@
-import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
-import { MessageSquare, Settings } from 'lucide-react';
+import React, { memo, useMemo } from 'react';
+import { NodeProps } from 'reactflow';
+import { MessageSquare } from 'lucide-react';
 import { NodeData } from '../../types';
-import { Typography } from '@/components/ui/typography';
+import { BaseNode, NodePreview } from '../base-node';
+import { useVariableContext, resolveVariable } from '../use-variable-context';
 
 function MessageNodeComponent({ data, selected }: NodeProps<NodeData>) {
   const messageConfig = data.messageConfig;
+  const context = useVariableContext();
 
   const getMessageTypeLabel = () => {
     const types: Record<string, string> = {
@@ -33,74 +35,78 @@ function MessageNodeComponent({ data, selected }: NodeProps<NodeData>) {
     return mediaType ? types[mediaType] || 'Mídia' : 'Mídia';
   };
 
-  const getPreviewContent = () => {
+  // Resolver variáveis no preview
+  const resolvedPreview = useMemo(() => {
     if (!messageConfig) return 'Duplo clique para configurar...';
 
     switch (messageConfig.messageType) {
       case 'text':
-        return messageConfig.text || 'Digite a mensagem...';
+        const resolvedText = resolveVariable(messageConfig.text, context);
+        return resolvedText || 'Digite a mensagem...';
+
       case 'media':
         const mediaLabel = getMediaTypeLabel(messageConfig.mediaType);
-        const fileName = messageConfig.docName || 'arquivo';
-        return messageConfig.mediaUrl
+        const resolvedDocName = resolveVariable(messageConfig.docName, context);
+        const resolvedMediaUrl = resolveVariable(
+          messageConfig.mediaUrl,
+          context,
+        );
+        const fileName = resolvedDocName || 'arquivo';
+        return resolvedMediaUrl
           ? `${mediaLabel}: ${fileName}`
           : 'Configure a mídia...';
+
       case 'contact':
-        if (!messageConfig.contactName) return 'Configure o contato...';
+        const resolvedContactName = resolveVariable(
+          messageConfig.contactName,
+          context,
+        );
+        if (!resolvedContactName) return 'Configure o contato...';
+
         const contactInfo = [];
-        contactInfo.push(`👤 ${messageConfig.contactName}`);
-        if (messageConfig.contactPhone) {
-          contactInfo.push(`📱 ${messageConfig.contactPhone}`);
+        contactInfo.push(`👤 ${resolvedContactName}`);
+
+        const resolvedPhone = resolveVariable(
+          messageConfig.contactPhone,
+          context,
+        );
+        if (resolvedPhone) {
+          contactInfo.push(`📱 ${resolvedPhone}`);
         }
-        if (messageConfig.contactOrganization) {
-          contactInfo.push(`🏢 ${messageConfig.contactOrganization}`);
+
+        const resolvedOrg = resolveVariable(
+          messageConfig.contactOrganization,
+          context,
+        );
+        if (resolvedOrg) {
+          contactInfo.push(`🏢 ${resolvedOrg}`);
         }
         return contactInfo.join('\n');
+
       case 'location':
-        return messageConfig.latitude && messageConfig.longitude
-          ? `${messageConfig.latitude}, ${messageConfig.longitude}`
+        const resolvedLat = resolveVariable(messageConfig.latitude, context);
+        const resolvedLng = resolveVariable(messageConfig.longitude, context);
+        return resolvedLat && resolvedLng
+          ? `📍 ${resolvedLat}, ${resolvedLng}`
           : 'Configure a localização...';
+
       case 'interactive_menu':
         return 'Menu interativo';
+
       default:
         return 'Duplo clique para configurar...';
     }
-  };
+  }, [messageConfig, context]);
 
   return (
-    <div
-      className={`bg-white rounded-lg border-2 shadow-lg min-w-[250px] max-w-[300px] ${
-        selected ? 'border-blue-500' : 'border-gray-300'
-      }`}
-    >
-      <Handle type="target" position={Position.Left} />
-
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-blue-500" />
-            <Typography variant="h3" className="font-semibold text-sm">
-              Enviar Mensagem
-            </Typography>
-          </div>
-          <Settings className="w-4 h-4 text-gray-400" />
-        </div>
-
-        {messageConfig && (
-          <div className="mb-2 flex items-center gap-2 text-xs">
-            <span className="px-2 py-1 bg-neutral-100 text-blue-600 rounded">
-              {getMessageTypeLabel()}
-            </span>
-          </div>
-        )}
-
-        <div className="text-xs text-gray-600 bg-gray-50/40 p-2 rounded line-clamp-3">
-          {getPreviewContent()}
-        </div>
-      </div>
-
-      <Handle type="source" position={Position.Right} />
-    </div>
+    <BaseNode
+      icon={<MessageSquare className="w-4 h-4" />}
+      title="Enviar Mensagem"
+      badge={messageConfig ? getMessageTypeLabel() : undefined}
+      selected={selected}
+      themeColor="blue"
+      preview={<NodePreview>{resolvedPreview}</NodePreview>}
+    />
   );
 }
 

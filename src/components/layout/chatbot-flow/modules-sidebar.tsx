@@ -82,7 +82,7 @@ const nodeTemplates: NodeTemplate[] = [
   {
     type: 'code_execution',
     label: 'Código',
-    icon: <Code2 className="w-5 h-5 text-indigo-600" />,
+    icon: <Code2 className="w-5 h-5 text-orange-500" />,
     description: 'Executar código JS/Python',
   },
   {

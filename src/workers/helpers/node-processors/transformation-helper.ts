@@ -2,6 +2,7 @@
  * Helper functions para transformações de dados
  * Funções puras sem side effects
  */
+import { replaceVariables } from '../variable-replacer';
 
 // ==================== STRING OPERATIONS ====================
 
@@ -537,37 +538,20 @@ export function mapObjectArray(
     template: unknown,
     sourceObj: Record<string, unknown>,
   ): unknown => {
-    // Se for string, substituir variáveis
+    // Se for string, substituir variáveis usando replaceVariables
     if (typeof template === 'string') {
-      return template.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
-        const trimmedKey = key.trim();
-
-        // Suportar dot notation
-        const fields = trimmedKey.split('.');
-        let result: unknown = sourceObj;
-
-        for (const field of fields) {
-          if (
-            typeof result === 'object' &&
-            result !== null &&
-            !Array.isArray(result)
-          ) {
-            result = (result as Record<string, unknown>)[field];
-          } else {
-            result = undefined;
-          }
-          if (result === undefined || result === null) {
-            return '';
-          }
-        }
-
-        // Se for objeto ou array, converter para JSON
-        if (typeof result === 'object') {
-          return JSON.stringify(result);
-        }
-
-        return String(result);
-      });
+      const replaced = replaceVariables(template, sourceObj);
+      // Se replaceVariables retornou undefined, significa que alguma variável não foi resolvida
+      if (replaced === undefined) {
+        // Retornar string vazia para variáveis não resolvidas (comportamento original)
+        return '';
+      }
+      // Se retornou string, usar diretamente
+      if (typeof replaced === 'string') {
+        return replaced;
+      }
+      // Se retornou outro tipo, converter para string
+      return String(replaced);
     }
 
     // Se for array, processar cada elemento
@@ -648,40 +632,23 @@ export function flatMapArray(input: unknown, template: string): unknown[] {
     );
   }
 
-  // Função para substituir variáveis no template
+  // Função para substituir variáveis no template usando replaceVariables
   const replaceVars = (
     templateStr: string,
     obj: Record<string, unknown>,
   ): string => {
-    return templateStr.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
-      const trimmedKey = key.trim();
-
-      // Suportar dot notation
-      const fields = trimmedKey.split('.');
-      let result: unknown = obj;
-
-      for (const field of fields) {
-        if (
-          typeof result === 'object' &&
-          result !== null &&
-          !Array.isArray(result)
-        ) {
-          result = (result as Record<string, unknown>)[field];
-        } else {
-          result = undefined;
-        }
-        if (result === undefined || result === null) {
-          return '';
-        }
-      }
-
-      // Se for objeto ou array, converter para JSON
-      if (typeof result === 'object') {
-        return JSON.stringify(result);
-      }
-
-      return String(result);
-    });
+    const replaced = replaceVariables(templateStr, obj);
+    // Se replaceVariables retornou undefined, significa que alguma variável não foi resolvida
+    if (replaced === undefined) {
+      // Retornar string vazia para variáveis não resolvidas (comportamento original)
+      return '';
+    }
+    // Se retornou string, usar diretamente
+    if (typeof replaced === 'string') {
+      return replaced;
+    }
+    // Se retornou outro tipo, converter para string
+    return String(replaced);
   };
 
   // Processar cada objeto e achatar os resultados

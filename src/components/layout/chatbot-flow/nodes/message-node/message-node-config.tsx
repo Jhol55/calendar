@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   MessageConfig,
   MessageType,
@@ -21,6 +21,7 @@ import { InstanceProps } from '@/contexts/user/user-context.type';
 // import { sendMessage } from '@/actions/uazapi/message';
 import { FormSelect } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { CodeiumEditorField } from '@/components/ui/codeium-editor-field';
 import { NodeConfigLayout } from '../node-config-layout';
 import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { MemoryConfigSection } from '../memory-config-section';
@@ -230,6 +231,11 @@ function MessageFormFields({
   setSelectedInstanceToken: React.Dispatch<React.SetStateAction<string>>;
 }) {
   const { form, setValue, register } = useForm();
+  // Refs para evitar loop infinito na sincronização
+  const isUpdatingFromFormRef = useRef(false);
+  const isUpdatingFromJsonConfigRef = useRef(false);
+  const lastSyncedJsonConfigRef = useRef<string>(jsonConfig);
+  const lastSyncedFormValueRef = useRef<string>('');
   const messageType = (form.messageType as MessageType) || 'text';
   const interactiveMenuType =
     (form.interactiveMenuType as InteractiveMenuType) || 'button';
@@ -364,6 +370,99 @@ function MessageFormFields({
       setJsonManuallyEdited(false);
     }
   }, [configMode, interactiveMenuType]);
+
+  // Sincronizar jsonConfig com o campo do form para CodeiumEditorField
+  useEffect(() => {
+    // Evitar loop: se a mudança veio do form, não atualizar de volta
+    if (isUpdatingFromFormRef.current) {
+      return;
+    }
+
+    // Se jsonConfig não mudou desde a última sincronização, não fazer nada
+    if (lastSyncedJsonConfigRef.current === jsonConfig) {
+      return;
+    }
+
+    if (configMode === 'json') {
+      if (interactiveMenuType === 'list') {
+        const currentFormValue =
+          (form.jsonConfigList as string | undefined) || '';
+        const jsonConfigValue = jsonConfig || '';
+        if (currentFormValue !== jsonConfigValue) {
+          isUpdatingFromJsonConfigRef.current = true;
+          setValue('jsonConfigList', jsonConfigValue);
+          lastSyncedJsonConfigRef.current = jsonConfigValue;
+          // Resetar flag no próximo tick
+          requestAnimationFrame(() => {
+            isUpdatingFromJsonConfigRef.current = false;
+          });
+        }
+      } else if (interactiveMenuType === 'carousel') {
+        const currentFormValue =
+          (form.jsonConfigCarousel as string | undefined) || '';
+        const jsonConfigValue = jsonConfig || '';
+        if (currentFormValue !== jsonConfigValue) {
+          isUpdatingFromJsonConfigRef.current = true;
+          setValue('jsonConfigCarousel', jsonConfigValue);
+          lastSyncedJsonConfigRef.current = jsonConfigValue;
+          // Resetar flag no próximo tick
+          requestAnimationFrame(() => {
+            isUpdatingFromJsonConfigRef.current = false;
+          });
+        }
+      }
+    }
+  }, [
+    jsonConfig,
+    configMode,
+    interactiveMenuType,
+    setValue,
+    form.jsonConfigList,
+    form.jsonConfigCarousel,
+  ]);
+
+  // Sincronizar mudanças do CodeiumEditorField de volta para jsonConfig
+  useEffect(() => {
+    // Evitar loop: se a mudança veio de jsonConfig, não atualizar de volta
+    if (isUpdatingFromJsonConfigRef.current) {
+      return;
+    }
+
+    if (configMode === 'json') {
+      const formValue =
+        interactiveMenuType === 'list'
+          ? (form.jsonConfigList as string | undefined) || ''
+          : interactiveMenuType === 'carousel'
+            ? (form.jsonConfigCarousel as string | undefined) || ''
+            : '';
+
+      // Se o valor do form não mudou desde a última sincronização, não fazer nada
+      if (lastSyncedFormValueRef.current === formValue) {
+        return;
+      }
+
+      const jsonConfigValue = jsonConfig || '';
+
+      // Aceitar valores vazios também (quando usuário apaga)
+      if (formValue !== jsonConfigValue) {
+        isUpdatingFromFormRef.current = true;
+        setJsonConfig(formValue);
+        setJsonManuallyEdited(true);
+        lastSyncedFormValueRef.current = formValue;
+        lastSyncedJsonConfigRef.current = formValue;
+        // Resetar flag no próximo tick
+        requestAnimationFrame(() => {
+          isUpdatingFromFormRef.current = false;
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    form.jsonConfigList,
+    form.jsonConfigCarousel,
+    configMode,
+    interactiveMenuType,
+  ]);
 
   // Atualizar campo do formulário quando JSON mudar (para passar validação Zod)
   useEffect(() => {
@@ -1794,22 +1893,22 @@ function MessageFormFields({
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => setJsonConfig(JSON_LIST_TEMPLATE)}
+                        onClick={() => {
+                          setJsonConfig(JSON_LIST_TEMPLATE);
+                          setValue('jsonConfigList', JSON_LIST_TEMPLATE);
+                        }}
                         className="absolute right-0 top-0 w-fit text-sm text-blue-600 hover:text-blue-700"
                       >
                         📄 Carregar Modelo de Exemplo
                       </Button>
                     </div>
-                    <Textarea
+                    <CodeiumEditorField
                       fieldName="jsonConfigList"
-                      value={jsonConfig}
-                      onChange={(e) => {
-                        setJsonConfig(e.target.value);
-                        setJsonManuallyEdited(true);
-                      }}
+                      language="json"
                       placeholder="Cole ou edite o JSON de configuração aqui..."
-                      rows={15}
-                      className="!bg-white font-mono"
+                      height="400px"
+                      theme="light"
+                      backgroundColor="#ffffff"
                     />
                   </div>
                 ) : (
@@ -2094,22 +2193,25 @@ function MessageFormFields({
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => setJsonConfig(JSON_CAROUSEL_TEMPLATE)}
+                        onClick={() => {
+                          setJsonConfig(JSON_CAROUSEL_TEMPLATE);
+                          setValue(
+                            'jsonConfigCarousel',
+                            JSON_CAROUSEL_TEMPLATE,
+                          );
+                        }}
                         className="w-fit text-sm text-blue-600 hover:text-blue-700 absolute top-0 right-0"
                       >
                         📄 Carregar Modelo de Exemplo
                       </Button>
                     </div>
-                    <Textarea
+                    <CodeiumEditorField
                       fieldName="jsonConfigCarousel"
-                      value={jsonConfig}
-                      onChange={(e) => {
-                        setJsonConfig(e.target.value);
-                        setJsonManuallyEdited(true);
-                      }}
+                      language="json"
                       placeholder="Cole ou edite o JSON de configuração aqui..."
-                      rows={15}
-                      className="!bg-white font-mono"
+                      height="400px"
+                      theme="light"
+                      backgroundColor="#ffffff"
                     />
                   </div>
                 ) : (

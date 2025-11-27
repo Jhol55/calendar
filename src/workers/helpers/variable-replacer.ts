@@ -38,7 +38,7 @@ function hasMethod(
  * Avalia uma expressão JavaScript de forma segura (estilo n8n)
  * Suporta encadeamento de métodos como .replace("0", "1").toUpperCase()
  */
-function evaluateJavaScriptExpression(
+export function evaluateJavaScriptExpression(
   baseValue: unknown,
   expression: string,
 ): unknown {
