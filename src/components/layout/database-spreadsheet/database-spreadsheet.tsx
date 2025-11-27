@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Typography } from '@/components/ui/typography';
 import { Button } from '@/components/ui/button';
@@ -68,14 +68,21 @@ export function DatabaseSpreadsheet({
   const [tableSchema, setTableSchema] = useState<TableSchema | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingMoreBefore, setLoadingMoreBefore] = useState(false);
+  const [lastPageLoaded, setLastPageLoaded] = useState(false);
+  const lastPageDataRef = useRef<TableData[] | null>(null);
   const [pagination, setPagination] = useState<{
-    offset: number;
+    offset: number; // Offset do final dos dados carregados
+    startOffset: number; // Offset do início dos dados carregados
     totalCount: number;
     hasMore: boolean;
+    hasMoreBefore: boolean;
   }>({
     offset: 0,
+    startOffset: 0,
     totalCount: 0,
     hasMore: false,
+    hasMoreBefore: false,
   });
   const [editingCell, setEditingCell] = useState<{
     rowId: string;
@@ -161,6 +168,8 @@ export function DatabaseSpreadsheet({
   const [renamingTable, setRenamingTable] = useState<string>('');
   const [showDeleteTableDialog, setShowDeleteTableDialog] = useState(false);
   const [deletingTable, setDeletingTable] = useState<string>('');
+  const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Carregar tabelas disponíveis
   useEffect(() => {
@@ -180,7 +189,15 @@ export function DatabaseSpreadsheet({
       setEditingCell(null);
       setEditingValue('');
       setHasUnsavedChanges(false);
-      setPagination({ offset: 0, totalCount: 0, hasMore: false });
+      setLastPageLoaded(false);
+      lastPageDataRef.current = null;
+      setPagination({
+        offset: 0,
+        startOffset: 0,
+        totalCount: 0,
+        hasMore: false,
+        hasMoreBefore: false,
+      });
       setPendingChanges({
         updates: [],
         additions: [],
@@ -234,7 +251,13 @@ export function DatabaseSpreadsheet({
       setColumnConditions({});
       setSortConfig(null);
       // Resetar paginação
-      setPagination({ offset: 0, totalCount: 0, hasMore: false });
+      setPagination({
+        offset: 0,
+        startOffset: 0,
+        totalCount: 0,
+        hasMore: false,
+        hasMoreBefore: false,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTable]);
@@ -257,17 +280,30 @@ export function DatabaseSpreadsheet({
     }
   };
 
-  const loadTableData = async (append = false) => {
+  const loadTableData = async (append = false, customOffset?: number) => {
     try {
       if (append) {
         setLoadingMore(true);
       } else {
         setLoading(true);
-        setTableData([]);
-        setPagination({ offset: 0, totalCount: 0, hasMore: false });
+        if (customOffset === undefined) {
+          setTableData([]);
+          setPagination({
+            offset: 0,
+            startOffset: 0,
+            totalCount: 0,
+            hasMore: false,
+            hasMoreBefore: false,
+          });
+        }
       }
 
-      const currentOffset = append ? pagination.offset : 0;
+      const currentOffset =
+        customOffset !== undefined
+          ? customOffset
+          : append
+            ? pagination.offset
+            : 0;
       const response = await getTableData(selectedTable, {
         offset: currentOffset,
         limit: 100,
@@ -291,15 +327,32 @@ export function DatabaseSpreadsheet({
         }
 
         // Atualizar estado de paginação
+        const newOffset = currentOffset + (tableResponse.data?.length || 0);
+        const newTotalCount = tableResponse.totalCount || pagination.totalCount;
         setPagination({
-          offset: currentOffset + (tableResponse.data?.length || 0),
-          totalCount: tableResponse.totalCount || 0,
+          offset: newOffset,
+          startOffset: append ? pagination.startOffset : currentOffset, // Se append, mantém startOffset; senão, usa currentOffset
+          totalCount: newTotalCount,
           hasMore: tableResponse.hasMore || false,
+          hasMoreBefore: currentOffset > 0, // Há mais dados antes se offset > 0
         });
 
         // Atualizar schema apenas na primeira carga
         if (!append && tableResponse.schema) {
           setTableSchema(tableResponse.schema);
+        }
+
+        // Carregar última página em background após carregamento inicial
+        if (!append && newTotalCount > 100) {
+          // Carregar imediatamente em background (não bloqueia a UI)
+          loadLastPageInBackground();
+        } else if (!append && newTotalCount <= 100) {
+          // Se tem 100 ou menos, já está tudo carregado
+          setLastPageLoaded(true);
+          // Se estamos na última página, armazenar os dados
+          if (currentOffset === 0 && newTotalCount <= 100) {
+            lastPageDataRef.current = tableResponse.data || [];
+          }
         }
       } else {
         console.error('Erro ao carregar dados:', response.message);
@@ -320,14 +373,187 @@ export function DatabaseSpreadsheet({
     }
   };
 
-  // Handler para scroll infinito
+  // Carregar última página de dados em background (sem mostrar loading)
+  const loadLastPageInBackground = async () => {
+    if (!selectedTable || lastPageLoaded) return;
+
+    try {
+      const currentTotal = pagination.totalCount || 0;
+      if (currentTotal <= 100) {
+        // Se tem 100 ou menos registros, já estão todos carregados
+        setLastPageLoaded(true);
+        return;
+      }
+
+      const lastPageOffset = Math.max(0, currentTotal - 100);
+
+      const response = await getTableData(selectedTable, {
+        offset: lastPageOffset,
+        limit: 100,
+      });
+
+      if (response.success && response.data) {
+        const tableResponse = response.data as {
+          data: TableData[];
+          schema: TableSchema | null;
+          totalCount?: number;
+          hasMore?: boolean;
+        };
+
+        // Armazenar os dados da última página em um ref para uso futuro
+        lastPageDataRef.current = tableResponse.data || [];
+        setLastPageLoaded(true);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar última página em background:', error);
+    }
+  };
+
+  // Carregar última página de dados (últimos 100 registros)
+  const loadLastPage = async () => {
+    try {
+      setLoadingMore(true);
+
+      // Calcular offset para última página
+      // Se totalCount = 12.000, lastPageOffset = 11.900 (linhas 11.901 a 12.000)
+      const currentTotal = pagination.totalCount || 0;
+      const lastPageOffset = Math.max(0, currentTotal - 100);
+
+      const response = await getTableData(selectedTable, {
+        offset: lastPageOffset,
+        limit: 100,
+      });
+
+      if (response.success && response.data) {
+        const tableResponse = response.data as {
+          data: TableData[];
+          schema: TableSchema | null;
+          totalCount?: number;
+          hasMore?: boolean;
+        };
+
+        // Substituir dados pelos últimos registros
+        setTableData(tableResponse.data || []);
+
+        // Atualizar paginação
+        // offset deve ser o final dos dados carregados (lastPageOffset + dados carregados)
+        // startOffset é o início dos dados carregados (lastPageOffset)
+        const loadedDataLength = tableResponse.data?.length || 0;
+        setPagination({
+          offset: lastPageOffset + loadedDataLength, // Offset do final dos dados carregados
+          startOffset: lastPageOffset, // Offset do início dos dados carregados
+          totalCount: tableResponse.totalCount || currentTotal,
+          hasMore: false, // Última página, não tem mais
+          hasMoreBefore: lastPageOffset > 0, // Há mais dados antes se offset > 0
+        });
+
+        setLastPageLoaded(true);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar última página:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Carregar página anterior (prepend aos dados atuais)
+  const loadPreviousPage = async () => {
+    if (
+      pagination.startOffset <= 0 ||
+      loadingMoreBefore ||
+      loadingMore ||
+      loading
+    )
+      return;
+
+    // Calcular offset da página anterior
+    const previousPageOffset = Math.max(0, pagination.startOffset - 100);
+
+    // Verificar se os dados já estão carregados no tableData
+    // Se previousPageOffset está dentro do range [startOffset, offset), os dados já estão carregados
+    if (
+      previousPageOffset >= pagination.startOffset &&
+      previousPageOffset < pagination.offset
+    ) {
+      // Dados já estão carregados, apenas atualizar o startOffset da paginação
+      // Não precisa fazer requisição
+      setPagination((prev) => ({
+        ...prev,
+        startOffset: previousPageOffset,
+        hasMoreBefore: previousPageOffset > 0,
+      }));
+      return;
+    }
+
+    try {
+      setLoadingMoreBefore(true);
+
+      const response = await getTableData(selectedTable, {
+        offset: previousPageOffset,
+        limit: 100,
+      });
+
+      if (response.success && response.data) {
+        const tableResponse = response.data as {
+          data: TableData[];
+          schema: TableSchema | null;
+          totalCount?: number;
+          hasMore?: boolean;
+        };
+
+        // Salvar posição atual do scroll antes de adicionar dados
+        const container = tableContainerRef.current;
+        const previousScrollHeight = container?.scrollHeight || 0;
+        const previousScrollTop = container?.scrollTop || 0;
+
+        // Adicionar dados anteriores no início (prepend)
+        // Filtrar duplicatas baseado no _id
+        setTableData((prev) => {
+          const newData = tableResponse.data || [];
+          const existingIds = new Set(prev.map((row) => row._id));
+          const uniqueNewData = newData.filter(
+            (row) => !existingIds.has(row._id),
+          );
+          return [...uniqueNewData, ...prev];
+        });
+
+        // Atualizar paginação
+        // O offset final não muda (continua sendo o final dos dados)
+        // Apenas o startOffset muda (início dos dados)
+        setPagination((prev) => ({
+          ...prev,
+          startOffset: previousPageOffset,
+          hasMoreBefore: previousPageOffset > 0,
+        }));
+
+        // Restaurar posição do scroll após renderizar
+        // Ajustar para manter a mesma posição visual
+        setTimeout(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight;
+            const heightDifference = newScrollHeight - previousScrollHeight;
+            container.scrollTop = previousScrollTop + heightDifference;
+          }
+          // Desabilitar loading após restaurar o scroll
+          setLoadingMoreBefore(false);
+        }, 100);
+      } else {
+        setLoadingMoreBefore(false);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar página anterior:', error);
+      setLoadingMoreBefore(false);
+    }
+  };
+
+  // Handler para scroll infinito (bidirecional)
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const scrollTop = target.scrollTop;
     const scrollHeight = target.scrollHeight;
     const clientHeight = target.clientHeight;
 
-    // Carregar mais quando estiver a 200px do final
+    // Carregar mais quando estiver a 200px do final (scroll para baixo)
     const threshold = 200;
     if (
       scrollHeight - scrollTop - clientHeight < threshold &&
@@ -336,6 +562,17 @@ export function DatabaseSpreadsheet({
       !loading
     ) {
       loadTableData(true);
+    }
+
+    // Carregar página anterior quando estiver a 200px do topo (scroll para cima)
+    if (
+      scrollTop < threshold &&
+      pagination.hasMoreBefore &&
+      !loadingMoreBefore &&
+      !loadingMore &&
+      !loading
+    ) {
+      loadPreviousPage();
     }
   };
 
@@ -406,7 +643,7 @@ export function DatabaseSpreadsheet({
     setValidationError(null);
   };
 
-  const handleAddRow = () => {
+  const handleAddRow = async () => {
     if (!tableSchema) return;
 
     const newRow: Record<string, unknown> = {
@@ -419,8 +656,50 @@ export function DatabaseSpreadsheet({
       newRow[col.name] = col.default || '';
     });
 
-    // Adicionar ao estado local
-    setTableData((prev) => [...prev, newRow as TableData]);
+    const currentTotal = pagination.totalCount || 0;
+    const lastPageOffset = Math.max(0, currentTotal - 100);
+    const currentDataLength = tableData.length;
+    const currentPageEnd = pagination.offset + currentDataLength;
+    const isOnLastPage = pagination.offset >= lastPageOffset;
+    const isAtEndOfData = currentPageEnd >= currentTotal;
+
+    // PRIORIDADE 1: Se a última página já foi carregada em background, usar os dados do ref (instantâneo, sem requisição)
+    if (lastPageLoaded && lastPageDataRef.current) {
+      // Usar os dados já carregados em background e adicionar a nova linha
+      setTableData([...lastPageDataRef.current, newRow as TableData]);
+      setPagination({
+        offset: lastPageOffset + lastPageDataRef.current.length + 1,
+        startOffset: lastPageOffset,
+        totalCount: currentTotal + 1,
+        hasMore: false,
+        hasMoreBefore: lastPageOffset > 0,
+      });
+      // Atualizar o ref também
+      lastPageDataRef.current = [
+        ...lastPageDataRef.current,
+        newRow as TableData,
+      ];
+    }
+    // PRIORIDADE 2: Se já estamos na última página e no final dos dados, apenas adicionar (instantâneo, sem requisição)
+    else if (isOnLastPage && isAtEndOfData) {
+      setTableData((prev) => [...prev, newRow as TableData]);
+      setPagination((prev) => ({
+        ...prev,
+        totalCount: (prev.totalCount || 0) + 1,
+        offset: prev.offset + 1, // Incrementa o offset final
+      }));
+    }
+    // ÚLTIMA OPÇÃO: Carregar última página agora (faz requisição)
+    else {
+      await loadLastPage();
+      // Adicionar a nova linha após carregar
+      setTableData((prev) => [...prev, newRow as TableData]);
+      setPagination((prev) => ({
+        ...prev,
+        totalCount: (prev.totalCount || 0) + 1,
+        offset: prev.offset + 1, // Incrementa o offset final
+      }));
+    }
 
     // Adicionar às mudanças pendentes
     setPendingChanges((prev) => ({
@@ -429,6 +708,20 @@ export function DatabaseSpreadsheet({
     }));
 
     setHasUnsavedChanges(true);
+
+    // Destacar a nova linha
+    setHighlightedRowId(newRow._id as string);
+    setTimeout(() => setHighlightedRowId(null), 3000);
+
+    // Fazer scroll até a nova linha após renderizar
+    setTimeout(() => {
+      if (tableContainerRef.current) {
+        tableContainerRef.current.scrollTo({
+          top: tableContainerRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
+      }
+    }, 100);
   };
 
   const handleDeleteSelectedRows = () => {
@@ -564,7 +857,13 @@ export function DatabaseSpreadsheet({
       setHasUnsavedChanges(false);
 
       // Recarregar dados da tabela para sincronizar (resetar paginação)
-      setPagination({ offset: 0, totalCount: 0, hasMore: false });
+      setPagination({
+        offset: 0,
+        startOffset: 0,
+        totalCount: 0,
+        hasMore: false,
+        hasMoreBefore: false,
+      });
       await loadTableData();
     } catch (error) {
       console.error('Erro ao salvar mudanças:', error);
@@ -1432,7 +1731,11 @@ export function DatabaseSpreadsheet({
                   >
                     <Button
                       variant="ghost"
-                      onClick={() => setSelectedTable(table)}
+                      onClick={() => {
+                        setSelectedTable(table);
+                        setLastPageLoaded(false);
+                        lastPageDataRef.current = null;
+                      }}
                       className={`flex-1 px-3 !py-1 rounded-md text-sm transition-colors ${
                         selectedTable === table
                           ? 'bg-white text-neutral-700 font-semibold '
@@ -1472,7 +1775,10 @@ export function DatabaseSpreadsheet({
                       >
                         Tabela
                       </Typography>
-                      <Typography variant="h2" className="text-neutral-600">
+                      <Typography
+                        variant="h2"
+                        className="text-neutral-600 text-xl"
+                      >
                         {selectedTable}
                       </Typography>
                     </div>
@@ -1483,13 +1789,16 @@ export function DatabaseSpreadsheet({
                     )}
                   </div>
                 )}
-                <div className="flex gap-4 items-center justify-end">
+                <div
+                  className="flex gap-4 items-center justify-end"
+                  style={{ zoom: 0.9 }}
+                >
                   {hasUnsavedChanges && (
                     <Button
                       type="button"
                       onClick={handleSaveChanges}
                       variant="gradient"
-                      bgHexColor="#70f051"
+                      // bgHexColor="#70f051"
                       disabled={loading}
                       className="gap-2 w-fit whitespace-nowrap"
                     >
@@ -1502,7 +1811,7 @@ export function DatabaseSpreadsheet({
                       type="button"
                       onClick={() => loadTableData()}
                       variant="gradient"
-                      bgHexColor="#65b8f4"
+                      // bgHexColor="#65b8f4"
                       disabled={loading}
                       className="gap-2 w-fit whitespace-nowrap"
                     >
@@ -1529,7 +1838,7 @@ export function DatabaseSpreadsheet({
                       type="button"
                       onClick={() => setShowAddColumnDialog(true)}
                       variant="gradient"
-                      bgHexColor="#8b5cf6"
+                      // bgHexColor="#8b5cf6"
                       className="gap-2 w-fit whitespace-nowrap"
                     >
                       <Plus className="w-4 h-4" />
@@ -1554,9 +1863,26 @@ export function DatabaseSpreadsheet({
 
               {selectedTable && tableSchema && (
                 <div
-                  className="flex-1 overflow-auto rounded-lg border-neutral-200 border"
+                  ref={tableContainerRef}
+                  className="flex-1 overflow-auto rounded-lg border-neutral-200 border relative"
                   onScroll={handleScroll}
                 >
+                  {/* Indicador de carregamento fixo no topo (visível independente do scroll horizontal) */}
+                  {loadingMoreBefore && (
+                    <div className="sticky top-0 left-0 right-0 z-30 bg-neutral-50 border-b border-neutral-200 p-4 flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-neutral-500" />
+                      <Typography
+                        variant="span"
+                        className="text-sm text-neutral-500"
+                      >
+                        Carregando registros anteriores... ({tableData.length} /{' '}
+                        {pagination.totalCount > 0
+                          ? pagination.totalCount
+                          : '?'}
+                        )
+                      </Typography>
+                    </div>
+                  )}
                   <table className="w-full border-collapse">
                     <thead className="bg-neutral-100 sticky top-0 z-10">
                       <tr className="bg-neutral-100 whitespace-nowrap">
@@ -1651,14 +1977,17 @@ export function DatabaseSpreadsheet({
                         const isSelected = selectedRows.some(
                           (r) => r.id === row._id,
                         );
+                        const isHighlighted = highlightedRowId === row._id;
                         return (
                           <tr
                             key={row._id}
-                            className={`cursor-pointer ${
+                            className={cn(
+                              'cursor-pointer transition-colors duration-300',
                               isSelected
                                 ? 'bg-neutral-100 hover:bg-neutral-100'
-                                : 'bg-white'
-                            }`}
+                                : 'bg-white',
+                              isHighlighted && 'bg-yellow-100 animate-pulse',
+                            )}
                             onClick={(e) => handleRowClick(e, index, row._id)}
                           >
                             <td className="border border-l-0 px-3">
@@ -1666,7 +1995,7 @@ export function DatabaseSpreadsheet({
                                 variant="span"
                                 className="text-sm text-neutral-600"
                               >
-                                {index + 1}
+                                {pagination.startOffset + index + 1}
                               </Typography>
                             </td>
                             {tableSchema.columns.map((col) => (
@@ -2023,7 +2352,7 @@ export function DatabaseSpreadsheet({
         closeButton={false}
         contentClassName="max-w-md h-fit"
       >
-        <div className="flex flex-col gap-6 p-6">
+        <div className="flex flex-col gap-6 p-6" style={{ zoom: 0.9 }}>
           <div className="flex flex-col gap-2">
             <Typography
               variant="h3"
