@@ -743,7 +743,9 @@ export function EditArrayDialog({
   // Inicializar array quando o dialog abrir
   useEffect(() => {
     if (isOpen) {
-      const items: ArrayItem[] = initialArray.map((item, index) => {
+      // Garantir que initialArray seja sempre um array válido
+      const safeArray = Array.isArray(initialArray) ? initialArray : [];
+      const items: ArrayItem[] = safeArray.map((item, index) => {
         const itemId = `item-${Date.now()}-${index}`;
         if (Array.isArray(item)) {
           return {

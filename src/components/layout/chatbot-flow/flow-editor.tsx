@@ -53,7 +53,16 @@ import {
   LoopConfig,
   CodeExecutionConfig,
 } from '../../layout/chatbot-flow/types';
-import { Save, Download, Upload, Plus, Play, Database, X } from 'lucide-react';
+import {
+  Save,
+  Download,
+  Upload,
+  Plus,
+  Play,
+  Database,
+  X,
+  Brain,
+} from 'lucide-react';
 import { ChatbotFlow } from '@/actions/chatbot-flows/flows';
 import { useUser } from '@/hooks/use-user';
 import { useCreateWorkflow, useUpdateWorkflow } from '@/lib/react-query/hooks';
@@ -71,6 +80,7 @@ import { LoopNodeConfig } from './nodes/loop-node/loop-node-config';
 import { CodeExecutionNodeConfig } from './nodes/code-execution-node/code-execution-node-config';
 import { ExecutionsPanel } from './executions-panel';
 import { DatabaseSpreadsheet } from '@/components/layout/database-spreadsheet/database-spreadsheet';
+import { FastMemorySpreadsheet } from '@/components/layout/fast-memory-spreadsheet';
 import { PlaywrightMcpNodeConfig } from './nodes/playwright-mcp-node/playwright-mcp-node-config';
 import { usePartialExecution } from '@/hooks/use-partial-execution';
 import { withExecuteButton } from './nodes/with-execute-button';
@@ -175,6 +185,7 @@ function FlowEditorContent() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isExecutionsPanelOpen, setIsExecutionsPanelOpen] = useState(false);
   const [isSpreadsheetOpen, setIsSpreadsheetOpen] = useState(false);
+  const [isMemorySpreadsheetOpen, setIsMemorySpreadsheetOpen] = useState(false);
   const [copiedNode, setCopiedNode] = useState<Node<NodeData> | null>(null);
   const [hasExecutionHighlight, setHasExecutionHighlight] = useState(false);
   const { user } = useUser();
@@ -1548,7 +1559,7 @@ function FlowEditorContent() {
             className="flex gap-2 p-4 !bg-transparent -translate-y-4 translate-x-4 rounded-bl-lg"
             style={panelTopRightStyle}
           >
-            <div className="flex gap-4 h-fit" style={{ zoom: 0.9 }}>
+            <div className="flex gap-2 h-fit" style={{ zoom: 0.9 }}>
               <Button
                 variant="gradient"
                 className="w-fit h-fit flex items-center justify-center gap-2"
@@ -1563,6 +1574,14 @@ function FlowEditorContent() {
                   Banco de dados
                 </Typography> */}
               </Button>
+              <Button
+                variant="gradient"
+                className="w-fit h-fit flex items-center justify-center gap-2"
+                onClick={() => setIsMemorySpreadsheetOpen(true)}
+                title="Memória Rápida"
+              >
+                <Brain className="w-4 h-4" />
+              </Button>
             </div>
           </Panel>
         </ReactFlow>
@@ -1573,6 +1592,11 @@ function FlowEditorContent() {
       <DatabaseSpreadsheet
         isOpen={isSpreadsheetOpen}
         onClose={() => setIsSpreadsheetOpen(false)}
+      />
+
+      <FastMemorySpreadsheet
+        isOpen={isMemorySpreadsheetOpen}
+        onClose={() => setIsMemorySpreadsheetOpen(false)}
       />
 
       {configDialogOpen && nodeToConfig?.type === 'message' && (

@@ -817,7 +817,14 @@ export function EditObjectDialog({
   // Inicializar pares quando o dialog abrir
   useEffect(() => {
     if (isOpen) {
-      const pairs: ObjectPair[] = Object.entries(initialObject).map(
+      // Garantir que initialObject sempre seja um objeto válido
+      const safeObject =
+        initialObject &&
+        typeof initialObject === 'object' &&
+        !Array.isArray(initialObject)
+          ? initialObject
+          : {};
+      const pairs: ObjectPair[] = Object.entries(safeObject).map(
         ([key, value], index) => {
           if (Array.isArray(value)) {
             return {
